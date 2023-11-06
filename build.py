@@ -36,7 +36,7 @@ def build():
         compiler_directives={
             "language_level": 3,
         },
-        annotate=True,
+        annotate=False,
     )
     distribution = Distribution({"ext_modules": ext_modules})
 
