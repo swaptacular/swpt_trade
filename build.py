@@ -20,7 +20,15 @@ def build():
             extra_link_args=link_args,
             include_dirs=include_dirs,
             libraries=libraries,
-        )
+        ),
+        Extension(
+            "*",
+            ["tests/*.pyx"],
+            extra_compile_args=compile_args,
+            extra_link_args=link_args,
+            include_dirs=include_dirs,
+            libraries=libraries,
+        ),
     ]
     ext_modules = cythonize(
         extensions,
