@@ -39,5 +39,5 @@ python-lsp-server = {extras = ["all"], version = "^1.7.2"}
 black = "^23.7.0"
 
 [build-system]
-requires = ["poetry-core", "setuptools", "cython"]
+requires = ["poetry-core", "setuptools", "cython ~= 3.0.5"]
 build-backend = "poetry.core.masonry.api"
