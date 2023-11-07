@@ -1,48 +1,38 @@
 #! /bin/env python
 import os
+import os.path
 import shutil
 from setuptools import Extension
 from setuptools.dist import Distribution
 from distutils.command.build_ext import build_ext
-
 from Cython.Build import cythonize
 
-compile_args = []
-link_args = []
-include_dirs = []
-libraries = []
+COMPILE_ARGS = []
+LINK_ARGS = []
+INCLUDE_DIRS = []
+LIBRARIES = []
 
 
 def build():
+    kwargs = {
+        "extra_compile_args": COMPILE_ARGS,
+        "extra_link_args": LINK_ARGS,
+        "include_dirs": INCLUDE_DIRS,
+        "libraries": LIBRARIES,
+    }
     extensions = [
-        Extension(
-            "*",
-            ["swpt_trade/*.pyx"],
-            extra_compile_args=compile_args,
-            extra_link_args=link_args,
-            include_dirs=include_dirs,
-            libraries=libraries,
-        ),
-        Extension(
-            "*",
-            ["tests/*.pyx"],
-            extra_compile_args=compile_args,
-            extra_link_args=link_args,
-            include_dirs=include_dirs,
-            libraries=libraries,
-        ),
+        Extension("*", ["swpt_trade/*.pyx"], **kwargs),
+        Extension("*", ["tests/*.pyx"], **kwargs),
     ]
     ext_modules = cythonize(
         extensions,
-        include_path=include_dirs,
+        include_path=INCLUDE_DIRS,
         compiler_directives={
             "language_level": 3,
         },
         annotate=False,
     )
-    distribution = Distribution({"ext_modules": ext_modules})
-
-    cmd = build_ext(distribution)
+    cmd = build_ext(Distribution({"ext_modules": ext_modules}))
     cmd.ensure_finalized()
     cmd.run()
 
@@ -56,4 +46,5 @@ def build():
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(__file__))
     build()
