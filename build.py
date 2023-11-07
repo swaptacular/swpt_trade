@@ -1,3 +1,4 @@
+#! /bin/env python
 import os
 import shutil
 from setuptools import Extension
