@@ -34,7 +34,7 @@ cdef extern from *:
     typedef long long i64;
     typedef std::unordered_map<long long, void*> voidmap;
 
-    void* lookup_node(voidmap *map, i64 node_id) {
+    inline void* lookup_node(voidmap *map, i64 node_id) {
         try {
             return map->at(node_id);
         } catch (const std::out_of_range& oor) {
