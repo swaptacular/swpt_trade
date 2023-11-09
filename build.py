@@ -30,6 +30,7 @@ def build():
         compiler_directives={
             "language_level": 3,
         },
+        annotate=True,
     )
     cmd = build_ext(Distribution({"ext_modules": ext_modules}))
     cmd.ensure_finalized()
