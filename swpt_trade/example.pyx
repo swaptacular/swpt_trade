@@ -44,19 +44,12 @@ cdef extern from *:
     """
     cdef void* lookup_node(voidmap*, i64)
 
-    cdef Node* get_debtor(nodemap* debtors_map, i64 debtor_id) noexcept:
-        return <Node*>lookup_node(<voidmap*>debtors_map, debtor_id)
+    cdef Node* add_node(nodemap* nodes_map, Node* node_ptr) except +:
+        deref(nodes_map)[node_ptr.id] = node_ptr
+        return node_ptr
 
-    cdef Node* add_debtor(nodemap* debtors_map, Node* debtor) except +:
-        deref(debtors_map)[debtor.id] = debtor
-        return debtor
-
-    cdef Node* get_creditor(nodemap* creditors_map, i64 creditor_id) noexcept:
-        return <Node*>lookup_node(<voidmap*>creditors_map, creditor_id)
-
-    cdef Node* add_creditor(nodemap* creditors_map, Node* creditor) except +:
-        deref(creditors)[creditor.id] = creditor
-        return creditor
+    cdef Node* get_node(nodemap* nodes_map, i64 node_id) noexcept:
+        return <Node*>lookup_node(<voidmap*>nodes_map, node_id)
 
     cdef Arc* add_arc(Node* node, Arc arc) except +:
         node.arcs.push_back(arc)
@@ -72,10 +65,10 @@ cpdef double dist((double, double) point1, (double, double) point2):
     return math.sqrt(x + y)
 
 cdef double mysum(double x, double y):
-    get_debtor(debtors, 1)
+    get_node(debtors, 1)
     cdef Node n = Node(1, vector[Arc](), 0.0, False)
-    add_debtor(debtors, &n)
-    n_ptr = get_debtor(debtors ,1)
+    add_node(debtors, &n)
+    n_ptr = get_node(debtors ,1)
     if n_ptr == NULL:
         print('not found')
     else:
