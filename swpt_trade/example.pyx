@@ -2,40 +2,56 @@
 
 from libcpp.vector cimport vector
 from libcpp.unordered_map cimport unordered_map
-from libc.stdlib cimport malloc, free
 from cython.operator cimport dereference as deref
 import math
-
-ctypedef long long i64
-ctypedef unordered_map[i64, Node*] nodemap
-ctypedef unordered_map[i64, void*] voidmap
-
-
-cdef struct Node:
-    i64 id
-    vector[Arc] arcs
-    double min_amount
-    bint visited
-
-
-cdef struct Arc:
-    Node* node_ptr
-    double amount
-
-
-cdef nodemap* debtors = new nodemap()
-cdef nodemap* creditors = new nodemap()
-
 
 cdef extern from *:
     """
     #include <unordered_map>
+    #include <vector>
     #include <stdexcept>
 
     typedef long long i64;
-    typedef std::unordered_map<long long, void*> voidmap;
 
-    inline void* lookup_node(voidmap *map, i64 node_id) {
+    class Node;
+
+    class Arc {
+    public:
+      Node* node_ptr;
+      double amount;
+
+      Arc() {}
+      Arc(Node* node_ptr, double amount) {
+        node_ptr = node_ptr;
+        amount = amount;
+      }
+      Arc(const Arc& other) {
+        node_ptr = other.node_ptr;
+        amount = other.amount;
+      }
+      ~Arc() {}
+    };
+
+    class Node {
+    public:
+      i64 id;
+      std::vector<Arc> arcs;
+      double min_amount;
+      int flags;
+
+      Node() {}
+      Node(i64 id, std::vector<Arc> arcs, double min_amount, int flags) {
+        id = id;
+        arcs = arcs;
+        min_amount = min_amount;
+        flags = flags;
+      }
+      ~Node() {}
+    };
+
+    typedef std::unordered_map<i64, Node*> nodemap;
+
+    inline Node* lookup_node(nodemap *map, i64 node_id) {
         try {
             return map->at(node_id);
         } catch (const std::out_of_range& oor) {
@@ -43,21 +59,45 @@ cdef extern from *:
         }
     }
     """
-    cdef void* lookup_node(voidmap*, i64)
+    ctypedef long long i64
 
-    cdef Node* add_node(nodemap* nodes_map, Node* node_ptr) except +:
-        deref(nodes_map)[node_ptr.id] = node_ptr
-        return node_ptr
+    cdef cppclass Arc:
+        Node* node_ptr
+        double amount
+        Arc() except +
+        Arc(Node*, double) except +
+        Arc(const Arc&) except +
 
-    cdef Node* get_node(nodemap* nodes_map, i64 node_id) noexcept:
-        return <Node*>lookup_node(<voidmap*>nodes_map, node_id)
+    cdef cppclass Node:
+        i64 id
+        vector[Arc] arcs
+        double min_amount
+        int flags
+        Node() except +
+        Node(i64, vector[Arc], double, int) except +
 
-    cdef Arc* add_arc(Node* node, Arc arc) except +:
-        node.arcs.push_back(arc)
-        return &arc
+    ctypedef unordered_map[i64, Node*] nodemap
 
-    cdef Arc* get_arc(Node* node, size_t index) except +:
-        return &node.arcs.at(index)
+    cdef Node* lookup_node(nodemap*, i64)
+
+
+cdef Node* add_node(nodemap* nodes_map, Node* node_ptr) except +:
+    deref(nodes_map)[node_ptr.id] = node_ptr
+    return node_ptr
+
+cdef Node* get_node(nodemap* nodes_map, i64 node_id) noexcept:
+    return lookup_node(nodes_map, node_id)
+
+cdef Arc* add_arc(Node* node, Arc arc) except +:
+    node.arcs.push_back(arc)
+    return &arc
+
+cdef Arc* get_arc(Node* node, size_t index) except +:
+    return &node.arcs.at(index)
+
+
+cdef nodemap* debtors = new nodemap()
+cdef nodemap* creditors = new nodemap()
 
 
 cdef class Digraph:
@@ -77,11 +117,7 @@ cdef class Digraph:
         cdef Node* node_ptr
         cdef Node* creditor_ptr = get_node(self.creditors, creditor_id)
         if creditor_ptr == NULL:
-            node_ptr = <Node*>malloc(sizeof(Node))
-            node_ptr.id = creditor_id
-            node_ptr.arcs = vector[Arc]()
-            node_ptr.min_amount = 0.0
-            node_ptr.visited = False
+            node_ptr = new Node(creditor_id, vector[Arc](), 0.0, 0)
             creditor_ptr = add_node(self.creditors, node_ptr)
 
         add_arc(debtor_ptr, Arc(creditor_ptr, amount))
@@ -129,8 +165,7 @@ cpdef double dist((double, double) point1, (double, double) point2):
 
 cdef double mysum(double x, double y):
     get_node(debtors, 1)
-    cdef Node n = Node(1, vector[Arc](), 0.0, False)
-    add_node(debtors, &n)
+    add_node(debtors, new Node(1, vector[Arc](), 0.0, False))
     n_ptr = get_node(debtors ,1)
     if n_ptr == NULL:
         print('not found')
