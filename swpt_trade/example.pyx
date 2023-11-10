@@ -1,10 +1,5 @@
 # distutils: language = c++
 
-from libcpp.vector cimport vector
-from libcpp.unordered_map cimport unordered_map
-from cython.operator cimport dereference as deref
-import math
-
 cdef extern from *:
     """
     #include <unordered_map>
@@ -163,12 +158,6 @@ cdef class Digraph:
 
 cdef NodeRegistry debtors
 cdef NodeRegistry creditors
-
-
-cpdef double dist((double, double) point1, (double, double) point2):
-    cdef double x = (point1[0] - point2[0]) ** 2
-    cdef double y = (point1[1] - point2[1]) ** 2
-    return math.sqrt(x + y)
 
 
 cdef double mysum(double x, double y):
