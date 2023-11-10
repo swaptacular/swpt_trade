@@ -15,7 +15,7 @@ cdef class Digraph:
 
         cdef Node* creditor_ptr = self.creditors.get_node(creditor_id)
         if creditor_ptr == NULL:
-            creditor_ptr = creditors.create_node(creditor_id, 0.0, 0)
+            creditor_ptr = self.creditors.create_node(creditor_id, 0.0, 0)
 
         creditor_ptr.add_arc(debtor_ptr, amount)
 
@@ -53,19 +53,3 @@ cdef class Digraph:
         #         del self._vmap[v]
         #     except KeyError:
         #         pass
-
-
-cdef NodeRegistry debtors
-cdef NodeRegistry creditors
-
-
-cdef double mysum(double x, double y):
-    debtors.get_node(1)
-    debtors.create_node(1, 0.0, 0)
-    n_ptr = debtors.get_node(1)
-    if n_ptr == NULL:
-        print('not found')
-    else:
-        print(n_ptr.id)
-
-    return x + y

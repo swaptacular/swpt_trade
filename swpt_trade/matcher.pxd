@@ -99,6 +99,3 @@ cdef extern from *:
         NodeRegistry() except +
         Node* create_node(i64, double, nodeflags) except +
         Node* get_node(i64) noexcept
-
-
-cdef double mysum(double x, double y)
