@@ -12,6 +12,7 @@ cdef extern from *:
     #include <stdexcept>
 
     typedef long long i64;
+    typedef unsigned int nodeflags;
 
     class Node;
 
@@ -20,107 +21,109 @@ cdef extern from *:
       Node* node_ptr;
       double amount;
 
-      Arc() {}
+      Arc() {
+        node_ptr = NULL;
+        amount = 0.0;
+      }
       Arc(Node* node_ptr, double amount) {
-        node_ptr = node_ptr;
-        amount = amount;
+        this->node_ptr = node_ptr;
+        this->amount = amount;
       }
       Arc(const Arc& other) {
         node_ptr = other.node_ptr;
         amount = other.amount;
       }
-      ~Arc() {}
     };
 
     class Node {
-    public:
-      i64 id;
+    private:
       std::vector<Arc> arcs;
-      double min_amount;
-      int flags;
 
-      Node() {}
-      Node(i64 id, std::vector<Arc> arcs, double min_amount, int flags) {
-        id = id;
-        arcs = arcs;
-        min_amount = min_amount;
-        flags = flags;
+    public:
+      const i64 id;
+      const double min_amount;
+      nodeflags flags;
+
+      Node(i64 id, double min_amount, nodeflags flags)
+          : id(id), min_amount(min_amount) {
+        this->flags = flags;
       }
-      ~Node() {}
+      unsigned int arcs_count() {
+        return arcs.size();
+      }
+      Arc& add_arc(Node* node_ptr, double amount) {
+        arcs.push_back(Arc(node_ptr, amount));
+        return arcs.back();
+      }
+      Arc& get_arc(size_t index) {
+        return arcs.at(index);
+      }
     };
 
-    typedef std::unordered_map<i64, Node*> nodemap;
+    class NodeRegistry {
+    private:
+      std::unordered_map<i64, Node*> map;
 
-    inline Node* lookup_node(nodemap *map, i64 node_id) {
+    public:
+      ~NodeRegistry() {
+        for (auto pair = map.begin(); pair != map.end(); ++pair) {
+          delete pair->second;
+        }
+      }
+      Node* create_node(i64 id, double min_amount, nodeflags flags) {
+        return map[id] = new Node(id, min_amount, flags);
+      }
+      Node* get_node(i64 id) {
         try {
-            return map->at(node_id);
+            return map.at(id);
         } catch (const std::out_of_range& oor) {
             return NULL;
         }
-    }
+      }
+    };
     """
     ctypedef long long i64
+    ctypedef unsigned int nodeflags
 
     cdef cppclass Arc:
         Node* node_ptr
         double amount
-        Arc() except +
         Arc(Node*, double) except +
         Arc(const Arc&) except +
 
     cdef cppclass Node:
-        i64 id
-        vector[Arc] arcs
-        double min_amount
-        int flags
-        Node() except +
-        Node(i64, vector[Arc], double, int) except +
+        const i64 id
+        const double min_amount
+        nodeflags flags
+        Node(i64, double, nodeflags) except +
+        unsigned int arcs_count() noexcept
+        Arc& add_arc(Node*, double) except +
+        Arc& get_arc(size_t) except +
 
-    ctypedef unordered_map[i64, Node*] nodemap
-
-    cdef Node* lookup_node(nodemap*, i64)
-
-
-cdef Node* add_node(nodemap* nodes_map, Node* node_ptr) except +:
-    deref(nodes_map)[node_ptr.id] = node_ptr
-    return node_ptr
-
-cdef Node* get_node(nodemap* nodes_map, i64 node_id) noexcept:
-    return lookup_node(nodes_map, node_id)
-
-cdef Arc* add_arc(Node* node, Arc arc) except +:
-    node.arcs.push_back(arc)
-    return &arc
-
-cdef Arc* get_arc(Node* node, size_t index) except +:
-    return &node.arcs.at(index)
-
-
-cdef nodemap* debtors = new nodemap()
-cdef nodemap* creditors = new nodemap()
+    cdef cppclass NodeRegistry:
+        NodeRegistry() except +
+        Node* create_node(i64, double, nodeflags) except +
+        Node* get_node(i64) noexcept
 
 
 cdef class Digraph:
-    cdef nodemap* debtors
-    cdef nodemap* creditors
+    cdef NodeRegistry debtors
+    cdef NodeRegistry creditors
 
     def __cinit__(self):
-        self.debtors = new nodemap()
-        self.creditors = new nodemap()
+        pass
         # self._vmap = {ROOT_VERTEX: []}
 
     cdef void add_supply(self, i64 debtor_id, double amount, i64 creditor_id):
-        cdef Node* debtor_ptr = get_node(self.debtors, debtor_id)
+        cdef Node* debtor_ptr = self.debtors.get_node(debtor_id)
         if debtor_ptr == NULL:
             raise RuntimeError("invalid debtor node")
 
-        cdef Node* node_ptr
-        cdef Node* creditor_ptr = get_node(self.creditors, creditor_id)
+        cdef Node* creditor_ptr = self.creditors.get_node(creditor_id)
         if creditor_ptr == NULL:
-            node_ptr = new Node(creditor_id, vector[Arc](), 0.0, 0)
-            creditor_ptr = add_node(self.creditors, node_ptr)
+            creditor_ptr = creditors.create_node(creditor_id, 0.0, 0)
 
-        add_arc(debtor_ptr, Arc(creditor_ptr, amount))
+        creditor_ptr.add_arc(debtor_ptr, amount)
 
         # assert v is not None
         # assert v != ROOT_VERTEX
@@ -158,15 +161,20 @@ cdef class Digraph:
         #         pass
 
 
+cdef NodeRegistry debtors
+cdef NodeRegistry creditors
+
+
 cpdef double dist((double, double) point1, (double, double) point2):
     cdef double x = (point1[0] - point2[0]) ** 2
     cdef double y = (point1[1] - point2[1]) ** 2
     return math.sqrt(x + y)
 
+
 cdef double mysum(double x, double y):
-    get_node(debtors, 1)
-    add_node(debtors, new Node(1, vector[Arc](), 0.0, False))
-    n_ptr = get_node(debtors ,1)
+    debtors.get_node(1)
+    debtors.create_node(1, 0.0, 0)
+    n_ptr = debtors.get_node(1)
     if n_ptr == NULL:
         print('not found')
     else:
