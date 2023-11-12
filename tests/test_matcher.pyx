@@ -26,7 +26,7 @@ def test_node():
     assert node != NULL
     assert node.id == 1
     assert node.min_amount == 100.0
-    assert node.flags == 3
+    assert node.status == 3
     assert node.arcs_count() == 0
 
     with pytest.raises(IndexError):
@@ -65,7 +65,7 @@ def test_node_registry():
     assert node_ptr != NULL
     assert node_ptr.id == 1
     assert node_ptr.min_amount == 100.0
-    assert node_ptr.flags == 3
+    assert node_ptr.status == 3
 
 
 @cytest

@@ -11,7 +11,7 @@ cdef extern from *:
     #include <limits>
 
     typedef long long i64;
-    typedef unsigned int nodeflags;
+    typedef size_t nodestatus;
     const double INF_AMOUNT = std::numeric_limits<double>::infinity();
 
     class Node;
@@ -38,11 +38,11 @@ cdef extern from *:
     public:
       const i64 id;
       const double min_amount;
-      nodeflags flags;
+      nodestatus status;
 
-      Node(i64 id, double min_amount, nodeflags flags)
+      Node(i64 id, double min_amount, nodestatus status)
           : id(id), min_amount(min_amount) {
-        this->flags = flags;
+        this->status = status;
       }
       unsigned int arcs_count() {
         return arcs.size();
@@ -66,8 +66,8 @@ cdef extern from *:
           delete pair->second;
         }
       }
-      Node* create_node(i64 id, double min_amount, nodeflags flags) {
-        return map[id] = new Node(id, min_amount, flags);
+      Node* create_node(i64 id, double min_amount, nodestatus status) {
+        return map[id] = new Node(id, min_amount, status);
       }
       Node* get_node(i64 id) {
         try {
@@ -80,7 +80,7 @@ cdef extern from *:
     #endif
     """
     ctypedef long long i64
-    ctypedef unsigned int nodeflags
+    ctypedef unsigned int nodestatus
     cdef double INF_AMOUNT
 
     cdef cppclass Arc:
@@ -92,15 +92,15 @@ cdef extern from *:
     cdef cppclass Node:
         const i64 id
         const double min_amount
-        nodeflags flags
-        Node(i64, double, nodeflags) except +
+        nodestatus status
+        Node(i64, double, nodestatus) except +
         unsigned int arcs_count() noexcept
         Arc& add_arc(Node*, double) except +
         Arc& get_arc(size_t) except +
 
     cdef cppclass NodeRegistry:
         NodeRegistry() except +
-        Node* create_node(i64, double, nodeflags) except +
+        Node* create_node(i64, double, nodestatus) except +
         Node* get_node(i64) noexcept
 
 

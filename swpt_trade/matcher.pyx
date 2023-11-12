@@ -1,14 +1,14 @@
 # distutils: language = c++
 
-cdef nodeflags CURRENCY_FLAGS_DEFAULT = 0
-cdef nodeflags TRADER_FLAGS_DEFAULT = 0
+cdef nodestatus CURRENCY_STATUS_DEFAULT = 0
+cdef nodestatus TRADER_STATUS_DEFAULT = 0
 cdef i64 ROOT_TRADER_ID = 0
 
 
 cdef class Digraph:
     def __cinit__(self):
         self.root_trader = self.traders.create_node(
-            ROOT_TRADER_ID, 0.0, TRADER_FLAGS_DEFAULT
+            ROOT_TRADER_ID, 0.0, TRADER_STATUS_DEFAULT
         )
 
     def add_currency(self, i64 currency_id, double min_amount):
@@ -18,7 +18,7 @@ cdef class Digraph:
             raise RuntimeError("invalid min_amount")
 
         currency = self.currencies.create_node(
-            currency_id, min_amount, CURRENCY_FLAGS_DEFAULT
+            currency_id, min_amount, CURRENCY_STATUS_DEFAULT
         )
         self.root_trader.add_arc(currency, INF_AMOUNT)
 
@@ -38,6 +38,6 @@ cdef class Digraph:
         trader = self.traders.get_node(trader_id)
         if trader == NULL:
             trader = self.traders.create_node(
-                trader_id, 0.0, TRADER_FLAGS_DEFAULT
+                trader_id, 0.0, TRADER_STATUS_DEFAULT
             )
         return currency, trader
