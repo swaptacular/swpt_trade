@@ -1,8 +1,9 @@
 # distutils: language = c++
 
 import pytest
+import math
 from . import cytest
-from swpt_trade.matcher cimport Arc, Node, NodeRegistry
+from swpt_trade.matcher cimport Arc, Node, NodeRegistry, Digraph
 
 
 @cytest
@@ -60,3 +61,53 @@ def test_node_registry():
     assert node_ptr.id == 1
     assert node_ptr.min_amount == 100.0
     assert node_ptr.flags == 3
+
+
+@cytest
+def test_construct_digraph():
+    g = Digraph()
+    cdef Node* root = g.root_creditor
+    assert root != NULL
+    assert root.arcs_count() == 0
+
+    with pytest.raises(RuntimeError):
+        g.add_supply(100.0, 666, 2)
+
+    with pytest.raises(RuntimeError):
+        g.add_demand(1, 100.0, 666)
+
+    assert root.arcs_count() == 0
+    g.add_debtor(666, 100.0)
+    assert root.arcs_count() == 1
+
+    with pytest.raises(RuntimeError):
+        g.add_debtor(666, 100.0)
+
+    g.add_supply(1000.0, 666, 1)
+    g.add_supply(2000.0, 666, 2)
+    g.add_demand(2, 500.0, 666)
+
+    assert root.id == 0
+    assert root.min_amount == 0.0
+    assert root.arcs_count() == 1
+    cdef Arc* arc = &root.get_arc(0)
+    assert math.isinf(arc.amount)
+
+    debtor = arc.node_ptr
+    assert debtor.id == 666
+    assert debtor.min_amount == 100.0
+    assert debtor.arcs_count() == 2
+
+    cdef Arc* a0 = &debtor.get_arc(0)
+    assert a0.node_ptr.id == 1
+    assert a0.node_ptr.arcs_count() == 0
+    assert a0.amount == 1000.0
+
+    cdef Arc* a1 = &debtor.get_arc(1)
+    assert a1.node_ptr.id == 2
+    assert a1.node_ptr.arcs_count() == 1
+    assert a1.amount == 2000.0
+
+    cdef Arc* creditor1_arc = &a1.node_ptr.get_arc(0)
+    assert creditor1_arc.node_ptr.id == 666
+    assert creditor1_arc.amount == 500.0

@@ -8,9 +8,11 @@ cdef extern from *:
     #include <unordered_map>
     #include <vector>
     #include <stdexcept>
+    #include <limits>
 
     typedef long long i64;
     typedef unsigned int nodeflags;
+    const double infinity = std::numeric_limits<double>::infinity();
 
     class Node;
 
@@ -79,6 +81,7 @@ cdef extern from *:
     """
     ctypedef long long i64
     ctypedef unsigned int nodeflags
+    cdef double infinity
 
     cdef cppclass Arc:
         Node* node_ptr
@@ -99,3 +102,11 @@ cdef extern from *:
         NodeRegistry() except +
         Node* create_node(i64, double, nodeflags) except +
         Node* get_node(i64) noexcept
+
+
+cdef class Digraph:
+    cdef NodeRegistry debtors
+    cdef NodeRegistry creditors
+    cdef Node* root_creditor
+    cdef (Node*, Node*) ensure_nodes(self, i64 debtor_id, i64 creditor_id)
+
