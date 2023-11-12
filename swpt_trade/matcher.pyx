@@ -19,14 +19,14 @@ cdef class Digraph:
         self.root_creditor.add_arc(debtor, infinity)
 
     def add_supply(self, double amount, i64 currency, i64 seller):
-        debtor, creditor = self.ensure_nodes(currency, seller)
+        debtor, creditor = self._ensure_nodes(currency, seller)
         debtor.add_arc(creditor, amount)
 
     def add_demand(self, i64 buyer, double amount, i64 currency):
-        debtor, creditor = self.ensure_nodes(currency, buyer)
+        debtor, creditor = self._ensure_nodes(currency, buyer)
         creditor.add_arc(debtor, amount)
 
-    cdef (Node*, Node*) ensure_nodes(self, i64 debtor_id, i64 creditor_id):
+    cdef (Node*, Node*) _ensure_nodes(self, i64 debtor_id, i64 creditor_id):
         debtor = self.debtors.get_node(debtor_id)
         if debtor == NULL:
             raise RuntimeError("invalid debtor node")

@@ -108,5 +108,5 @@ cdef class Digraph:
     cdef NodeRegistry debtors
     cdef NodeRegistry creditors
     cdef Node* root_creditor
-    cdef (Node*, Node*) ensure_nodes(self, i64 debtor_id, i64 creditor_id)
+    cdef (Node*, Node*) _ensure_nodes(self, i64 debtor_id, i64 creditor_id)
 
