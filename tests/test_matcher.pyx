@@ -58,10 +58,10 @@ def test_node():
 
 @cytest
 def test_node_registry():
-    cdef NodeRegistry debtors
-    assert debtors.get_node(1) == NULL
-    assert debtors.create_node(1, 100.0, 3) != NULL
-    node_ptr = debtors.get_node(1)
+    cdef NodeRegistry nodes
+    assert nodes.get_node(1) == NULL
+    assert nodes.create_node(1, 100.0, 3) != NULL
+    node_ptr = nodes.get_node(1)
     assert node_ptr != NULL
     assert node_ptr.id == 1
     assert node_ptr.min_amount == 100.0
@@ -71,7 +71,7 @@ def test_node_registry():
 @cytest
 def test_construct_digraph():
     g = Digraph()
-    cdef Node* root = g.root_creditor
+    cdef Node* root = g.root_trader
     assert root != NULL
     assert root.arcs_count() == 0
 
@@ -82,11 +82,11 @@ def test_construct_digraph():
         g.add_demand(1, 100.0, 666)
 
     assert root.arcs_count() == 0
-    g.add_debtor(666, 100.0)
+    g.add_currency(666, 100.0)
     assert root.arcs_count() == 1
 
     with pytest.raises(RuntimeError):
-        g.add_debtor(666, 100.0)
+        g.add_currency(666, 100.0)
 
     g.add_supply(1000.0, 666, 1)
     g.add_supply(2000.0, 666, 2)
@@ -98,21 +98,21 @@ def test_construct_digraph():
     cdef Arc* arc = &root.get_arc(0)
     assert math.isinf(arc.amount)
 
-    debtor = arc.node_ptr
-    assert debtor.id == 666
-    assert debtor.min_amount == 100.0
-    assert debtor.arcs_count() == 2
+    currency = arc.node_ptr
+    assert currency.id == 666
+    assert currency.min_amount == 100.0
+    assert currency.arcs_count() == 2
 
-    cdef Arc* a0 = &debtor.get_arc(0)
+    cdef Arc* a0 = &currency.get_arc(0)
     assert a0.node_ptr.id == 1
     assert a0.node_ptr.arcs_count() == 0
     assert a0.amount == 1000.0
 
-    cdef Arc* a1 = &debtor.get_arc(1)
+    cdef Arc* a1 = &currency.get_arc(1)
     assert a1.node_ptr.id == 2
     assert a1.node_ptr.arcs_count() == 1
     assert a1.amount == 2000.0
 
-    cdef Arc* creditor1_arc = &a1.node_ptr.get_arc(0)
-    assert creditor1_arc.node_ptr.id == 666
-    assert creditor1_arc.amount == 500.0
+    cdef Arc* trader1_arc = &a1.node_ptr.get_arc(0)
+    assert trader1_arc.node_ptr.id == 666
+    assert trader1_arc.amount == 500.0

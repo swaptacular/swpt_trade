@@ -105,8 +105,8 @@ cdef extern from *:
 
 
 cdef class Digraph:
-    cdef NodeRegistry debtors
-    cdef NodeRegistry creditors
-    cdef Node* root_creditor
-    cdef (Node*, Node*) _ensure_nodes(self, i64 debtor_id, i64 creditor_id)
+    cdef NodeRegistry currencies
+    cdef NodeRegistry traders
+    cdef Node* root_trader
+    cdef (Node*, Node*) _ensure_nodes(self, i64, i64)
 

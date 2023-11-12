@@ -1,39 +1,41 @@
 # distutils: language = c++
 
-cdef nodeflags FLG_D_DEFAULT = 0
-cdef nodeflags FLG_C_DEFAULT = 0
-cdef i64 ROOT_CREDITOR_ID = 0
+cdef nodeflags CURRENCY_FLAGS_DEFAULT = 0
+cdef nodeflags TRADER_FLAGS_DEFAULT = 0
+cdef i64 ROOT_TRADER_ID = 0
 
 
 cdef class Digraph:
     def __cinit__(self):
-        self.root_creditor = self.creditors.create_node(
-            ROOT_CREDITOR_ID, 0.0, FLG_C_DEFAULT
+        self.root_trader = self.traders.create_node(
+            ROOT_TRADER_ID, 0.0, TRADER_FLAGS_DEFAULT
         )
 
-    def add_debtor(self, i64 debtor_id, double min_amount):
-        if self.debtors.get_node(debtor_id) != NULL:
-            raise RuntimeError("duplicated debtor node")
+    def add_currency(self, i64 currency_id, double min_amount):
+        if self.currencies.get_node(currency_id) != NULL:
+            raise RuntimeError("duplicated currency")
 
-        debtor = self.debtors.create_node(debtor_id, min_amount, FLG_D_DEFAULT)
-        self.root_creditor.add_arc(debtor, INF_AMOUNT)
+        currency = self.currencies.create_node(
+            currency_id, min_amount, CURRENCY_FLAGS_DEFAULT
+        )
+        self.root_trader.add_arc(currency, INF_AMOUNT)
 
-    def add_supply(self, double amount, i64 currency, i64 seller):
-        debtor, creditor = self._ensure_nodes(currency, seller)
-        debtor.add_arc(creditor, amount)
+    def add_supply(self, double amount, i64 currency_id, i64 seller_id):
+        currency, seller = self._ensure_nodes(currency_id, seller_id)
+        currency.add_arc(seller, amount)
 
-    def add_demand(self, i64 buyer, double amount, i64 currency):
-        debtor, creditor = self._ensure_nodes(currency, buyer)
-        creditor.add_arc(debtor, amount)
+    def add_demand(self, i64 buyer_id, double amount, i64 currency_id):
+        currency, buyer = self._ensure_nodes(currency_id, buyer_id)
+        buyer.add_arc(currency, amount)
 
-    cdef (Node*, Node*) _ensure_nodes(self, i64 debtor_id, i64 creditor_id):
-        debtor = self.debtors.get_node(debtor_id)
-        if debtor == NULL:
-            raise RuntimeError("invalid debtor node")
+    cdef (Node*, Node*) _ensure_nodes(self, i64 currency_id, i64 trader_id):
+        currency = self.currencies.get_node(currency_id)
+        if currency == NULL:
+            raise RuntimeError("invalid currency")
 
-        creditor = self.creditors.get_node(creditor_id)
-        if creditor == NULL:
-            creditor = self.creditors.create_node(
-                creditor_id, 0.0, FLG_C_DEFAULT
+        trader = self.traders.get_node(trader_id)
+        if trader == NULL:
+            trader = self.traders.create_node(
+                trader_id, 0.0, TRADER_FLAGS_DEFAULT
             )
-        return debtor, creditor
+        return currency, trader
