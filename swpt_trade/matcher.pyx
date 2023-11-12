@@ -14,6 +14,8 @@ cdef class Digraph:
     def add_currency(self, i64 currency_id, double min_amount):
         if self.currencies.get_node(currency_id) != NULL:
             raise RuntimeError("duplicated currency")
+        if min_amount <= 0.0:
+            raise RuntimeError("invalid min_amount")
 
         currency = self.currencies.create_node(
             currency_id, min_amount, CURRENCY_FLAGS_DEFAULT
