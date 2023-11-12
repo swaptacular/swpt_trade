@@ -16,7 +16,7 @@ cdef class Digraph:
             raise RuntimeError("duplicated debtor node")
 
         debtor = self.debtors.create_node(debtor_id, min_amount, FLG_D_DEFAULT)
-        self.root_creditor.add_arc(debtor, infinity)
+        self.root_creditor.add_arc(debtor, INF_AMOUNT)
 
     def add_supply(self, double amount, i64 currency, i64 seller):
         debtor, creditor = self._ensure_nodes(currency, seller)

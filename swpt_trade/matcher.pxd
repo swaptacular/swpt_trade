@@ -12,7 +12,7 @@ cdef extern from *:
 
     typedef long long i64;
     typedef unsigned int nodeflags;
-    const double infinity = std::numeric_limits<double>::infinity();
+    const double INF_AMOUNT = std::numeric_limits<double>::infinity();
 
     class Node;
 
@@ -81,7 +81,7 @@ cdef extern from *:
     """
     ctypedef long long i64
     ctypedef unsigned int nodeflags
-    cdef double infinity
+    cdef double INF_AMOUNT
 
     cdef cppclass Arc:
         Node* node_ptr

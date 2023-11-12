@@ -3,12 +3,12 @@
 import pytest
 import math
 from . import cytest
-from swpt_trade.matcher cimport Arc, Node, NodeRegistry, Digraph, infinity
+from swpt_trade.matcher cimport Arc, Node, NodeRegistry, Digraph, INF_AMOUNT
 
 
 @cytest
 def test_infinity():
-    assert infinity == math.inf
+    assert INF_AMOUNT == math.inf
 
 
 @cytest
