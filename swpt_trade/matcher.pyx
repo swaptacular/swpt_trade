@@ -79,7 +79,7 @@ cdef class Digraph:
         # TODO
         pass
 
-    cdef void _traverse(self):
+    cdef Node* _traverse(self):
         cdef Node* current_node
         cdef Node* next_node
         cdef size_t arcs_count
@@ -118,11 +118,15 @@ cdef class Digraph:
                 continue
 
             if next_node.status & NODE_PATH_FLAG:
-                # TODO: Found a cycle
-                return
+                # We've got a cycle!
+                current_node.status = next_arc_index << 1
+                return next_node
 
             current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
             path.push_back(next_node)
+
+        # There are no cycles.
+        return NULL
 
     cdef bool _is_pristine(self) noexcept:
         return (
