@@ -62,7 +62,7 @@ cdef class Digraph:
         if not self._is_pristine():
             return RuntimeError("The graph traversal has already started.")
         if seller_id == ROOT_TRADER_ID:
-            return RuntimeError("invalid trader ID")
+            return RuntimeError("invalid seller ID")
 
         currency, seller = self._ensure_nodes(currency_id, seller_id)
         currency.add_arc(seller, amount)
