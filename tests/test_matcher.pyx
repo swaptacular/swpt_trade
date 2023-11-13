@@ -71,7 +71,7 @@ def test_node_registry():
 @cytest
 def test_construct_digraph():
     g = Digraph()
-    cdef Node* root = g.root_trader
+    cdef Node* root = g.path.back()
     assert root != NULL
     assert root.arcs_count() == 0
 

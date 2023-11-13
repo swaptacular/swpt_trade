@@ -1,4 +1,6 @@
 # distutils: language = c++
+from libcpp cimport bool
+from libcpp.vector cimport vector
 
 cdef extern from *:
     """
@@ -107,6 +109,6 @@ cdef extern from *:
 cdef class Digraph:
     cdef NodeRegistry currencies
     cdef NodeRegistry traders
-    cdef Node* root_trader
-    cdef (Node*, Node*) _ensure_nodes(self, i64, i64)
-
+    cdef vector[Node*] path
+    cdef inline (Node*, Node*) _ensure_nodes(self, i64, i64)
+    cdef inline bool _is_pristine(self) noexcept
