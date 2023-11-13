@@ -74,6 +74,7 @@ def test_construct_digraph():
     cdef Node* root = g.path.back()
     assert root != NULL
     assert root.arcs_count() == 0
+    assert root.status == 1
 
     with pytest.raises(RuntimeError):
         g.add_supply(100.0, 666, 2)

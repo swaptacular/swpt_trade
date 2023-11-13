@@ -1,17 +1,47 @@
 # distutils: language = c++
 
-cdef nodestatus NODE_INITIAL_STATUS = 0
+# To ensure that we will traverse all the nodes in the graph, we
+# create an artificial node called "the root trader", which wants to
+# buy infinite amounts of all existing currencies. The traversal of
+# the graph always starts from the root trader.
 cdef i64 ROOT_TRADER_ID = 0
+
+# The node's status is a "size_t" word (64 bits on 64-bit machines, 32
+# bits on 32-bit machines), which contains two pieces of information:
+#
+# 1) The index of the currently traversed arc.
+# 2) A flag indicating that the node participates in the currently
+#    traversed path.
+#
+# The word's least significant bit holds the flag, and the highest 63
+# bits hold the index:
+#
+#   63    62    61   .  .  .  .  .  .  .  .  3     2     1     0
+# +---------------------------------------------------------+-----+
+# |                                                         |     |
+# |                    index (63 bits)                      |1 bit|
+# |                                                         |flag |
+# +---------------------------------------------------------+-----+
+#
+# Initially, all status bits are zeroed (index = 0, flag = 0).
+cdef nodestatus NODE_INITIAL_STATUS = 0
+cdef nodestatus ROOT_INITIAL_STATUS = 1
 
 
 cdef class Digraph:
     def __cinit__(self):
         root_trader = self.traders.create_node(
-            ROOT_TRADER_ID, 0.0, NODE_INITIAL_STATUS
+            ROOT_TRADER_ID, 0.0, ROOT_INITIAL_STATUS
         )
         self.path.push_back(root_trader)
 
     def add_currency(self, i64 currency_id, double min_amount):
+        """Declares a currency.
+
+        All arranged trades in this currency will be for amounts
+        greater of equal than the specified `min_amount`. Possible
+        trades for lesser amounts will be ignored.
+        """
         if not self._is_pristine():
             return RuntimeError("invalid state")
         if self.currencies.get_node(currency_id) != NULL:
@@ -22,9 +52,13 @@ cdef class Digraph:
         currency = self.currencies.create_node(
             currency_id, min_amount, NODE_INITIAL_STATUS
         )
-        self.path.back().add_arc(currency, INF_AMOUNT)
+        root_trader = self.path.back()
+        root_trader.add_arc(currency, INF_AMOUNT)
 
     def add_supply(self, double amount, i64 currency_id, i64 seller_id):
+        """Declares that a given seller wants to sell a given amount
+        of a given currency.
+        """
         if not self._is_pristine():
             return RuntimeError("invalid state")
 
@@ -32,6 +66,9 @@ cdef class Digraph:
         currency.add_arc(seller, amount)
 
     def add_demand(self, i64 buyer_id, double amount, i64 currency_id):
+        """Declares that a given buyer wants to buy a given amount of
+        a given currency.
+        """
         if not self._is_pristine():
             return RuntimeError("invalid state")
 
@@ -45,7 +82,7 @@ cdef class Digraph:
     cdef bool _is_pristine(self) noexcept:
         return (
             self.path.size() == 1
-            and self.path[0].status == NODE_INITIAL_STATUS
+            and self.path[0].status == ROOT_INITIAL_STATUS
         )
 
     cdef (Node*, Node*) _ensure_nodes(self, i64 currency_id, i64 trader_id):
