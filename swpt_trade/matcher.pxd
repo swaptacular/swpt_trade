@@ -46,7 +46,7 @@ cdef extern from *:
           : id(id), min_amount(min_amount) {
         this->status = status;
       }
-      unsigned int arcs_count() {
+      size_t arcs_count() {
         return arcs.size();
       }
       Arc& add_arc(Node* node_ptr, double amount) {
@@ -82,7 +82,7 @@ cdef extern from *:
     #endif
     """
     ctypedef long long i64
-    ctypedef unsigned int nodestatus
+    ctypedef size_t nodestatus
     cdef double INF_AMOUNT
 
     cdef cppclass Arc:
@@ -96,7 +96,7 @@ cdef extern from *:
         const double min_amount
         nodestatus status
         Node(i64, double, nodestatus) except +
-        unsigned int arcs_count() noexcept
+        size_t arcs_count() noexcept
         Arc& add_arc(Node*, double) except +
         Arc& get_arc(size_t) except +
 
@@ -112,3 +112,4 @@ cdef class Digraph:
     cdef vector[Node*] path
     cdef (Node*, Node*) _ensure_nodes(self, i64, i64)
     cdef inline bool _is_pristine(self) noexcept
+    cdef inline void _find_path(self)
