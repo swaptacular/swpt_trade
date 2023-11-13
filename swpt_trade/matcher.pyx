@@ -91,15 +91,15 @@ cdef class Digraph:
             current_node = path.back()
             arcs_count = current_node.arcs_count()
             next_arc_index = current_node.status >> 1
-            next_node = NULL
 
             if current_node.status & NODE_PATH_FLAG:
                 # The fact that we see a node that participates in the
                 # traversal path again, means that the arc that we
-                # followed the last time turned out to be a dead end.
-                # Therefore we must skip it.
+                # followed the previous time turned out to be a dead
+                # end. Therefore we must skip it.
                 next_arc_index += 1
 
+            next_node = NULL
             while next_node == NULL and next_arc_index < arcs_count:
                 next_arc = &current_node.get_arc(next_arc_index)
                 if (
