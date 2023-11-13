@@ -79,7 +79,7 @@ cdef class Digraph:
         # TODO
         pass
 
-    cdef Node* _traverse(self):
+    cdef bool _find_cylce(self):
         cdef Node* current_node
         cdef Node* next_node
         cdef size_t arcs_count
@@ -100,7 +100,7 @@ cdef class Digraph:
                 # Therefore we must skip it.
                 next_arc_index += 1
 
-            while next_arc_index < arcs_count:
+            while next_node == NULL and next_arc_index < arcs_count:
                 next_arc = &current_node.get_arc(next_arc_index)
                 if (
                     next_arc.amount < current_node.min_amount
@@ -120,13 +120,13 @@ cdef class Digraph:
             if next_node.status & NODE_PATH_FLAG:
                 # We've got a cycle!
                 current_node.status = next_arc_index << 1
-                return next_node
+                return True
 
             current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
             path.push_back(next_node)
 
         # There are no cycles.
-        return NULL
+        return False
 
     cdef bool _is_pristine(self) noexcept:
         return (

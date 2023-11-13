@@ -112,4 +112,4 @@ cdef class Digraph:
     cdef vector[Node*] path
     cdef inline (Node*, Node*) _ensure_nodes(self, i64, i64)
     cdef inline bool _is_pristine(self) noexcept
-    cdef Node* _traverse(self)
+    cdef bool _find_cylce(self)
