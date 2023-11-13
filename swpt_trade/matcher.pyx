@@ -61,6 +61,8 @@ cdef class Digraph:
         """
         if not self._is_pristine():
             return RuntimeError("The graph traversal has already started.")
+        if seller_id == ROOT_TRADER_ID:
+            return RuntimeError("invalid trader ID")
 
         currency, seller = self._ensure_nodes(currency_id, seller_id)
         currency.add_arc(seller, amount)
@@ -107,7 +109,7 @@ cdef class Digraph:
                 ):
                     next_node = next_arc.node_ptr
                     break
-                next_arc_index += 1  # The arc is invalid. Skip it.
+                next_arc_index += 1  # Invalid arc. Skip it.
 
             if next_node == NULL:
                 # The current node is a dead end.
