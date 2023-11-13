@@ -89,40 +89,38 @@ cdef class Digraph:
         while self.path.size() > 0:
             current_node = self.path.back()
             arcs_count = current_node.arcs_count()
-            next_arc_index = current_node.status >> 1
-
-            if current_node.status & NODE_PATH_FLAG:
-                # The fact that we see a node that participates in the
-                # traversal path again, means that the arc that we
-                # followed the previous time turned out to be a dead
-                # end. Therefore we must skip it.
-                next_arc_index += 1
-
+            next_arc_index = (
+                (current_node.status >> 1)
+                # If the "path" flag of the current node is set, this
+                # means that the arc that we followed turned out to be
+                # a dead end. Therefore, now we must skip it.
+                + (current_node.status & NODE_PATH_FLAG)
+            )
             next_node = NULL
-            while next_node == NULL and next_arc_index < arcs_count:
+
+            while next_arc_index < arcs_count:
                 next_arc = &current_node.get_arc(next_arc_index)
+                amount = next_arc.amount
                 if (
-                    next_arc.amount < current_node.min_amount
-                    or next_arc.amount < next_arc.node_ptr.min_amount
+                    amount >= current_node.min_amount
+                    and amount >= next_arc.node_ptr.min_amount
                 ):
-                    # This arc is bogus. Skip it.
-                    next_arc_index += 1
-                    continue
-                next_node = next_arc.node_ptr
+                    next_node = next_arc.node_ptr
+                    break
+                next_arc_index += 1  # The arc is invalid. Skip it.
 
             if next_node == NULL:
-                # Remove the current node from the path.
+                # The current node is a dead end.
                 current_node.status = next_arc_index << 1
                 self.path.pop_back()
-                continue
-
-            if next_node.status & NODE_PATH_FLAG:
+            elif next_node.status & NODE_PATH_FLAG == 0:
+                # We follow the arc, moving to the next node.
+                current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
+                self.path.push_back(next_node)
+            else:
                 # We've got a cycle!
                 current_node.status = next_arc_index << 1
                 return True
-
-            current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
-            self.path.push_back(next_node)
 
         # There are no cycles.
         return False
