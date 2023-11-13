@@ -79,16 +79,15 @@ cdef class Digraph:
         # TODO
         pass
 
-    cdef bool _find_cylce(self):
+    cdef bool _find_cylce(self) except? False:
         cdef Node* current_node
         cdef Node* next_node
         cdef size_t arcs_count
         cdef size_t next_arc_index
         cdef Arc* next_arc
-        cdef vector[Node*] path = self.path
 
-        while path.size() > 0:
-            current_node = path.back()
+        while self.path.size() > 0:
+            current_node = self.path.back()
             arcs_count = current_node.arcs_count()
             next_arc_index = current_node.status >> 1
 
@@ -114,7 +113,7 @@ cdef class Digraph:
             if next_node == NULL:
                 # Remove the current node from the path.
                 current_node.status = next_arc_index << 1
-                path.pop_back()
+                self.path.pop_back()
                 continue
 
             if next_node.status & NODE_PATH_FLAG:
@@ -123,7 +122,7 @@ cdef class Digraph:
                 return True
 
             current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
-            path.push_back(next_node)
+            self.path.push_back(next_node)
 
         # There are no cycles.
         return False
