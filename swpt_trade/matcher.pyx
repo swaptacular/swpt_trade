@@ -87,6 +87,7 @@ cdef class Digraph:
         cdef size_t arcs_count
         cdef size_t next_arc_index
         cdef Arc* next_arc
+        cdef size_t node_path_flag = NODE_PATH_FLAG
 
         while self.path.size() > 0:
             current_node = self.path.back()
@@ -96,7 +97,7 @@ cdef class Digraph:
                 # If the "path" flag of the current node is set, this
                 # means that the arc that we followed turned out to be
                 # a dead end. Therefore, now we must skip it.
-                + (current_node.status & NODE_PATH_FLAG)
+                + (current_node.status & node_path_flag)
             )
             next_node = NULL
 
@@ -115,9 +116,9 @@ cdef class Digraph:
                 # The current node is a dead end.
                 current_node.status = next_arc_index << 1
                 self.path.pop_back()
-            elif next_node.status & NODE_PATH_FLAG == 0:
+            elif next_node.status & node_path_flag == 0:
                 # We follow the arc, moving to the next node.
-                current_node.status = (next_arc_index << 1) | NODE_PATH_FLAG
+                current_node.status = (next_arc_index << 1) | node_path_flag
                 self.path.push_back(next_node)
             else:
                 # We've got a cycle!
