@@ -110,5 +110,5 @@ cdef class Digraph:
     cdef NodeRegistry currencies
     cdef NodeRegistry traders
     cdef vector[Node*] path
-    cdef inline (Node*, Node*) _ensure_nodes(self, i64, i64)
+    cdef (Node*, Node*) _ensure_nodes(self, i64, i64)
     cdef inline bool _is_pristine(self) noexcept
