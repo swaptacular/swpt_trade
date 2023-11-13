@@ -79,7 +79,7 @@ cdef class Digraph:
         # TODO
         pass
 
-    cdef void _find_path(self):
+    cdef void _traverse(self):
         cdef Node* current_node
         cdef Node* next_node
         cdef size_t arcs_count
