@@ -25,13 +25,12 @@ cdef i64 ROOT_TRADER_ID = 0
 #
 # Initially, all status bits are zeroed (index = 0, flag = 0).
 cdef nodestatus NODE_INITIAL_STATUS = 0
-cdef nodestatus ROOT_INITIAL_STATUS = 1
 
 
 cdef class Digraph:
     def __cinit__(self):
         root_trader = self.traders.create_node(
-            ROOT_TRADER_ID, 0.0, ROOT_INITIAL_STATUS
+            ROOT_TRADER_ID, 0.0, NODE_INITIAL_STATUS
         )
         self.path.push_back(root_trader)
 
@@ -43,7 +42,7 @@ cdef class Digraph:
         trades for lesser amounts will be ignored.
         """
         if not self._is_pristine():
-            return RuntimeError("invalid state")
+            return RuntimeError("The graph traversal has already started.")
         if self.currencies.get_node(currency_id) != NULL:
             raise RuntimeError("duplicated currency")
         if min_amount <= 0.0:
@@ -60,7 +59,7 @@ cdef class Digraph:
         of a given currency.
         """
         if not self._is_pristine():
-            return RuntimeError("invalid state")
+            return RuntimeError("The graph traversal has already started.")
 
         currency, seller = self._ensure_nodes(currency_id, seller_id)
         currency.add_arc(seller, amount)
@@ -70,19 +69,21 @@ cdef class Digraph:
         a given currency.
         """
         if not self._is_pristine():
-            return RuntimeError("invalid state")
+            return RuntimeError("The graph traversal has already started.")
 
         currency, buyer = self._ensure_nodes(currency_id, buyer_id)
         buyer.add_arc(currency, amount)
 
     def find_cycle(self):
+        if self._is_pristine():
+            self.path[0].status = 1
+
         # TODO
-        pass
 
     cdef bool _is_pristine(self) noexcept:
         return (
             self.path.size() == 1
-            and self.path[0].status == ROOT_INITIAL_STATUS
+            and self.path[0].status == NODE_INITIAL_STATUS
         )
 
     cdef (Node*, Node*) _ensure_nodes(self, i64 currency_id, i64 trader_id):
