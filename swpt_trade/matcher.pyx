@@ -81,7 +81,7 @@ cdef class Digraph:
         # TODO
         pass
 
-    cdef bool _find_cylce(self) except? False:
+    cdef bool _find_cycle(self) except? False:
         cdef Node* current_node
         cdef Node* next_node
         cdef size_t arcs_count
