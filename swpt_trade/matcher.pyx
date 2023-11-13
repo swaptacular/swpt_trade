@@ -87,7 +87,7 @@ cdef class Digraph:
         cdef size_t arcs_count
         cdef size_t next_arc_index
         cdef Arc* next_arc
-        cdef size_t path_flag = NODE_PATH_FLAG
+        cdef nodestatus path_flag = NODE_PATH_FLAG
 
         while self.path.size() > 0:
             current_node = self.path.back()
