@@ -51,7 +51,7 @@ cdef class Digraph:
         currency = self.currencies.create_node(
             currency_id, min_amount, NODE_INITIAL_STATUS
         )
-        root_trader = self.path.back()
+        root_trader = self.path.front()
         root_trader.add_arc(currency, INF_AMOUNT)
 
     def add_supply(self, double amount, i64 currency_id, i64 seller_id):
