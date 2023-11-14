@@ -151,7 +151,7 @@ def test_digraph_value_errors():
 
 
 @cytest
-def test_digraph_find_no_cylcle():
+def test_digraph_find_no_cylcles():
     g = Digraph()
     g.add_currency(666, 100.0)
     g.add_currency(999, 50.0)
