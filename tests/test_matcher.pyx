@@ -77,17 +77,17 @@ def test_construct_digraph():
     assert root.arcs_count() == 0
     assert root.status == 0
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         g.add_supply(100.0, 666, 2)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         g.add_demand(1, 100.0, 666)
 
     assert root.arcs_count() == 0
     g.add_currency(666, 100.0)
     assert root.arcs_count() == 1
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         g.add_currency(666, 100.0)
 
     g.add_supply(1000.0, 666, 1)
@@ -118,3 +118,33 @@ def test_construct_digraph():
     cdef Arc* trader1_arc = &a1.node_ptr.get_arc(0)
     assert trader1_arc.node_ptr.id == 666
     assert trader1_arc.amount == 500.0
+
+
+@cytest
+def test_digraph_value_errors():
+    g = Digraph()
+    huge_int = 1234567890123456789012345
+
+    for params in [
+        (huge_int, 100.0),
+        (666, -1.0),
+        (666, math.nan),
+    ]:
+        with pytest.raises((ValueError, OverflowError)):
+            g.add_currency(*params)
+
+    g.add_currency(666, 100.0)
+
+    for params in [
+        (0.0, huge_int, 1),
+        (0.0, 666, huge_int),
+    ]:
+        with pytest.raises((ValueError, OverflowError)):
+            g.add_supply(*params)
+
+    for params in [
+        (1, 0.0, huge_int),
+        (huge_int, 0.0, 666),
+    ]:
+        with pytest.raises((ValueError, OverflowError)):
+            g.add_demand(*params)

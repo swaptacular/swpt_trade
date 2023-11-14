@@ -45,9 +45,9 @@ cdef class Digraph:
         if not self._is_pristine():
             return RuntimeError("The graph traversal has already started.")
         if self.currencies.get_node(currency_id) != NULL:
-            raise RuntimeError("duplicated currency")
-        if min_amount <= 0.0:
-            raise RuntimeError("invalid min_amount")
+            raise ValueError("duplicated currency")
+        if not min_amount > 0.0:
+            raise ValueError("invalid min_amount")
 
         currency = self.currencies.create_node(
             currency_id, min_amount, NODE_INITIAL_STATUS
@@ -62,7 +62,7 @@ cdef class Digraph:
         if not self._is_pristine():
             return RuntimeError("The graph traversal has already started.")
         if seller_id == ROOT_TRADER_ID:
-            return RuntimeError("invalid seller ID")
+            return ValueError("invalid seller ID")
 
         currency, seller = self._ensure_nodes(currency_id, seller_id)
         currency.add_arc(seller, amount)
@@ -137,7 +137,7 @@ cdef class Digraph:
     cdef (Node*, Node*) _ensure_nodes(self, i64 currency_id, i64 trader_id):
         currency = self.currencies.get_node(currency_id)
         if currency == NULL:
-            raise RuntimeError("invalid currency")
+            raise ValueError("invalid currency")
 
         trader = self.traders.get_node(trader_id)
         if trader == NULL:
