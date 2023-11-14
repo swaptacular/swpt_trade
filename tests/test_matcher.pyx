@@ -148,3 +148,47 @@ def test_digraph_value_errors():
     ]:
         with pytest.raises((ValueError, OverflowError)):
             g.add_demand(*params)
+
+
+@cytest
+def test_digraph_find_no_cylcle():
+    g = Digraph()
+    g.add_currency(666, 100.0)
+    g.add_currency(999, 50.0)
+    g.add_supply(1000.0, 666, 1)
+    g.add_supply(2000.0, 999, 3)
+    g.add_demand(2, 500.0, 666)
+    g.add_demand(1, 10.0, 666)  # too small
+    g.add_demand(3, 250.0, 666)
+    assert not g._find_cycle()
+    assert g.path.size() == 0
+
+    with pytest.raises(RuntimeError):
+        g.add_demand(1, 5000.0, 999)
+
+
+@cytest
+def test_digraph_find_one_cylcle():
+    g = Digraph()
+    g.add_currency(666, 100.0)
+    g.add_currency(999, 50.0)
+
+    g.add_demand(1, 1000.0, 666)
+    g.add_demand(3, 2000.0, 999)
+
+    g.add_supply(500.0, 666, 2)
+    g.add_supply(10.0, 666, 1)  # too small
+    g.add_supply(250.0, 666, 3)
+    g.add_supply(5000.0, 999, 1)
+
+    assert g._find_cycle()
+    assert g.path.size() == 5
+    assert g.path.back().id == 1
+
+    # the cycle:
+    assert g.traders.get_node(1).status == 0b000
+    assert g.currencies.get_node(999).status == 0b001
+    assert g.traders.get_node(3).status == 0b001
+    assert g.currencies.get_node(666).status == 0b101
+
+    assert g.traders.get_node(2).status == 0b000
