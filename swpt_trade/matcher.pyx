@@ -110,6 +110,10 @@ cdef class Digraph:
 
         >>> graph.find_cycle()
         None
+
+        Once a `None` has been returned, next calls to `find_cycle()`
+        will also return `None`. This means that all possible trading
+        cycles have been exhausted.
         """
         if self._find_cycle():
             return self._process_cycle()
