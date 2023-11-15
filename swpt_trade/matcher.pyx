@@ -1,8 +1,6 @@
 # distutils: language = c++
 from libcpp.vector cimport vector
 from cpython cimport array
-from collections.abc import Sequence
-from typing import Optional
 
 # To ensure that we will traverse all the nodes in the graph, we
 # create an artificial node called "the root trader", which wants to
@@ -81,19 +79,21 @@ cdef class Digraph:
         currency, buyer = self._ensure_nodes(currency_id, buyer_id)
         buyer.add_arc(currency, amount)
 
-    def find_cycle(self) -> Optional[tuple[float, Sequence[int]]]:
+    def find_cycle(self):
         """Try to find a trading cycle in the graph.
 
-        When a cycle has been found, returns an (amount, node_ids)
-        tuple. Otherwise returns `None`. The amount will always be
-        positive (could be `math.inf`). The returned sequence of node
-        IDs will consist of alternating currency IDs and trader IDs,
-        but the first element in the sequence will always be a
-        currency ID. (The number of elements in the sequence will
-        always be even.)
+        Returns an (amount, node_ids_sequence) tuple when a cycle has
+        been found; otherwise returns `None`. The amount will always
+        be a positive float (it could be `math.inf` though). The
+        returned sequence of node IDs will consist of alternating
+        currency IDs and trader IDs, and the first element in the
+        sequence will always be a currency ID. The total number of
+        elements in the sequence will always be even. For example:
 
-        For example, if the function returns (10.0, [101, 1, 102, 2]),
-        this means that:
+        >>> graph.find_cycle()
+        (10.0, array('q', [101, 1, 102, 2]))
+
+        means that:
 
         1. The trader with ID `1` should receive 10.0 tokens of the
            `101` currency, and should give 10.0 tokens of the `102`
@@ -108,7 +108,7 @@ cdef class Digraph:
 
         return None
 
-    def _process_cycle(self) -> tuple[float, Sequence[int]]:
+    def _process_cycle(self):
         cdef Node* current_node = self.path.back()
         cdef size_t offset = 1 if current_node.min_amount > 0.0 else 0
         cdef size_t arc_index = current_node.status >> 1
