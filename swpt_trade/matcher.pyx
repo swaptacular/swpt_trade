@@ -1,4 +1,8 @@
 # distutils: language = c++
+from libcpp.vector cimport vector
+from cpython cimport array
+from collections.abc import Sequence
+from typing import Optional
 
 # To ensure that we will traverse all the nodes in the graph, we
 # create an artificial node called "the root trader", which wants to
@@ -77,9 +81,71 @@ cdef class Digraph:
         currency, buyer = self._ensure_nodes(currency_id, buyer_id)
         buyer.add_arc(currency, amount)
 
-    def find_cycle(self):
-        # TODO
-        pass
+    def find_cycle(self) -> Optional[tuple[float, Sequence[int]]]:
+        """Try to find a trading cycle in the graph.
+
+        When a cycle has been found, returns an (amount, node_ids)
+        tuple. Otherwise returns `None`. The amount will always be
+        positive (could be `math.inf`). The returned sequence of node
+        IDs will consist of alternating currency IDs and trader IDs,
+        but the first element in the sequence will always be a
+        currency ID. (The number of elements in the sequence will
+        always be even.)
+
+        For example, if the function returns (10.0, [101, 1, 102, 2]),
+        this means that:
+
+        1. The trader with ID `1` should receive 10.0 tokens of the
+           `101` currency, and should give 10.0 tokens of the `102`
+           currency.
+
+        2. The trader with ID `2` should receive 10.0 tokens of the
+           `102` currency, and should give 10.0 tokens of the `101`
+           currency.
+        """
+        if self._find_cycle():
+            return self._process_cycle()
+
+        return None
+
+    def _process_cycle(self) -> tuple[float, Sequence[int]]:
+        cdef Node* current_node = self.path.back()
+        cdef size_t offset = 1 if current_node.min_amount > 0.0 else 0
+        cdef size_t arc_index = current_node.status >> 1
+        cdef Node* last_node = current_node.get_arc(arc_index).node_ptr
+        cdef vector[Arc*] arcs
+        arcs.reserve(1000)
+
+        cdef Arc* arc
+        cdef double cycle_amount = INF_AMOUNT
+
+        while True:
+            arc = &current_node.get_arc(arc_index)
+            arcs.push_back(arc)
+
+            if arc.amount < cycle_amount:
+                cycle_amount = arc.amount
+
+            if current_node == last_node:
+                break
+
+            self.path.pop_back()
+            current_node = self.path.back()
+            arc_index = current_node.status >> 1
+            current_node.status = arc_index << 1  # Clears the "path" flag.
+
+        cdef size_t cycle_length  = arcs.size()
+        cdef array.array cycle_array = array.array('q')
+        array.resize(cycle_array, cycle_length)
+        cdef i64[:] ca = cycle_array
+        cdef size_t i
+
+        for i in range(cycle_length):
+            arc = arcs[i]
+            arc.amount -= cycle_amount
+            ca[(i + offset) % cycle_length] = arc.node_ptr.id
+
+        return cycle_amount, cycle_array
 
     cdef bool _find_cycle(self) except? False:
         cdef Node* current_node

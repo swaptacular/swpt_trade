@@ -192,3 +192,29 @@ def test_digraph_find_one_cylcle():
     assert g.currencies.get_node(666).status == 0b101
 
     assert g.traders.get_node(2).status == 0b000
+
+    amount, cycle = g._process_cycle()
+    assert amount == 250.0
+    assert list(cycle) == [666, 1, 999, 3]
+
+
+@cytest
+def test_digraph_cylcles():
+    g = Digraph()
+    g.add_currency(666, 100.0)
+    g.add_currency(999, 50.0)
+
+    g.add_demand(1, 1000.0, 666)
+    g.add_demand(3, 2000.0, 999)
+
+    g.add_supply(500.0, 666, 2)
+    g.add_supply(10.0, 666, 1)  # too small
+    g.add_supply(250.0, 666, 3)
+    g.add_supply(5000.0, 999, 1)
+
+    amount, cycle = g.find_cycle()
+    assert amount == 250.0
+    assert list(cycle) in [[666, 1, 999, 3], [999, 3, 666, 1]]
+
+    assert g.find_cycle() is None
+    assert g.find_cycle() is None
