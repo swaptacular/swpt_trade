@@ -120,6 +120,12 @@ cdef class Digraph:
 
         return None
 
+    def cycles(self):
+        """Iterate over all trading cycles in the graph.
+        """
+        while cycle := self.find_cycle():
+            yield cycle
+
     cdef object _process_cycle(self):
         cdef Node* current_node = self.path.back()
         cdef size_t offset = 1 if current_node.min_amount > 0.0 else 0
