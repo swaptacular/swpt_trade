@@ -102,6 +102,14 @@ cdef class Digraph:
         2. The trader with ID `2` should receive 10.0 tokens of the
            `102` currency, and should give 10.0 tokens of the `101`
            currency.
+
+        Note that this method modifies the graph, so that next calls
+        to `graph.find_cycle()` will yield another trading cycle, or
+        no cycle. For example, the result of calling `find_cycle()`
+        again may be:
+
+        >>> graph.find_cycle()
+        None
         """
         if self._find_cycle():
             return self._process_cycle()
