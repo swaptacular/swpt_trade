@@ -2,6 +2,7 @@
 
 import pytest
 import math
+import array
 from . import cytest
 from swpt_trade.matcher cimport Arc, Node, NodeRegistry, Digraph, INF_AMOUNT
 
@@ -213,6 +214,8 @@ def test_digraph_cylcles():
     g.add_supply(5000.0, 999, 1)
 
     amount, cycle = g.find_cycle()
+    assert isinstance(amount, float)
+    assert isinstance(cycle, array.array)
     assert amount == 250.0
     assert list(cycle) in [[666, 1, 999, 3], [999, 3, 666, 1]]
 

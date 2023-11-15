@@ -108,7 +108,7 @@ cdef class Digraph:
 
         return None
 
-    def _process_cycle(self):
+    cdef object _process_cycle(self):
         cdef Node* current_node = self.path.back()
         cdef size_t offset = 1 if current_node.min_amount > 0.0 else 0
         cdef size_t arc_index = current_node.status >> 1
