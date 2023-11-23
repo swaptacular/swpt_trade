@@ -7,7 +7,7 @@ from setuptools.dist import Distribution
 from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
 
-COMPILE_ARGS = []
+COMPILE_ARGS = ['-O3']
 LINK_ARGS = []
 INCLUDE_DIRS = []
 LIBRARIES = []

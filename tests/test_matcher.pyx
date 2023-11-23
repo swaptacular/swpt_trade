@@ -221,3 +221,96 @@ def test_digraph_cylcles():
 
     assert g.find_cycle() is None
     assert g.find_cycle() is None
+
+
+@pytest.mark.skip('performance test')
+@cytest
+def test_random_matches():
+    import random
+    import time
+    from collections import namedtuple
+
+    Currency = namedtuple("Currency", "id location")
+
+    ################################
+    # Graph generation parameters: #
+    ################################
+
+    # The processing time increases almost linearly with the increase
+    # of `traders_count`. 1 million traders with 5 million offers are
+    # processed for approximately 10 seconds on a 3GHz machine.
+    traders_count = 1000000
+
+    # When `traders_count` is fixed, the processing time increases
+    # linearly with the increase of `offers_count`.
+    offers_count = 5 * traders_count
+
+    # Increasing the `currencies_count` increases the processing time,
+    # but not by more than a few times.
+    currencies_count = traders_count // 50
+
+    # Decreasing the buyers/sellers ratio decreases the processing
+    # time; and increasing the buyers/sellers ratio increases the
+    # processing time.
+    additional_sellers_to_buyers_ratio = 1 / 10
+
+    # When `avg_sell_amount` and `avg_sell_amount` are increased
+    # (compared to 1.0 which is the chosen currency `min_amount`), the
+    # processing time also increases, but more and more slowly.
+    avg_sell_amount = 100.0
+    avg_buy_amount = avg_sell_amount
+
+    # The processing time seems to not be significantly affected by
+    # changes in `locality_distance`.
+    locality_distance = min(traders_count, 10000)
+
+    assert traders_count >= 2
+    assert currencies_count >= 2
+    random.seed(1)
+    lambd_sell = 1 / avg_sell_amount
+    lambd_buy = 1 / avg_buy_amount
+    traders_list = [trader_id for trader_id in range(1, traders_count + 1)]
+    currencies_list = [
+        Currency(currency_id, random.randrange(traders_count))
+        for currency_id in range(10000000001, currencies_count + 10000000001)
+    ]
+
+    graph = Digraph()
+    for currency_id, _ in currencies_list:
+        graph.add_currency(currency_id, 1.0)
+
+    # Add one buy offer and one sell offer for each trader.
+    for trader_id in traders_list:
+        buy_currency = random.choice(currencies_list)
+        buy_amount = random.expovariate(lambd_buy)
+        sell_currency = random.choice(currencies_list)
+        sell_amount = random.expovariate(lambd_sell)
+        graph.add_supply(sell_amount, sell_currency.id, trader_id)
+        graph.add_demand(trader_id, buy_amount, buy_currency.id)
+
+    # Add additional buy/sell offers to reach `offers_count`.
+    for _ in range(offers_count - 2 * traders_count):
+        currency = random.choice(currencies_list)
+        trader_location = (
+            currency.location
+            + random.randrange(locality_distance)
+        )
+        trader_id = traders_list[trader_location % traders_count]
+        r = additional_sellers_to_buyers_ratio
+        if random.random() < r / (r + 1):
+            # Add a seller.
+            amount = random.expovariate(lambd_sell)
+            graph.add_supply(amount, currency.id, trader_id)
+        else:
+            # Add a buyer.
+            amount = random.expovariate(lambd_buy)
+            graph.add_demand(trader_id, amount, currency.id)
+
+    zero_time = time.time()
+    performed_deals = 0
+    cleared_amount = 0
+    for amount, nodes in graph.cycles():
+        performed_deals += 1
+        cleared_amount += (amount * len(nodes) // 2)
+
+    print(performed_deals, cleared_amount, time.time() - zero_time)
