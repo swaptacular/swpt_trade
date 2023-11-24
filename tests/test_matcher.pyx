@@ -223,6 +223,31 @@ def test_digraph_cylcles():
     assert g.find_cycle() is None
 
 
+@cytest
+def test_digraph_overlapping_cylcles():
+    g = Digraph()
+    g.add_currency(101, 50.0)
+    g.add_currency(102, 50.0)
+    g.add_currency(103, 50.0)
+
+    g.add_demand(1, 1000.0, 103)
+    g.add_demand(2, 1000.0, 103)
+    g.add_demand(3, 1000.0, 101)
+    g.add_demand(4, 300.0, 102)
+
+    g.add_supply(1000.0, 101, 1)
+    g.add_supply(50.0, 102, 2)
+    g.add_supply(1000.0, 102, 3)
+    g.add_supply(100.0, 101, 4)
+    g.add_supply(200.0, 103, 4)
+
+    deals = list(g.cycles())
+    deals.sort(key=lambda t: t[0])
+    assert len(deals) == 3
+    assert [amt for amt, nodes_ in deals] == [50.0, 100.0, 150.0]
+    assert [len(nodes) for amt, nodes in deals] == [4, 4, 6]
+
+
 @pytest.mark.skip('performance test')
 @cytest
 def test_random_matches():
