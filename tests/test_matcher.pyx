@@ -82,7 +82,7 @@ def test_construct_digraph():
         g.add_supply(100.0, 666, 2)
 
     with pytest.raises(ValueError):
-        g.add_demand(1, 100.0, 666)
+        g.add_demand(100.0, 666, 1)
 
     with pytest.raises(ValueError):
         g.get_min_amount(666)
@@ -97,7 +97,7 @@ def test_construct_digraph():
 
     g.add_supply(1000.0, 666, 1)
     g.add_supply(2000.0, 666, 2)
-    g.add_demand(2, 500.0, 666)
+    g.add_demand(500.0, 666, 2)
 
     assert root.id == 0
     assert root.min_amount == 0.0
@@ -148,8 +148,8 @@ def test_digraph_value_errors():
             g.add_supply(*params)
 
     for params in [
-        (1, 0.0, huge_int),
-        (huge_int, 0.0, 666),
+        (0.0, huge_int, 1),
+        (0.0, 666, huge_int),
     ]:
         with pytest.raises((ValueError, OverflowError)):
             g.add_demand(*params)
@@ -162,14 +162,14 @@ def test_digraph_find_no_cylcles():
     g.add_currency(999, 50.0)
     g.add_supply(1000.0, 666, 1)
     g.add_supply(2000.0, 999, 3)
-    g.add_demand(2, 500.0, 666)
-    g.add_demand(1, 10.0, 666)  # too small
-    g.add_demand(3, 250.0, 666)
+    g.add_demand(500.0, 666, 2)
+    g.add_demand(10.0, 666, 1)  # too small
+    g.add_demand(250.0, 666, 3)
     assert not g._find_cycle()
     assert g.path.size() == 0
 
     with pytest.raises(RuntimeError):
-        g.add_demand(1, 5000.0, 999)
+        g.add_demand(5000.0, 999, 1)
 
 
 @cytest
@@ -178,8 +178,8 @@ def test_digraph_find_one_cylcle():
     g.add_currency(666, 100.0)
     g.add_currency(999, 50.0)
 
-    g.add_demand(1, 1000.0, 666)
-    g.add_demand(3, 2000.0, 999)
+    g.add_demand(1000.0, 666, 1)
+    g.add_demand(2000.0, 999, 3)
 
     g.add_supply(500.0, 666, 2)
     g.add_supply(10.0, 666, 1)  # too small
@@ -209,8 +209,8 @@ def test_digraph_cylcles():
     g.add_currency(666, 100.0)
     g.add_currency(999, 50.0)
 
-    g.add_demand(1, 1000.0, 666)
-    g.add_demand(3, 2000.0, 999)
+    g.add_demand(1000.0, 666, 1)
+    g.add_demand(2000.0, 999, 3)
 
     g.add_supply(500.0, 666, 2)
     g.add_supply(10.0, 666, 1)  # too small
@@ -234,10 +234,10 @@ def test_digraph_overlapping_cylcles():
     g.add_currency(102, 50.0)
     g.add_currency(103, 50.0)
 
-    g.add_demand(1, 1000.0, 103)
-    g.add_demand(2, 1000.0, 103)
-    g.add_demand(3, 1000.0, 101)
-    g.add_demand(4, 300.0, 102)
+    g.add_demand(1000.0, 103, 1)
+    g.add_demand(1000.0, 103, 2)
+    g.add_demand(1000.0, 101, 3)
+    g.add_demand(300.0, 102, 4)
 
     g.add_supply(1000.0, 101, 1)
     g.add_supply(50.0, 102, 2)
@@ -315,7 +315,7 @@ def test_random_matches():
         sell_currency = random.choice(currencies_list)
         sell_amount = random.expovariate(lambd_sell)
         graph.add_supply(sell_amount, sell_currency.id, trader_id)
-        graph.add_demand(trader_id, buy_amount, buy_currency.id)
+        graph.add_demand(buy_amount, buy_currency.id, trader_id)
 
     # Add additional buy/sell offers to reach `offers_count`.
     for _ in range(offers_count - 2 * traders_count):
@@ -333,7 +333,7 @@ def test_random_matches():
         else:
             # Add a buyer.
             amount = random.expovariate(lambd_buy)
-            graph.add_demand(trader_id, amount, currency.id)
+            graph.add_demand(amount, currency.id, trader_id)
 
     zero_time = time.time()
     performed_deals = 0

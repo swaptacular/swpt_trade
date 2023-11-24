@@ -81,7 +81,7 @@ cdef class Digraph:
         currency, seller = self._ensure_nodes(currency_id, seller_id)
         currency.add_arc(seller, amount)
 
-    def add_demand(self, i64 buyer_id, double amount, i64 currency_id):
+    def add_demand(self, double amount, i64 currency_id, i64 buyer_id):
         """Declares that a given buyer wants to buy a given amount of
         a given currency.
         """
