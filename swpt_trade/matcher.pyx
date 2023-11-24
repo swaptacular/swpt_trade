@@ -134,6 +134,9 @@ cdef class Digraph:
 
     def cycles(self):
         """Iterate over all trading cycles in the graph.
+
+        Note that once the returned iterator has been exhausted, next
+        calls to `graph.cycles()` will return an empty iterator.
         """
         while cycle := self.find_cycle():
             yield cycle

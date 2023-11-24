@@ -251,6 +251,8 @@ def test_digraph_overlapping_cylcles():
     assert [amt for amt, nodes in deals] == [50.0, 100.0, 150.0]
     assert [len(nodes) for amt, nodes in deals] == [4, 4, 6]
 
+    # The cycle iterator has been exhausted.
+    assert len(list(g.cycles())) == 0
 
 @pytest.mark.skip('performance test')
 @cytest
