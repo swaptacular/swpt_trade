@@ -57,6 +57,18 @@ cdef class Digraph:
         root_trader = self.path.front()
         root_trader.add_arc(currency, INF_AMOUNT)
 
+    def get_min_amount(self, i64 currency_id):
+        """Return the `min_amount` set for a given currency.
+
+        Raises a `ValueError` if the passed currency ID does not
+        correspond to a known currency.
+        """
+        currency = self.currencies.get_node(currency_id)
+        if currency == NULL:
+            raise ValueError("invalid currency")
+
+        return currency.min_amount
+
     def add_supply(self, double amount, i64 currency_id, i64 seller_id):
         """Declares that a given seller wants to sell a given amount
         of a given currency.

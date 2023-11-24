@@ -84,9 +84,13 @@ def test_construct_digraph():
     with pytest.raises(ValueError):
         g.add_demand(1, 100.0, 666)
 
+    with pytest.raises(ValueError):
+        g.get_min_amount(666)
+
     assert root.arcs_count() == 0
     g.add_currency(666, 100.0)
     assert root.arcs_count() == 1
+    assert g.get_min_amount(666) == 100.0
 
     with pytest.raises(ValueError):
         g.add_currency(666, 100.0)
