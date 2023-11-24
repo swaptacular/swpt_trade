@@ -244,7 +244,7 @@ def test_digraph_overlapping_cylcles():
     deals = list(g.cycles())
     deals.sort(key=lambda t: t[0])
     assert len(deals) == 3
-    assert [amt for amt, nodes_ in deals] == [50.0, 100.0, 150.0]
+    assert [amt for amt, nodes in deals] == [50.0, 100.0, 150.0]
     assert [len(nodes) for amt, nodes in deals] == [4, 4, 6]
 
 
