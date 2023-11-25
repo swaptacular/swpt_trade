@@ -70,7 +70,7 @@ def test_node_registry():
 
 
 @cytest
-def test_construct_digraph():
+def test_digraph_construction():
     g = Digraph()
     assert g.path.size() == 1
     cdef Node* root = g.path.back()
