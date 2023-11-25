@@ -257,6 +257,7 @@ def test_digraph_overlapping_cylcles():
     assert len(list(g.cycles())) == 0
 
     # Check sort ranks.
+    assert g.traders.get_node(0).sort_rank == 5
     assert g.traders.get_node(1).sort_rank == 1
     assert g.traders.get_node(2).sort_rank == 1
     assert g.traders.get_node(3).sort_rank == 2
@@ -267,6 +268,10 @@ def test_digraph_overlapping_cylcles():
     assert g.currencies.get_node(104).sort_rank == 0
 
     # Check the order of arcs.
+    assert g.traders.get_node(0).get_arc(0).node_ptr.id in [101, 102]
+    assert g.traders.get_node(0).get_arc(1).node_ptr.id in [101, 102]
+    assert g.traders.get_node(0).get_arc(2).node_ptr.id == 103
+    assert g.traders.get_node(0).get_arc(3).node_ptr.id == 104
     assert g.traders.get_node(1).get_arc(0).node_ptr.id == 103
     assert g.traders.get_node(2).get_arc(0).node_ptr.id == 103
     assert g.traders.get_node(2).get_arc(1).node_ptr.id == 104
