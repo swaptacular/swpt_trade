@@ -234,7 +234,7 @@ cdef class Digraph:
         # There are no cycles.
         return False
 
-    cdef bool _is_pristine(self) noexcept:
+    cdef inline bool _is_pristine(self) noexcept:
         return (
             self.path.size() == 1
             and self.path[0].status == NODE_INITIAL_STATUS

@@ -108,17 +108,17 @@ cdef extern from *:
     };
 
 
-    Arc::Arc(Node* node_ptr, double amount) {
+    inline Arc::Arc(Node* node_ptr, double amount) {
       this->node_ptr = node_ptr;
       this->amount = amount;
     }
 
-    Arc::Arc(const Arc& other) {
+    inline Arc::Arc(const Arc& other) {
       node_ptr = other.node_ptr;
       amount = other.amount;
     }
 
-    bool Arc::operator< (const Arc& other) {
+    inline bool Arc::operator< (const Arc& other) {
       return node_ptr->sort_rank > other.node_ptr->sort_rank;
     }
 
