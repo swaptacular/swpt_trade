@@ -41,8 +41,9 @@ cdef extern from *:
       size_t sort_rank;
 
       Node(i64 id, double min_amount, nodestatus status)
-          : id(id), min_amount(min_amount), sort_rank(0) {
+          : id(id), min_amount(min_amount) {
         this->status = status;
+        this->sort_rank = 0;
       }
       size_t arcs_count() {
         return arcs.size();
