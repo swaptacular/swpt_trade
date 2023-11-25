@@ -173,7 +173,7 @@ def test_digraph_find_no_cylcles():
 
 
 @cytest
-def test_digraph_find_one_cylcle():
+def test_digraph_process_cycle():
     g = Digraph()
     g.add_currency(666, 100.0)
     g.add_currency(999, 50.0)
@@ -204,7 +204,7 @@ def test_digraph_find_one_cylcle():
 
 
 @cytest
-def test_digraph_cylcles():
+def test_digraph_simple_cylcle():
     g = Digraph()
     g.add_currency(666, 100.0)
     g.add_currency(999, 50.0)
