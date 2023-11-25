@@ -127,6 +127,13 @@ cdef class Digraph:
         will also return `None`. This means that all possible trading
         cycles have been exhausted.
         """
+        if self._is_pristine():
+            # NOTE: Before we start, we must optimize the order in
+            # which each node's arcs are traversed. The goal is to
+            # visit nodes with bigger branching factor first, thus
+            # minimizing the average length of the generated cycles.
+            self._sort_arcs()
+
         if self._find_cycle():
             return self._process_cycle()
 
@@ -244,3 +251,10 @@ cdef class Digraph:
                 trader_id, 0.0, NODE_INITIAL_STATUS
             )
         return currency, trader
+
+    cdef void _sort_arcs(self):
+        self.currencies.calc_ranks()
+        self.traders.calc_ranks()
+
+        self.currencies.sort_arcs()
+        self.traders.sort_arcs()

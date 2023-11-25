@@ -233,9 +233,11 @@ def test_digraph_overlapping_cylcles():
     g.add_currency(101, 50.0)
     g.add_currency(102, 50.0)
     g.add_currency(103, 50.0)
+    g.add_currency(104, 50.0)
 
-    g.add_demand(1000.0, 103, 1)
+    g.add_demand(150.0, 103, 1)
     g.add_demand(1000.0, 103, 2)
+    g.add_demand(1000.0, 104, 2)
     g.add_demand(1000.0, 101, 3)
     g.add_demand(300.0, 102, 4)
 
@@ -253,6 +255,29 @@ def test_digraph_overlapping_cylcles():
 
     # The cycle iterator has been exhausted.
     assert len(list(g.cycles())) == 0
+
+    # Check sort ranks.
+    assert g.traders.get_node(1).sort_rank == 1
+    assert g.traders.get_node(2).sort_rank == 1
+    assert g.traders.get_node(3).sort_rank == 2
+    assert g.traders.get_node(4).sort_rank == 2
+    assert g.currencies.get_node(101).sort_rank == 2
+    assert g.currencies.get_node(102).sort_rank == 2
+    assert g.currencies.get_node(103).sort_rank == 1
+    assert g.currencies.get_node(104).sort_rank == 0
+
+    # Check the order of arcs.
+    assert g.traders.get_node(1).get_arc(0).node_ptr.id == 103
+    assert g.traders.get_node(2).get_arc(0).node_ptr.id == 103
+    assert g.traders.get_node(2).get_arc(1).node_ptr.id == 104
+    assert g.traders.get_node(3).get_arc(0).node_ptr.id == 101
+    assert g.traders.get_node(4).get_arc(0).node_ptr.id == 102
+    assert g.currencies.get_node(101).get_arc(0).node_ptr.id == 4
+    assert g.currencies.get_node(101).get_arc(1).node_ptr.id == 1
+    assert g.currencies.get_node(102).get_arc(0).node_ptr.id == 3
+    assert g.currencies.get_node(102).get_arc(1).node_ptr.id == 2
+    assert g.currencies.get_node(103).get_arc(0).node_ptr.id == 4
+
 
 @pytest.mark.skip('performance test')
 @cytest
