@@ -32,6 +32,7 @@ def test_bid():
 def test_bid_registry():
     cdef BidRegistry* r = new BidRegistry(101)
     assert r.base_debtor_id == 101
+    assert r.add_bid(1, 0, 1000, 101, 1.0) == NULL  # ignored
 
     # priceable
     r.add_bid(1, 101, 6000, 0, 0.0)
@@ -45,9 +46,9 @@ def test_bid_registry():
     r.add_bid(1, 105, 2000, 104, 1.0)
     r.add_bid(1, 155, 2000, 666, 1.0)
 
-    # not priceable (cylce)
-    r.add_bid(1, 106, 900, 107, 1.0)
-    r.add_bid(1, 107, 800, 106, 1.0)
+    # not priceable (a peg cylce)
+    assert r.add_bid(1, 106, 900, 107, 1.0) != NULL
+    assert r.add_bid(1, 107, 800, 106, 1.0) != NULL
 
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
