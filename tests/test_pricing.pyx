@@ -50,6 +50,9 @@ def test_bid_registry():
     assert r.add_bid(1, 106, 900, 107, 1.0) != NULL
     assert r.add_bid(1, 107, 800, 106, 1.0) != NULL
 
+    # not priceable (a different trader)
+    r.add_bid(2, 123, 5000, 101, 1.0)
+
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
         assert bid.priceable()
