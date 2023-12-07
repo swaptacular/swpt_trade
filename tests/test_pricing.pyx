@@ -54,6 +54,8 @@ def test_bid_registry():
     while (bid := r.get_priceable_bid()) != NULL:
         assert bid.priceable()
         assert not bid.tradable()
+        bid.set_tradable()
+        assert bid.tradable()
         debtor_ids.append(bid.debtor_id)
 
     assert len(debtor_ids) == 5
