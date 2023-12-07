@@ -4,7 +4,7 @@ import pytest
 import math
 import array
 from . import cytest
-from swpt_trade.matcher cimport Arc, Node, NodeRegistry, Digraph, INF_AMOUNT
+from swpt_trade.matching cimport Arc, Node, NodeRegistry, Digraph, INF_AMOUNT
 
 
 @cytest

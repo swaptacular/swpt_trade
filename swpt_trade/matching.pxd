@@ -4,8 +4,8 @@ from libcpp.vector cimport vector
 
 cdef extern from *:
     """
-    #ifndef MATCHER_CLASSES_H
-    #define MATCHER_CLASSES_H
+    #ifndef MATCHING_CLASSES_H
+    #define MATCHING_CLASSES_H
 
     #include <unordered_map>
     #include <vector>
