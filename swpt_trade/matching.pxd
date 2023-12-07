@@ -26,7 +26,7 @@ cdef extern from *:
       double amount;
       Arc(Node*, double);
       Arc(const Arc&);
-      bool operator< (const Arc&);
+      bool operator< (const Arc&) const;
     };
 
 
@@ -119,7 +119,7 @@ cdef extern from *:
       amount = other.amount;
     }
 
-    inline bool Arc::operator< (const Arc& other) {
+    inline bool Arc::operator< (const Arc& other) const {
       return node_ptr->sort_rank > other.node_ptr->sort_rank;
     }
 
