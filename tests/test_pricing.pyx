@@ -62,3 +62,13 @@ def test_bid_registry():
         r.add_bid(1, 108, 700, 0, 1.0)
 
     del r
+
+@cytest
+def test_empty_bid_registry():
+    cdef BidRegistry* r = new BidRegistry(101)
+    assert r.get_priceable_bid() == NULL
+
+    with pytest.raises(RuntimeError):
+        r.add_bid(1, 108, 700, 0, 1.0)
+
+    del r
