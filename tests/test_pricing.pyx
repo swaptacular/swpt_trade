@@ -12,19 +12,21 @@ def test_bid():
     assert bid.creditor_id == 1
     assert bid.debtor_id == 101
     assert bid.amount == -5000
+    assert bid.anchor_id == 0
     assert bid.peg_ptr == NULL
     assert bid.peg_exchange_rate == 1.0
     assert not bid.priceable()
+    assert not bid.visited()
     assert not bid.tradable()
     
-    bid.set_tradable()
-    assert bid.tradable()
-    bid.set_tradable()
-    bid.set_tradable()
-    assert bid.tradable()
-    bid.set_tradable()
-    assert bid.tradable()
+    bid.set_visited()
     assert not bid.priceable()
+    assert bid.visited()
+    assert not bid.tradable()
+    bid.set_tradable()
+    assert not bid.priceable()
+    assert bid.visited()
+    assert bid.tradable()
     del bid
 
 
@@ -32,7 +34,7 @@ def test_bid():
 def test_bid_registry():
     cdef BidRegistry* r = new BidRegistry(101)
     assert r.base_debtor_id == 101
-    assert r.add_bid(1, 0, 1000, 101, 1.0) == NULL  # ignored
+    r.add_bid(1, 0, 1000, 101, 1.0)  # ignored
 
     # priceable
     r.add_bid(1, 101, 6000, 0, 0.0)
@@ -47,8 +49,8 @@ def test_bid_registry():
     r.add_bid(1, 155, 2000, 666, 1.0)
 
     # not priceable (a peg cylce)
-    assert r.add_bid(1, 106, 900, 107, 1.0) != NULL
-    assert r.add_bid(1, 107, 800, 106, 1.0) != NULL
+    r.add_bid(1, 106, 900, 107, 1.0)
+    r.add_bid(1, 107, 800, 106, 1.0)
 
     # not priceable (a different trader)
     r.add_bid(2, 123, 5000, 101, 1.0)
@@ -56,9 +58,15 @@ def test_bid_registry():
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
         assert bid.priceable()
+        assert not bid.visited()
         assert not bid.tradable()
+        assert bid.anchor_id != 12345
+        bid.set_visited()
         bid.set_tradable()
+        bid.anchor_id = 12345
+        assert bid.visited()
         assert bid.tradable()
+        assert bid.anchor_id == 12345
         debtor_ids.append(bid.debtor_id)
 
     assert len(debtor_ids) == 5
