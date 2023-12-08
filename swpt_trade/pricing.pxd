@@ -57,12 +57,12 @@ cdef extern from *:
       bidflags flags = 0;
 
     public:
-      i64 creditor_id;
-      i64 debtor_id;
-      i64 amount;
+      const i64 creditor_id;
+      const i64 debtor_id;
+      const i64 amount;
       i64 anchor_id;
       Bid* peg_ptr = NULL;
-      float peg_exchange_rate;
+      const float peg_exchange_rate;
 
       Bid(
         i64 creditor_id,
@@ -194,12 +194,12 @@ cdef extern from *:
     ctypedef long long i64
 
     cdef cppclass Bid:
-        i64 creditor_id
-        i64 debtor_id
-        i64 amount
+        const i64 creditor_id
+        const i64 debtor_id
+        const i64 amount
         i64 anchor_id
-        Bid* peg_ptr
-        float peg_exchange_rate
+        Bid* const peg_ptr
+        const float peg_exchange_rate
         Bid(i64, i64, i64, i64, float) except +
         bool priceable() noexcept
         bool visited() noexcept
