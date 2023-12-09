@@ -62,7 +62,7 @@ cdef class BidProcessor:
         # If there is no exchange rate -- return 0, 0.0.
         return 0, 0.0
 
-    cdef void _register_tradable_bid(self, Bid* bid):
+    cdef void _add_candidate_offer(self, Bid* bid):
         o = CandidateOffer()
         o.amount = bid.amount
         o.debtor_id = bid.debtor_id
@@ -99,6 +99,12 @@ cdef class BidProcessor:
         )
 
     cdef void _process_bid(self, Bid* bid) noexcept:
+        """If possible, add a candidate offer for the given bid.
+
+        This function assumes that the bids for each trader (aka
+        creditor) form a tree, having the `base_debtor_id` as their
+        root.
+        """
         if not bid.processed():
             bid.set_processed()
             tradable = self._check_if_tradable(bid.debtor_id)
@@ -124,4 +130,4 @@ cdef class BidProcessor:
                 and tradable
                 and abs(bid.amount) >= self.min_trade_amount
             ):
-                self._register_tradable_bid(bid)
+                self._add_candidate_offer(bid)

@@ -235,7 +235,7 @@ cdef class BidProcessor:
     cdef object candidate_offers
     cdef bool _check_if_tradable(self, i64 debtor_id) noexcept
     cdef (i64, float) _calc_endorsed_peg(self,i64 debtor_id) noexcept
-    cdef void _register_tradable_bid(self,Bid* bid)
+    cdef void _add_candidate_offer(self,Bid* bid)
     cdef (i64, float) _calc_anchored_peg(self, Bid* bid) noexcept
     cdef bool _validate_peg(self, Bid* bid) noexcept
     cdef void _process_bid(self, Bid* bid) noexcept
