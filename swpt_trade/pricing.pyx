@@ -9,7 +9,46 @@ cdef class BidProcessor:
     def __cinit__(self, i64 base_debtor_id):
         self.base_debtor_id = base_debtor_id
         self.min_trade_amount = MIN_TRADE_AMOUNT
-        self.bid_registry = NULL
+        self.bid_registry_ptr = new BidRegistry(base_debtor_id)
+        self.candidate_offers = []
+
+    def __dealloc__(self):
+        del self.bid_registry_ptr
+
+    def register_bid(
+        self,
+        i64 creditor_id,
+        i64 debtor_id,
+        i64 amount,
+        object peg_debtor_id=None,
+        object peg_exchange_rate=None,
+    ):
+        if peg_debtor_id is None:
+            peg_debtor_id = 0
+        if peg_exchange_rate is None:
+            peg_exchange_rate = 0.0
+
+        self.bid_registry_ptr.add_bid(
+            creditor_id,
+            debtor_id,
+            amount,
+            peg_debtor_id,
+            peg_exchange_rate,
+        )
+
+    def generate_candidate_offers(self):
+        r = self.bid_registry_ptr
+
+        while (bid := r.get_priceable_bid()) != NULL:
+            self._process_bid(bid)
+        candidate_offers = self.candidate_offers
+
+        # Free unused memory.
+        del self.bid_registry_ptr
+        self.bid_registry_ptr = new BidRegistry(self.base_debtor_id)
+        self.candidate_offers = []
+
+        return candidate_offers
 
     cdef bool _check_if_tradable(self, i64 debtor_id) noexcept:
         # TODO: Add a real implementation. Debtor IDs that are not
@@ -24,8 +63,11 @@ cdef class BidProcessor:
         return 0, 0.0
 
     cdef void _register_tradable_bid(self, Bid* bid):
-        # TODO: Add a real implementation.
-        raise RuntimeError
+        o = CandidateOffer()
+        o.amount = bid.amount
+        o.debtor_id = bid.debtor_id
+        o.creditor_id = bid.creditor_id
+        self.candidate_offers.append(o)
 
     cdef (i64, float) _calc_anchored_peg(self, Bid* bid) noexcept:
         """Try to calculate the exchange rate to the nearest anchor-currency.

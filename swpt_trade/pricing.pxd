@@ -222,10 +222,17 @@ cdef extern from *:
         Bid* get_priceable_bid() noexcept
 
 
+cdef class CandidateOffer:
+    cdef readonly i64 amount
+    cdef readonly i64 debtor_id
+    cdef readonly i64 creditor_id
+
+
 cdef class BidProcessor:
-    cdef BidRegistry* bid_registry
     cdef i64 base_debtor_id
     cdef i64 min_trade_amount
+    cdef BidRegistry* bid_registry_ptr
+    cdef object candidate_offers
     cdef bool _check_if_tradable(self, i64 debtor_id) noexcept
     cdef (i64, float) _calc_endorsed_peg(self,i64 debtor_id) noexcept
     cdef void _register_tradable_bid(self,Bid* bid)
