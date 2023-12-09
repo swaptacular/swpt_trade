@@ -220,3 +220,16 @@ cdef extern from *:
         BidRegistry(i64) except +
         void add_bid(i64, i64, i64, i64, float) except +
         Bid* get_priceable_bid() noexcept
+
+
+cdef class BidProcessor:
+    cdef BidRegistry* bid_registry
+    cdef i64 base_debtor_id
+    cdef i64 min_trade_amount
+    cdef bool _check_if_tradable(self, i64 debtor_id) noexcept
+    cdef (i64, float) _calc_endorsed_peg(self,i64 debtor_id) noexcept
+    cdef void _register_tradable_bid(self,Bid* bid)
+    cdef (i64, float) _calc_anchored_peg(self, Bid* bid) noexcept
+    cdef bool _validate_peg(self, Bid* bid) noexcept
+    cdef void _process_bid(self, Bid* bid) noexcept
+
