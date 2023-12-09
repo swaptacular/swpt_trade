@@ -12,10 +12,11 @@ cdef extern from *:
 
     typedef long long i64;
     typedef unsigned char bidflags;
-    const bidflags DECIDED_FLAG = 1;
-    const bidflags PRICEABLE_FLAG = 2;
-    const bidflags TRADABLE_FLAG = 4;
-    const bidflags VISITED_FLAG = 8;
+    const bidflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
+    const bidflags PRICEABLE_FLAG = 1 << 1;
+    const bidflags PROCESSED_FLAG = 1 << 3;
+    const bidflags DEADEND_FLAG = 1 << 4;
+    const bidflags ANCHOR_FLAG = 1 << 5;
 
     class Account {
     public:
@@ -55,12 +56,16 @@ cdef extern from *:
     class Bid {
     private:
       bidflags flags = 0;
+      const i64 peg_debtor_id;
+
+      bool priceable() {
+        return (flags & PRICEABLE_FLAG) != 0;
+      }
 
     public:
       const i64 creditor_id;
       const i64 debtor_id;
       const i64 amount;
-      i64 anchor_id;
       Bid* peg_ptr = NULL;
       const float peg_exchange_rate;
 
@@ -70,26 +75,29 @@ cdef extern from *:
         i64 amount,
         i64 peg_debtor_id,
         float peg_exchange_rate
-      ) : creditor_id(creditor_id),
+      ) : peg_debtor_id(peg_debtor_id),
+          creditor_id(creditor_id),
           debtor_id(debtor_id),
           amount(amount),
-          anchor_id(peg_debtor_id),
           peg_exchange_rate(peg_exchange_rate) {
       }
-      bool priceable() {
-        return (flags & PRICEABLE_FLAG) != 0;
+      bool processed() {
+        return (flags & PROCESSED_FLAG) != 0;
       }
-      bool visited() {
-        return (flags & VISITED_FLAG) != 0;
+      bool deadend() {
+        return (flags & DEADEND_FLAG) != 0;
       }
-      bool tradable() {
-        return (flags & TRADABLE_FLAG) != 0;
+      bool anchor() {
+        return (flags & ANCHOR_FLAG) != 0;
       }
-      void set_visited() {
-        flags |= VISITED_FLAG;
+      void set_processed() {
+        flags |= PROCESSED_FLAG;
       }
-      void set_tradable() {
-        flags |= TRADABLE_FLAG;
+      void set_deadend() {
+        flags |= DEADEND_FLAG;
+      }
+      void set_anchor() {
+        flags |= ANCHOR_FLAG;
       }
 
       friend class BidRegistry;
@@ -104,10 +112,10 @@ cdef extern from *:
 
       static bool decide_priceability(Bid* bid) {
         if (bid != NULL) {
-          if (bid->flags & DECIDED_FLAG) {
+          if (bid->flags & PRICEABILITY_DECIDED_FLAG) {
             return bid->priceable();
           }
-          bid->flags |= DECIDED_FLAG;
+          bid->flags |= PRICEABILITY_DECIDED_FLAG;
           if (decide_priceability(bid->peg_ptr)) {
             bid->flags |= PRICEABLE_FLAG;
             return true;
@@ -122,13 +130,13 @@ cdef extern from *:
           // If the current bid is for the base currency, it is priceable
           // by definition.
           if (bid_ptr->debtor_id == base_debtor_id) {
-            bid_ptr->flags |= DECIDED_FLAG | PRICEABLE_FLAG;
+            bid_ptr->flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
           }
           // Try to find the bid relative to which the current bid must
           // be priced.
           try {
             bid_ptr->peg_ptr = map.at(
-              Account(bid_ptr->creditor_id, bid_ptr->anchor_id)
+              Account(bid_ptr->creditor_id, bid_ptr->peg_debtor_id)
             );
           } catch (const std::out_of_range& oor) {
             bid_ptr->peg_ptr = NULL;
@@ -197,15 +205,15 @@ cdef extern from *:
         const i64 creditor_id
         const i64 debtor_id
         const i64 amount
-        i64 anchor_id
         Bid* const peg_ptr
         const float peg_exchange_rate
         Bid(i64, i64, i64, i64, float) except +
-        bool priceable() noexcept
-        bool visited() noexcept
-        void set_visited() noexcept
-        bool tradable() noexcept
-        void set_tradable() noexcept
+        bool processed() noexcept
+        void set_processed() noexcept
+        bool deadend() noexcept
+        void set_deadend() noexcept
+        bool anchor() noexcept
+        void set_anchor() noexcept
 
     cdef cppclass BidRegistry:
         const i64 base_debtor_id

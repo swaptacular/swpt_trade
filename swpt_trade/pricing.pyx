@@ -10,9 +10,10 @@ cdef bool check_if_tradable(i64 debtor_id) noexcept:
     return True
 
 
-cdef (i64, float) calc_endored_peg(i64 debtor_id) noexcept:
+cdef (i64, float) calc_endorsed_peg(i64 debtor_id) noexcept:
     # TODO: Add a real implementation. Must return the exchange rate
-    # to the nearest tradable currency.
+    # to the nearest tradable currency, or the base currency. If there
+    # is no exchange rate -- return 0, 0.0.
     return 0, 0.0
 
 
@@ -33,7 +34,7 @@ cdef (i64, float) calc_anchored_peg(Bid* bid) noexcept:
     cdef i64 anchor_debtor_id = bid.debtor_id
     cdef float exchange_rate = 1.0
 
-    while bid.anchor_id != bid.debtor_id and bid.peg_ptr != NULL:
+    while not bid.anchor() and bid.peg_ptr != NULL:
         exchange_rate *= bid.peg_exchange_rate
         bid = bid.peg_ptr
         anchor_debtor_id = bid.debtor_id
@@ -45,32 +46,30 @@ cdef bool validate_peg(Bid* bid) noexcept:
     """Compare bid's peg to the endorsed peg.
     """
     id1, rate1 = calc_anchored_peg(bid)
-    id2, rate2 = calc_endored_peg(bid.debtor_id)
+    id2, rate2 = calc_endorsed_peg(bid.debtor_id)
     return id1 == id2 and rate1 == rate2
 
 
-cdef void visit_bid(Bid* bid, i64 base_debtor_id):
-    if not bid.visited():
-        bid.set_visited()
-
-        if check_if_tradable(bid.debtor_id):
-            bid.set_tradable()
+cdef void process_bid(Bid* bid, i64 base_debtor_id):
+    if not bid.processed():
+        bid.set_processed()
+        tradable = check_if_tradable(bid.debtor_id)
 
         if bid.debtor_id == base_debtor_id:
-            bid.anchor_id = base_debtor_id
+            bid.set_anchor()
         else:
-            if bid.peg_ptr == NULL:
-                raise RuntimeError("peg_ptr is NULL")
-            visit_bid(bid.peg_ptr, base_debtor_id)
+            peg_bid = bid.peg_ptr
+            if peg_bid == NULL:
+                raise RuntimeError("Bid's peg_ptr is NULL.")
+            process_bid(peg_bid, base_debtor_id)
 
-            if bid.tradable():
-                bid.anchor_id = bid.debtor_id if validate_peg(bid) else 0
-            else:
-                bid.anchor_id = bid.peg_ptr.anchor_id
+            if peg_bid.deadend():
+                bid.set_deadend()
+            elif tradable:
+                if validate_peg(bid):
+                    bid.set_anchor()
+                else:
+                    bid.set_deadend()
 
-        if (
-            bid.tradable()
-            and abs(bid.amount) >= MIN_TRADE_AMOUNT
-            and bid.anchor_id == bid.debtor_id
-        ):
+        if bid.anchor() and tradable and abs(bid.amount) >= MIN_TRADE_AMOUNT:
             register_tradable_bid(bid)

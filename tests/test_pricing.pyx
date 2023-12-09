@@ -12,21 +12,21 @@ def test_bid():
     assert bid.creditor_id == 1
     assert bid.debtor_id == 101
     assert bid.amount == -5000
-    assert bid.anchor_id == 0
     assert bid.peg_ptr == NULL
     assert bid.peg_exchange_rate == 1.0
-    assert not bid.priceable()
-    assert not bid.visited()
-    assert not bid.tradable()
+    assert not bid.processed()
+    assert not bid.deadend()
+    assert not bid.anchor()
     
-    bid.set_visited()
-    assert not bid.priceable()
-    assert bid.visited()
-    assert not bid.tradable()
-    bid.set_tradable()
-    assert not bid.priceable()
-    assert bid.visited()
-    assert bid.tradable()
+    bid.set_processed()
+    assert bid.processed()
+    bid.set_deadend()
+    bid.set_deadend()
+    assert bid.deadend()
+    bid.set_anchor()
+    bid.set_anchor()
+    bid.set_anchor()
+    assert bid.anchor()
     del bid
 
 
@@ -57,16 +57,15 @@ def test_bid_registry():
 
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
-        assert bid.priceable()
-        assert not bid.visited()
-        assert not bid.tradable()
-        assert bid.anchor_id != 12345
-        bid.set_visited()
-        bid.set_tradable()
-        bid.anchor_id = 12345
-        assert bid.visited()
-        assert bid.tradable()
-        assert bid.anchor_id == 12345
+        assert not bid.processed()
+        assert not bid.deadend()
+        assert not bid.anchor()
+        bid.set_processed()
+        bid.set_deadend()
+        bid.set_anchor()
+        assert bid.processed()
+        assert bid.deadend()
+        assert bid.anchor()
         debtor_ids.append(bid.debtor_id)
 
     assert len(debtor_ids) == 5
