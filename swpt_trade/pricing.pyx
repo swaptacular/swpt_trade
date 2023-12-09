@@ -102,7 +102,7 @@ cdef class BidProcessor:
         """If possible, add a candidate offer for the given bid.
 
         This function assumes that the bids for each trader (aka
-        creditor) form a tree, having the `base_debtor_id` as their
+        creditor) form a tree, having the `base_debtor_id` as its
         root.
         """
         if not bid.processed():
