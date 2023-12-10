@@ -1,5 +1,7 @@
 # distutils: language = c++
 import cython
+from libcpp cimport bool
+from libcpp.unordered_set cimport unordered_set
 
 cdef i64 MIN_TRADE_AMOUNT = 1000
 cdef float EPSILON = 1e-5
@@ -41,19 +43,32 @@ cdef class BidProcessor:
 
         while (bid := r.get_priceable_bid()) != NULL:
             self._process_bid(bid)
-        candidate_offers = self.candidate_offers
+
+        # Obviously, no deals can be arranged for traders which do not
+        # have at least one buy offer, and at least one sell offer.
+        # Therefore, we eliminate offers from such traders.
+        cdef CandidateOffer o
+        candidate_offers = [
+            o for o in self.candidate_offers if (
+                self.buyers.count(o.creditor_id) != 0
+                and self.sellers.count(o.creditor_id) != 0
+            )
+        ]
 
         # Free unused memory.
         del self.bid_registry_ptr
         self.bid_registry_ptr = new BidRegistry(self.base_debtor_id)
         self.candidate_offers = []
+        self.buyers.clear()
+        self.sellers.clear()
 
         return candidate_offers
 
-    cdef bool _check_if_tradable(self, i64 debtor_id) noexcept:
-        # TODO: Add a real implementation. Debtor IDs that are not
-        # tradable must be logged, so as to eventually create an
-        # system account for them.
+    cdef bool _check_if_tradable(self, Bid* bid) noexcept:
+        # TODO: Add a real implementation. `bid.debtor_id`s that are not
+        # tradable, for which `bid.amount <= -self.min_trade_amount`,
+        # must be logged, so as to eventually create system accounts
+        # for them.
         return True
 
     cdef (i64, float) _calc_endorsed_peg(self, i64 debtor_id) noexcept:
@@ -63,7 +78,12 @@ cdef class BidProcessor:
         return 0, 0.0
 
     cdef void _add_candidate_offer(self, Bid* bid):
-        o = CandidateOffer()
+        if bid.amount > 0:
+            self.buyers.insert(bid.creditor_id)
+        else:
+            self.sellers.insert(bid.creditor_id)
+
+        cdef CandidateOffer o = CandidateOffer()
         o.amount = bid.amount
         o.debtor_id = bid.debtor_id
         o.creditor_id = bid.creditor_id
@@ -107,7 +127,7 @@ cdef class BidProcessor:
         """
         if not bid.processed():
             bid.set_processed()
-            tradable = self._check_if_tradable(bid.debtor_id)
+            tradable = self._check_if_tradable(bid)
 
             if bid.debtor_id == self.base_debtor_id:
                 bid.set_anchor()

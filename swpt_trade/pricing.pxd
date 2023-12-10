@@ -1,6 +1,6 @@
 # distutils: language = c++
 from libcpp cimport bool
-from libcpp.vector cimport vector
+from libcpp.unordered_set cimport unordered_set
 
 cdef extern from *:
     """
@@ -202,6 +202,20 @@ cdef extern from *:
     ctypedef long long i64
 
     cdef cppclass Bid:
+        """Tells the disposition of a given trader to a given currency.
+
+        The `amount` field can be negative (the trader wants to sell),
+        positive (the trader wants to buy), or zero (the trader do not
+        want to trade). Bids with zero amounts must also be processed,
+        because they may declare an exchange rate to another currency
+        (the bid's "peg currency"), which have been approved by the
+        trader.
+
+        Bids are organised in tree-like structures, each bid pointing
+        to the bid for its peg currency (see the `peg_ptr` field). In
+        addition to this, every bid maintains several flags bits,
+        which are used during the traversal of the bid-tree.
+        """
         const i64 creditor_id
         const i64 debtor_id
         const i64 amount
@@ -216,6 +230,15 @@ cdef extern from *:
         void set_anchor() noexcept
 
     cdef cppclass BidRegistry:
+        """Given a set of `Bid`s, generates a tree of priceable bids.
+
+        At the root of the tree is the "base currency" (determined by
+        the `base_debtor_id` field). Bids whose currencies are
+        directly or indirectly pegged to the base currency, are
+        considered "priceable", and will be included in the generated
+        tree. Bids that are not priceable, will be excluded from the
+        tree.
+        """
         const i64 base_debtor_id
         BidRegistry(i64) except +
         void add_bid(i64, i64, i64, i64, float) except +
@@ -223,6 +246,11 @@ cdef extern from *:
 
 
 cdef class CandidateOffer:
+    """A trader bid, that may eventually become a confirmed offer.
+
+    The `amount` field can be negative (the trader wants to sell), or
+    positive (the trader wants to buy). The amount can not be zero.
+    """
     cdef readonly i64 amount
     cdef readonly i64 debtor_id
     cdef readonly i64 creditor_id
@@ -233,10 +261,12 @@ cdef class BidProcessor:
     cdef i64 min_trade_amount
     cdef BidRegistry* bid_registry_ptr
     cdef object candidate_offers
-    cdef bool _check_if_tradable(self, i64 debtor_id) noexcept
-    cdef (i64, float) _calc_endorsed_peg(self,i64 debtor_id) noexcept
-    cdef void _add_candidate_offer(self,Bid* bid)
-    cdef (i64, float) _calc_anchored_peg(self, Bid* bid) noexcept
-    cdef bool _validate_peg(self, Bid* bid) noexcept
-    cdef void _process_bid(self, Bid* bid) noexcept
+    cdef unordered_set[i64] buyers
+    cdef unordered_set[i64] sellers
+    cdef bool _check_if_tradable(self, Bid*) noexcept
+    cdef (i64, float) _calc_endorsed_peg(self, i64) noexcept
+    cdef void _add_candidate_offer(self, Bid*)
+    cdef (i64, float) _calc_anchored_peg(self, Bid*) noexcept
+    cdef bool _validate_peg(self, Bid*) noexcept
+    cdef void _process_bid(self, Bid*) noexcept
 
