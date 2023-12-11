@@ -50,9 +50,10 @@ cdef class BidProcessor:
         cdef CandidateOffer o
         candidate_offers = [
             o for o in self.candidate_offers if (
-                self.buyers.count(o.creditor_id) != 0
-                and self.sellers.count(o.creditor_id) != 0
-            )
+                self.buyers.count(o.creditor_id)
+                if o.amount < 0
+                else self.sellers.count(o.creditor_id)
+            ) != 0
         ]
 
         # Free unused memory.
