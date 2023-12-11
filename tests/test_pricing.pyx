@@ -55,6 +55,9 @@ def test_bid_registry():
     # not priceable (a different trader)
     r.add_bid(2, 123, 5000, 101, 1.0)
 
+    with pytest.raises(RuntimeError):
+        r.add_bid(2, 123, 5000, 101, 1.0)  # duplicated
+
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
         assert not bid.processed()

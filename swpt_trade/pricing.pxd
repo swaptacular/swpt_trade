@@ -18,39 +18,158 @@ cdef extern from *:
     const bidflags DEADEND_FLAG = 1 << 4;
     const bidflags ANCHOR_FLAG = 1 << 5;
 
-    class Account {
+    class Key128 {
     public:
-      i64 creditor_id;
-      i64 debtor_id;
+      i64 first;
+      i64 second;
 
-      Account(i64 creditor_id, i64 debtor_id)
-        : creditor_id(creditor_id), debtor_id(debtor_id) {
+      Key128(i64 first, i64 second)
+        : first(first), second(second) {
       }
-      Account(const Account& other) {
-        creditor_id = other.creditor_id;
-        debtor_id = other.debtor_id;
+      Key128(const Key128& other) {
+        first = other.first;
+        second = other.second;
       }
-      bool operator== (const Account& other) const {
-        return (
-          creditor_id == other.creditor_id
-          && debtor_id == other.debtor_id
-        );
+      bool operator== (const Key128& other) const {
+        return first == other.first && second == other.second;
       }
     };
 
     namespace std {
-      template <> struct hash<Account>
+      template <> struct hash<Key128>
       {
-        inline size_t operator()(const Account& account) const
+        inline size_t operator()(const Key128& key) const
         {
-          // Combine creditor_id and debtor_id to calculate a hash value.
-          size_t h = hash<i64>()(account.creditor_id);
-          size_t k = hash<i64>()(account.debtor_id);
+          // Combine first and second to calculate a hash value.
+          size_t h = hash<i64>()(key.first);
+          size_t k = hash<i64>()(key.second);
           h ^= k + 0x9e3779b9 + (h << 6) + (h >> 2);
           return h;
         }
       };
     }
+
+
+    class Peg {
+    private:
+      bidflags flags = 0;
+      const Key128 peg_debtor_key;
+      const i64 peg_debtor_id;
+
+      bool priceable() {
+        return (flags & PRICEABLE_FLAG) != 0;
+      }
+      void set_anchor() {
+        flags |= ANCHOR_FLAG;
+      }
+
+    public:
+      const i64 debtor_id;
+      const float peg_exchange_rate;
+      Peg* peg_ptr = NULL;
+
+      Peg(
+        i64 debtor_id,
+        Key128 peg_debtor_key,
+        i64 peg_debtor_id,
+        float peg_exchange_rate
+      ) : peg_debtor_key(peg_debtor_key),
+          peg_debtor_id(peg_debtor_id),
+          debtor_id(debtor_id),
+          peg_exchange_rate(peg_exchange_rate) {
+      }
+      bool anchor() {
+        return (flags & ANCHOR_FLAG) != 0;
+      }
+
+      friend class PegRegistry;
+    };
+
+
+    class PegRegistry {
+    private:
+      std::unordered_map<Key128, Peg*> pegs;
+      std::unordered_map<i64, Peg*> anchors;
+      bool prepared_for_queries = false;
+
+      static bool decide_priceability(Peg* peg) {
+        if (peg != NULL) {
+          if (peg->flags & PRICEABILITY_DECIDED_FLAG) {
+            return peg->priceable();
+          }
+          peg->flags |= PRICEABILITY_DECIDED_FLAG;
+          if (decide_priceability(peg->peg_ptr)) {
+            peg->flags |= PRICEABLE_FLAG;
+            return true;
+          }
+        }
+        return false;
+      }
+
+      void prepare_for_queries() {
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          Peg* peg_ptr = pair->second;
+          if (peg_ptr->debtor_id == base_debtor_id) {
+            peg_ptr->flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
+          }
+          try {
+            peg_ptr->peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
+          } catch (const std::out_of_range& oor) {
+            peg_ptr->peg_ptr = NULL;
+          }
+        }
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          decide_priceability(pair->second);
+        }
+      }
+
+    public:
+      const Key128 base_debtor_key;
+      const i64 base_debtor_id;
+
+      PegRegistry(Key128 base_debtor_key, i64 base_debtor_id)
+        : base_debtor_key(base_debtor_key),
+          base_debtor_id(base_debtor_id) {
+      }
+      ~PegRegistry() {
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          delete pair->second;
+        }
+      }
+      void add_peg(
+        Key128 debtor_key,
+        i64 debtor_id,
+        Key128 peg_debtor_key,
+        i64 peg_debtor_id,
+        float peg_exchange_rate,
+        bool confirmed
+      ) {
+        if (prepared_for_queries) {
+          throw std::runtime_error("add_peg called after query preparation");
+        }
+        if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
+          confirmed = true;
+        }
+        Peg*& peg_ptr_ref = pegs[debtor_key];
+        if (peg_ptr_ref != NULL) {
+          throw std::runtime_error("duplicated peg");
+        }
+        peg_ptr_ref = new Peg(
+          debtor_id,
+          peg_debtor_key,
+          peg_debtor_id,
+          peg_exchange_rate
+        );
+        if (confirmed) {
+          peg_ptr_ref->set_anchor();
+          Peg*& anchor_ptr_ref = anchors[debtor_id];
+          if (anchor_ptr_ref != NULL) {
+            throw std::runtime_error("duplicated anchor");
+          }
+          anchor_ptr_ref = peg_ptr_ref;
+        }
+      }
+    };
 
 
     class Bid {
@@ -106,8 +225,8 @@ cdef extern from *:
 
     class BidRegistry {
     private:
-      std::unordered_map<Account, Bid*> map;
-      std::unordered_map<Account, Bid*>::const_iterator iter_curr, iter_stop;
+      std::unordered_map<Key128, Bid*> bids;
+      std::unordered_map<Key128, Bid*>::const_iterator iter_curr, iter_stop;
       bool iter_started = false;
 
       static bool decide_priceability(Bid* bid) {
@@ -125,26 +244,20 @@ cdef extern from *:
       }
 
       void prepare_for_iteration() {
-        for (auto pair = map.begin(); pair != map.end(); ++pair) {
-          Bid* bid_ptr = pair->second;  // the current bid
-          // If the current bid is for the base currency, it is priceable
-          // by definition.
+        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
+          Bid* bid_ptr = pair->second;
           if (bid_ptr->debtor_id == base_debtor_id) {
             bid_ptr->flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
           }
-          // Try to find the bid relative to which the current bid must
-          // be priced.
           try {
-            bid_ptr->peg_ptr = map.at(
-              Account(bid_ptr->creditor_id, bid_ptr->peg_debtor_id)
+            bid_ptr->peg_ptr = bids.at(
+              Key128(bid_ptr->creditor_id, bid_ptr->peg_debtor_id)
             );
           } catch (const std::out_of_range& oor) {
             bid_ptr->peg_ptr = NULL;
           }
         }
-        for (auto pair = map.begin(); pair != map.end(); ++pair) {
-          // Starting from the current bid, traverse the peg graph, trying to
-          // reach the base currency (which is priceable by definition).
+        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
           decide_priceability(pair->second);
         }
       }
@@ -156,7 +269,7 @@ cdef extern from *:
         : base_debtor_id(base_debtor_id) {
       }
       ~BidRegistry() {
-        for (auto pair = map.begin(); pair != map.end(); ++pair) {
+        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
           delete pair->second;
         }
       }
@@ -174,7 +287,11 @@ cdef extern from *:
         // ignore bids for it. This should be safe, because debtor ID `0`
         // is declared as reserved in the spec.
         if (debtor_id != 0) {
-          map[Account(creditor_id, debtor_id)] = new Bid(
+          Bid*& bid_ptr_ref = bids[Key128(creditor_id, debtor_id)];
+          if (bid_ptr_ref != NULL) {
+            throw std::runtime_error("duplicated bid");
+          }
+          bid_ptr_ref = new Bid(
             creditor_id, debtor_id, amount, peg_debtor_id, peg_exchange_rate
           );
         }
@@ -182,8 +299,8 @@ cdef extern from *:
       Bid* get_priceable_bid() {
         if (!iter_started) {
           prepare_for_iteration();
-          iter_curr = map.cbegin();
-          iter_stop = map.cend();
+          iter_curr = bids.cbegin();
+          iter_stop = bids.cend();
           iter_started = true;
         }
         while (iter_curr != iter_stop) {
@@ -201,6 +318,28 @@ cdef extern from *:
     """
     ctypedef long long i64
 
+    cdef cppclass Key128:
+        """An 128-bit opaque hashable identifier.
+        """
+        const i64 first
+        const i64 second
+
+
+    cdef cppclass Peg:
+        """Tells to which other currency a given currency is pegged.
+
+        Pegs are organized in tree-like structures, each peg pointing
+        to its peg currency (see the `peg_ptr` field). In addition to
+        this, every bid maintains several flags bits, which are used
+        during the traversal of the peg-tree.
+        """
+        const i64 debtor_id
+        const float peg_exchange_rate
+        Peg* const peg_ptr
+        Peg(i64, Key128, i64, float) except +
+        bool anchor() noexcept
+
+
     cdef cppclass Bid:
         """Tells the disposition of a given trader to a given currency.
 
@@ -211,7 +350,7 @@ cdef extern from *:
         (the bid's "peg currency"), which have been approved by the
         trader.
 
-        Bids are organised in tree-like structures, each bid pointing
+        Bids are organized in tree-like structures, each bid pointing
         to the bid for its peg currency (see the `peg_ptr` field). In
         addition to this, every bid maintains several flags bits,
         which are used during the traversal of the bid-tree.
@@ -269,4 +408,3 @@ cdef class BidProcessor:
     cdef (i64, float) _calc_anchored_peg(self, Bid*) noexcept
     cdef bool _validate_peg(self, Bid*) noexcept
     cdef void _process_bid(self, Bid*) noexcept
-
