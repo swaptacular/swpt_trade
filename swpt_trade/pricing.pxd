@@ -17,6 +17,7 @@ cdef extern from *:
     const bidflags PROCESSED_FLAG = 1 << 3;
     const bidflags DEADEND_FLAG = 1 << 4;
     const bidflags ANCHOR_FLAG = 1 << 5;
+    const bidflags CONFIRMED_FLAG = 1 << 6;
 
     class Key128 {
     public:
@@ -62,6 +63,9 @@ cdef extern from *:
       void set_anchor() {
         flags |= ANCHOR_FLAG;
       }
+      void set_confirmed() {
+        flags |= CONFIRMED_FLAG;
+      }
 
     public:
       const i64 debtor_id;
@@ -81,6 +85,12 @@ cdef extern from *:
       bool anchor() {
         return (flags & ANCHOR_FLAG) != 0;
       }
+      bool confirmed() {
+        return (flags & CONFIRMED_FLAG) != 0;
+      }
+      bool tradable() {
+        return confirmed() && priceable();
+      }
 
       friend class PegRegistry;
     };
@@ -89,7 +99,7 @@ cdef extern from *:
     class PegRegistry {
     private:
       std::unordered_map<Key128, Peg*> pegs;
-      std::unordered_map<i64, Peg*> anchors;
+      std::unordered_map<i64, Peg*> tradables;
       bool prepared_for_queries = false;
 
       static bool decide_priceability(Peg* peg) {
@@ -104,23 +114,6 @@ cdef extern from *:
           }
         }
         return false;
-      }
-
-      void prepare_for_queries() {
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          Peg* peg_ptr = pair->second;
-          if (peg_ptr->debtor_id == base_debtor_id) {
-            peg_ptr->flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
-          }
-          try {
-            peg_ptr->peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
-          } catch (const std::out_of_range& oor) {
-            peg_ptr->peg_ptr = NULL;
-          }
-        }
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          decide_priceability(pair->second);
-        }
       }
 
     public:
@@ -147,8 +140,12 @@ cdef extern from *:
         if (prepared_for_queries) {
           throw std::runtime_error("add_peg called after query preparation");
         }
-        if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
-          confirmed = true;
+        if (debtor_id == 0) {
+          // Exclude currencies claiming debtor ID `0` from the graph.
+          if (confirmed) {
+            throw std::runtime_error("invalid confirmed debtor_id");
+          }
+          return;
         }
         Peg*& peg_ptr_ref = pegs[debtor_key];
         if (peg_ptr_ref != NULL) {
@@ -160,14 +157,44 @@ cdef extern from *:
           peg_debtor_id,
           peg_exchange_rate
         );
-        if (confirmed) {
-          peg_ptr_ref->set_anchor();
-          Peg*& anchor_ptr_ref = anchors[debtor_id];
-          if (anchor_ptr_ref != NULL) {
-            throw std::runtime_error("duplicated anchor");
-          }
-          anchor_ptr_ref = peg_ptr_ref;
+        if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
+          peg_ptr_ref->flags = (
+              PRICEABILITY_DECIDED_FLAG
+              | PRICEABLE_FLAG
+              | ANCHOR_FLAG
+          );
         }
+        if (confirmed) {
+          peg_ptr_ref->set_confirmed();
+        }
+      }
+      void prepare_for_queries() {
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          Peg* peg_ptr = pair->second;
+          try {
+            Peg* parent_peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
+            peg_ptr->peg_ptr = (
+              (parent_peg_ptr->debtor_id == peg_ptr->peg_debtor_id)
+              ? parent_peg_ptr : NULL
+            );
+          } catch (const std::out_of_range& oor) {
+            peg_ptr->peg_ptr = NULL;
+          }
+        }
+        tradables.clear();
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          Peg* peg_ptr = pair->second;
+          decide_priceability(peg_ptr);
+          if (peg_ptr->tradable()) {
+            Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
+            if (tradable_ptr_ref != NULL) {
+              throw std::runtime_error("duplicated tradable debtor_id");
+            }
+            peg_ptr->set_anchor();
+            tradable_ptr_ref = peg_ptr;
+          }
+        }
+        prepared_for_queries = true;
       }
     };
 
@@ -338,6 +365,8 @@ cdef extern from *:
         Peg* const peg_ptr
         Peg(i64, Key128, i64, float) except +
         bool anchor() noexcept
+        bool confirmed() noexcept
+        bool tradable() noexcept
 
 
     cdef cppclass Bid:
