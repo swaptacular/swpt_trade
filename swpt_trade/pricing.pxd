@@ -159,9 +159,9 @@ cdef extern from *:
         );
         if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
           peg_ptr_ref->flags = (
-              PRICEABILITY_DECIDED_FLAG
-              | PRICEABLE_FLAG
-              | ANCHOR_FLAG
+            PRICEABILITY_DECIDED_FLAG
+            | PRICEABLE_FLAG
+            | ANCHOR_FLAG
           );
         }
         if (confirmed) {
@@ -193,6 +193,14 @@ cdef extern from *:
             peg_ptr->set_anchor();
             tradable_ptr_ref = peg_ptr;
           }
+        }
+        if (
+          pegs.count(base_debtor_key) != 0
+          && pegs.at(base_debtor_key)->anchor()
+          && !pegs.at(base_debtor_key)->tradable()
+          && tradables.count(base_debtor_id) != 0
+        ) {
+          throw std::runtime_error("duplicated anchor debtor_id");
         }
         prepared_for_queries = true;
       }
