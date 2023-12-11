@@ -143,7 +143,7 @@ cdef extern from *:
           );
         }
         if (debtor_id == 0) {
-          // Exclude currencies claiming debtor ID `0` from the graph.
+          // Currencies claiming debtor ID `0` are excluded from the graph.
           if (confirmed) {
             throw std::runtime_error("invalid confirmed debtor_id");
           }
@@ -151,7 +151,7 @@ cdef extern from *:
         }
         Peg*& peg_ptr_ref = pegs[debtor_key];
         if (peg_ptr_ref != NULL) {
-          throw std::runtime_error("duplicated peg");
+          throw std::runtime_error("duplicated debtor_key");
         }
         peg_ptr_ref = new Peg(
           debtor_id,
@@ -190,7 +190,7 @@ cdef extern from *:
           if (peg_ptr->tradable()) {
             Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
             if (tradable_ptr_ref != NULL) {
-              throw std::runtime_error("duplicated tradable debtor_id");
+              throw std::runtime_error("duplicated anchor debtor_id");
             }
             peg_ptr->set_anchor();
             tradable_ptr_ref = peg_ptr;
