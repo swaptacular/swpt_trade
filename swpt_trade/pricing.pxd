@@ -129,7 +129,7 @@ cdef extern from *:
           delete pair->second;
         }
       }
-      void add_peg(
+      void add_currency(
         Key128 debtor_key,
         i64 debtor_id,
         Key128 peg_debtor_key,
@@ -138,7 +138,9 @@ cdef extern from *:
         bool confirmed
       ) {
         if (prepared_for_queries) {
-          throw std::runtime_error("add_peg called after query preparation");
+          throw std::runtime_error(
+            "add_currency called after query preparation"
+          );
         }
         if (debtor_id == 0) {
           // Exclude currencies claiming debtor ID `0` from the graph.
@@ -375,6 +377,28 @@ cdef extern from *:
         bool anchor() noexcept
         bool confirmed() noexcept
         bool tradable() noexcept
+
+
+    cdef cppclass PegRegistry:
+        """Given a set of currencies, generates the peg-tree.
+
+        At the root of the peg tree is the "base currency" (determined
+        by the `base_debtor_key` and `base_debtor_id` fields).
+        Currencies that are directly or indirectly pegged to the base
+        currency, are considered "priceable", and will be included in
+        the generated tree. Currencies that are not priceable, will be
+        excluded from the tree.
+
+        The `prepare_for_queries` method must be called before
+        queering the registry, after all currencies have been added to
+        the registry. (A currency can be added to the registry by
+        calling the `add_currency` method.)
+        """
+        const i64 base_debtor_key
+        const i64 base_debtor_id
+        PegRegistry(Key128, i64) except +
+        void add_currency(Key128, i64, Key128, i64, float, bool) except +
+        void prepare_for_queries() except +
 
 
     cdef cppclass Bid:
