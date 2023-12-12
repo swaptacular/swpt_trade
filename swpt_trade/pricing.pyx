@@ -1,21 +1,36 @@
 # distutils: language = c++
 import cython
+import hashlib
+from cpython cimport array
 from libcpp cimport bool
-from libcpp.unordered_set cimport unordered_set
 
 cdef i64 MIN_TRADE_AMOUNT = 1000
 cdef float EPSILON = 1e-5
+cdef unsigned short DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
 
 cdef class BidProcessor:
-    def __cinit__(self, i64 base_debtor_id):
+    def __cinit__(
+        self,
+        str base_debtor_uri,
+        i64 base_debtor_id,
+        unsigned short max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
+    ):
+        self.base_debtor_uri = base_debtor_uri
         self.base_debtor_id = base_debtor_id
+        self.max_distance_to_base = max_distance_to_base
         self.min_trade_amount = MIN_TRADE_AMOUNT
         self.bid_registry_ptr = new BidRegistry(base_debtor_id)
+        self.peg_registry_ptr = new PegRegistry(
+            self._calc_key128(base_debtor_uri),
+            base_debtor_id,
+            max_distance_to_base,
+        )
         self.candidate_offers = []
 
     def __dealloc__(self):
         del self.bid_registry_ptr
+        del self.peg_registry_ptr
 
     def register_bid(
         self,
@@ -64,6 +79,12 @@ cdef class BidProcessor:
         self.sellers.clear()
 
         return candidate_offers
+
+    cdef Key128 _calc_key128(self, str uri):
+        m = hashlib.sha256()
+        m.update(uri.encode('utf8'))
+        cdef i64[:] data = array.array('q', m.digest())
+        return Key128(data[0], data[1])
 
     cdef Peg* _find_tradable_peg(self, Bid* bid) noexcept:
         # TODO: Add a real implementation. `bid`s for non-tradable

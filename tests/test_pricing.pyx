@@ -2,7 +2,7 @@
 
 import pytest
 from . import cytest
-from swpt_trade.pricing cimport Bid, BidRegistry
+from swpt_trade.pricing cimport Bid, BidRegistry, BidProcessor
 
 
 @cytest
@@ -88,3 +88,21 @@ def test_empty_bid_registry():
         r.add_bid(1, 108, 700, 0, 1.0)
 
     del r
+
+
+@cytest
+def test_calc_key128():
+    import hashlib
+    import sys
+
+    bp = BidProcessor('', 1)
+    for x in range(20):
+        s = f'test{x}'
+        key = bp._calc_key128(s)
+        m = hashlib.sha256()
+        m.update(s.encode('utf8'))
+        digest = m.digest()
+        first = int.from_bytes(digest[:8], sys.byteorder, signed="True")
+        second = int.from_bytes(digest[8:16], sys.byteorder, signed="True")
+        assert first == key.first
+        assert second == key.second

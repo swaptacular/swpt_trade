@@ -28,6 +28,9 @@ cdef extern from *:
       i64 first;
       i64 second;
 
+      Key128()
+        : first(0), second(0) {
+      }
       Key128(i64 first, i64 second)
         : first(first), second(second) {
       }
@@ -407,7 +410,8 @@ cdef extern from *:
         """
         const i64 first
         const i64 second
-
+        Key128() noexcept
+        Key128(i64, i64) noexcept
 
     cdef cppclass Peg:
         """Tells to which other currency a given currency is pegged.
@@ -449,7 +453,6 @@ cdef extern from *:
         void prepare_for_queries() except +
         float get_price(i64) noexcept
         Peg* get_tradable_peg(i64) noexcept
-
 
     cdef cppclass Bid:
         """Tells the disposition of a given trader to a given currency.
@@ -507,9 +510,12 @@ cdef class CandidateOffer:
 
 
 cdef class BidProcessor:
-    cdef i64 base_debtor_id
-    cdef i64 min_trade_amount
+    cdef readonly str base_debtor_uri
+    cdef readonly i64 base_debtor_id
+    cdef readonly i64 min_trade_amount
+    cdef readonly unsigned short max_distance_to_base
     cdef BidRegistry* bid_registry_ptr
+    cdef PegRegistry* peg_registry_ptr
     cdef object candidate_offers
     cdef unordered_set[i64] buyers
     cdef unordered_set[i64] sellers
@@ -519,3 +525,4 @@ cdef class BidProcessor:
     cdef (i64, float) _calc_anchored_peg(self, Bid*) noexcept
     cdef bool _validate_peg(self, Bid*, Peg*) noexcept
     cdef void _process_bid(self, Bid*)
+    cdef Key128 _calc_key128(self, str)
