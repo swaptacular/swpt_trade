@@ -141,7 +141,7 @@ cdef extern from *:
         if (base_debtor_id == 0) {
           throw std::runtime_error("invalid base_debtor_id");
         }
-        if (max_distance_to_base == INFINITE_DISTANCE) {
+        if (max_distance_to_base >= INFINITE_DISTANCE) {
           throw std::runtime_error("invalid max_distance_to_base");
         }
       }
