@@ -12,12 +12,16 @@ cdef extern from *:
 
     typedef long long i64;
     typedef unsigned char bidflags;
+
     const bidflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
     const bidflags PRICEABLE_FLAG = 1 << 1;
     const bidflags PROCESSED_FLAG = 1 << 3;
     const bidflags DEADEND_FLAG = 1 << 4;
     const bidflags ANCHOR_FLAG = 1 << 5;
     const bidflags CONFIRMED_FLAG = 1 << 6;
+
+    const unsigned short INFINITE_DISTANCE = 0xffff;
+
 
     class Key128 {
     public:
@@ -54,6 +58,8 @@ cdef extern from *:
     class Peg {
     private:
       bidflags flags = 0;
+      unsigned short distance_to_base = INFINITE_DISTANCE;
+      float price = NAN;
       const Key128 peg_debtor_key;
       const i64 peg_debtor_id;
 
@@ -102,29 +108,41 @@ cdef extern from *:
       std::unordered_map<i64, Peg*> tradables;
       bool prepared_for_queries = false;
 
-      static bool decide_priceability(Peg* peg) {
+      unsigned short calc_distance_to_base(Peg* peg) {
         if (peg != NULL) {
           if (peg->flags & PRICEABILITY_DECIDED_FLAG) {
-            return peg->priceable();
+            return peg->distance_to_base;
           }
           peg->flags |= PRICEABILITY_DECIDED_FLAG;
-          if (decide_priceability(peg->peg_ptr)) {
+          Peg* parent = peg->peg_ptr;
+          unsigned short dist;
+          if ((dist = calc_distance_to_base(parent)) < max_distance_to_base) {
+            peg->distance_to_base = dist + 1;
+            peg->price = parent->price * peg->peg_exchange_rate;
             peg->flags |= PRICEABLE_FLAG;
-            return true;
+            return peg->distance_to_base;
           }
         }
-        return false;
+        return INFINITE_DISTANCE;
       }
 
     public:
       const Key128 base_debtor_key;
       const i64 base_debtor_id;
+      const unsigned short max_distance_to_base;
 
-      PegRegistry(Key128 base_debtor_key, i64 base_debtor_id)
-        : base_debtor_key(base_debtor_key),
-          base_debtor_id(base_debtor_id) {
+      PegRegistry(
+        Key128 base_debtor_key,
+        i64 base_debtor_id,
+        unsigned short max_distance_to_base
+      ) : base_debtor_key(base_debtor_key),
+          base_debtor_id(base_debtor_id),
+          max_distance_to_base(max_distance_to_base) {
         if (base_debtor_id == 0) {
           throw std::runtime_error("invalid base_debtor_id");
+        }
+        if (max_distance_to_base == INFINITE_DISTANCE) {
+          throw std::runtime_error("invalid max_distance_to_base");
         }
       }
       ~PegRegistry() {
@@ -168,6 +186,8 @@ cdef extern from *:
             | PRICEABLE_FLAG
             | ANCHOR_FLAG
           );
+          peg_ptr_ref->distance_to_base = 0;
+          peg_ptr_ref->price = 1.0;
         }
         if (confirmed) {
           peg_ptr_ref->set_confirmed();
@@ -196,7 +216,7 @@ cdef extern from *:
         tradables.clear();
         for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
           Peg* peg_ptr = pair->second;
-          decide_priceability(peg_ptr);
+          calc_distance_to_base(peg_ptr);
           if (peg_ptr->tradable()) {
             Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
             if (tradable_ptr_ref != NULL) {
@@ -374,10 +394,10 @@ cdef extern from *:
     cdef cppclass Peg:
         """Tells to which other currency a given currency is pegged.
 
-        Pegs are organized in tree-like structures, each peg pointing
-        to its peg currency (see the `peg_ptr` field). In addition to
-        this, every bid maintains several flags bits, which are used
-        during the traversal of the peg-tree.
+        Pegs are organized in tree-like structures, each currency
+        pointing to its peg currency (see the `peg_ptr` field). In
+        addition to this, every bid maintains several flags bits,
+        which are used during the traversal of the peg-tree.
         """
         const i64 debtor_id
         const float peg_exchange_rate
@@ -405,7 +425,8 @@ cdef extern from *:
         """
         const i64 base_debtor_key
         const i64 base_debtor_id
-        PegRegistry(Key128, i64) except +
+        const unsigned short max_distance_to_base
+        PegRegistry(Key128, i64, unsigned short) except +
         void add_currency(Key128, i64, Key128, i64, float, bool) except +
         void prepare_for_queries() except +
 
