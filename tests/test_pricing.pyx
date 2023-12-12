@@ -2,7 +2,7 @@
 
 import pytest
 from . import cytest
-from swpt_trade.pricing cimport Bid, BidRegistry, BidProcessor
+from swpt_trade.pricing cimport Key128, Bid, BidRegistry, BidProcessor
 
 
 @cytest
@@ -88,6 +88,16 @@ def test_empty_bid_registry():
         r.add_bid(1, 108, 700, 0, 1.0)
 
     del r
+
+
+@cytest
+def test_key128_calc_hash():
+    seen_values = set()
+    for i in range(100):
+        for j in range(100):
+            k = Key128(i, j)
+            h = k.calc_hash()
+            assert h not in seen_values
 
 
 @cytest

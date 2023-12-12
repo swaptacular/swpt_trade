@@ -41,6 +41,7 @@ cdef extern from *:
       bool operator== (const Key128& other) const {
         return first == other.first && second == other.second;
       }
+      size_t calc_hash();
     };
 
     namespace std {
@@ -55,6 +56,10 @@ cdef extern from *:
           return h;
         }
       };
+    }
+
+    inline size_t Key128::calc_hash() {
+      return std::hash<Key128>()(*this);
     }
 
 
@@ -412,6 +417,7 @@ cdef extern from *:
         const i64 second
         Key128() noexcept
         Key128(i64, i64) noexcept
+        size_t calc_hash()
 
     cdef cppclass Peg:
         """Tells to which other currency a given currency is pegged.
