@@ -65,14 +65,13 @@ cdef class BidProcessor:
 
         return candidate_offers
 
-    cdef bool _check_if_tradable(self, Bid* bid) noexcept:
-        # TODO: Add a real implementation. `bid.debtor_id`s that are not
-        # tradable, for which `bid.amount <= -self.min_trade_amount`,
-        # must be logged, so as to eventually create system accounts
-        # for them.
-        return True
+    cdef Peg* _find_tradable_peg(self, Bid* bid) noexcept:
+        # TODO: Add a real implementation. `bid`s for non-tradable
+        # currencies, for which `bid.amount <= -self.min_trade_amount`,
+        # must be logged, so as to eventually create system accounts for them.
+        return NULL
 
-    cdef (i64, float) _calc_endorsed_peg(self, i64 debtor_id) noexcept:
+    cdef (i64, float) _calc_endorsed_peg(self, Peg* tradable_peg) noexcept:
         # TODO: Add a real implementation. Must return the exchange
         # rate to the nearest tradable currency, or the base currency.
         # If there is no exchange rate -- return 0, 0.0.
@@ -108,27 +107,30 @@ cdef class BidProcessor:
         return anchor_debtor_id, exchange_rate
 
     @cython.cdivision(True)
-    cdef bool _validate_peg(self, Bid* bid) noexcept:
+    cdef bool _validate_peg(self, Bid* bid, Peg* tradable_peg) noexcept:
         """Compare bid's peg to the endorsed peg.
         """
         id1, rate1 = self._calc_anchored_peg(bid)
-        id2, rate2 = self._calc_endorsed_peg(bid.debtor_id)
+        id2, rate2 = self._calc_endorsed_peg(tradable_peg)
         return (
             id1 == id2
             and rate2 != 0.0
             and abs(1.0 - rate1 / rate2) < EPSILON
         )
 
-    cdef void _process_bid(self, Bid* bid) noexcept:
+    cdef void _process_bid(self, Bid* bid):
         """If possible, add a candidate offer for the given bid.
 
         This function assumes that the bids for each trader (aka
         creditor) form a tree, having the `base_debtor_id` as its
         root.
         """
+        cdef bool is_tradable
+
         if not bid.processed():
             bid.set_processed()
-            tradable = self._check_if_tradable(bid)
+            tradable_peg = self._find_tradable_peg(bid)
+            is_tradable = tradable_peg != NULL
 
             if bid.debtor_id == self.base_debtor_id:
                 bid.set_anchor()
@@ -140,15 +142,15 @@ cdef class BidProcessor:
 
                 if peg_bid.deadend():
                     bid.set_deadend()
-                elif tradable:
-                    if self._validate_peg(bid):
+                elif is_tradable:
+                    if self._validate_peg(bid, tradable_peg):
                         bid.set_anchor()
                     else:
                         bid.set_deadend()
 
             if (
                 bid.anchor()
-                and tradable
+                and is_tradable
                 and abs(bid.amount) >= self.min_trade_amount
             ):
                 self._add_candidate_offer(bid)

@@ -235,6 +235,24 @@ cdef extern from *:
         }
         prepared_for_queries = true;
       }
+      float get_price(i64 debtor_id) {
+        if (debtor_id == base_debtor_id) {
+          return 1.0;
+        }
+        try {
+          Peg* peg = tradables.at(debtor_id);
+          return peg->price;
+        } catch (const std::out_of_range& oor) {
+          return NAN;
+        }
+      }
+      Peg* get_tradable_peg(i64 debtor_id) {
+        try {
+          return tradables.at(debtor_id);
+        } catch (const std::out_of_range& oor) {
+          return NULL;
+        }
+      }
     };
 
 
@@ -429,6 +447,8 @@ cdef extern from *:
         PegRegistry(Key128, i64, unsigned short) except +
         void add_currency(Key128, i64, Key128, i64, float, bool) except +
         void prepare_for_queries() except +
+        float get_price(i64) noexcept
+        Peg* get_tradable_peg(i64) noexcept
 
 
     cdef cppclass Bid:
@@ -493,9 +513,9 @@ cdef class BidProcessor:
     cdef object candidate_offers
     cdef unordered_set[i64] buyers
     cdef unordered_set[i64] sellers
-    cdef bool _check_if_tradable(self, Bid*) noexcept
-    cdef (i64, float) _calc_endorsed_peg(self, i64) noexcept
+    cdef Peg* _find_tradable_peg(self, Bid*) noexcept
+    cdef (i64, float) _calc_endorsed_peg(self, Peg*) noexcept
     cdef void _add_candidate_offer(self, Bid*)
     cdef (i64, float) _calc_anchored_peg(self, Bid*) noexcept
-    cdef bool _validate_peg(self, Bid*) noexcept
-    cdef void _process_bid(self, Bid*) noexcept
+    cdef bool _validate_peg(self, Bid*, Peg*) noexcept
+    cdef void _process_bid(self, Bid*)
