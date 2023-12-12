@@ -244,6 +244,11 @@ cdef extern from *:
         prepared_for_queries = true;
       }
       float get_price(i64 debtor_id) {
+        if (!prepared_for_queries) {
+          throw std::runtime_error(
+            "get_price called before query preparation"
+          );
+        }
         if (debtor_id == base_debtor_id) {
           return 1.0;
         }
@@ -255,6 +260,11 @@ cdef extern from *:
         }
       }
       Peg* get_tradable_peg(i64 debtor_id) {
+        if (!prepared_for_queries) {
+          throw std::runtime_error(
+            "get_tradable_peg called before query preparation"
+          );
+        }
         try {
           return tradables.at(debtor_id);
         } catch (const std::out_of_range& oor) {
@@ -451,14 +461,14 @@ cdef extern from *:
         the registry. (A currency can be added to the registry by
         calling the `add_currency` method.)
         """
-        const i64 base_debtor_key
+        const Key128 base_debtor_key
         const i64 base_debtor_id
         const unsigned short max_distance_to_base
         PegRegistry(Key128, i64, unsigned short) except +
         void add_currency(Key128, i64, Key128, i64, float, bool) except +
         void prepare_for_queries() except +
-        float get_price(i64) noexcept
-        Peg* get_tradable_peg(i64) noexcept
+        float get_price(i64) except +
+        Peg* get_tradable_peg(i64) except +
 
     cdef cppclass Bid:
         """Tells the disposition of a given trader to a given currency.
