@@ -123,6 +123,9 @@ cdef extern from *:
       PegRegistry(Key128 base_debtor_key, i64 base_debtor_id)
         : base_debtor_key(base_debtor_key),
           base_debtor_id(base_debtor_id) {
+        if (base_debtor_id == 0) {
+          throw std::runtime_error("invalid base_debtor_id");
+        }
       }
       ~PegRegistry() {
         for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
@@ -171,6 +174,13 @@ cdef extern from *:
         }
       }
       void prepare_for_queries() {
+        if (pegs.count(base_debtor_key) == 0) {
+          add_currency(
+            base_debtor_key, base_debtor_id,
+            Key128(0, 0), 0,
+            0.0, false
+          );
+        }
         for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
           Peg* peg_ptr = pair->second;
           try {
@@ -197,8 +207,7 @@ cdef extern from *:
           }
         }
         if (
-          pegs.count(base_debtor_key) != 0
-          && pegs.at(base_debtor_key)->anchor()
+          pegs.at(base_debtor_key)->anchor()
           && !pegs.at(base_debtor_key)->tradable()
           && tradables.count(base_debtor_id) != 0
         ) {
