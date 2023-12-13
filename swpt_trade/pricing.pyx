@@ -6,7 +6,7 @@ from libcpp cimport bool
 
 cdef i64 MIN_TRADE_AMOUNT = 1000
 cdef float EPSILON = 1e-5
-cdef unsigned short DEFAULT_MAX_DISTANCE_TO_BASE = 10
+cdef distance DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
 
 cdef class BidProcessor:
@@ -14,7 +14,7 @@ cdef class BidProcessor:
         self,
         str base_debtor_uri,
         i64 base_debtor_id,
-        unsigned short max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
+        distance max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
     ):
         self.base_debtor_uri = base_debtor_uri
         self.base_debtor_id = base_debtor_id

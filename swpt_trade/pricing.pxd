@@ -12,6 +12,7 @@ cdef extern from *:
 
     typedef long long i64;
     typedef unsigned char bidflags;
+    typedef unsigned short distance;
 
     const bidflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
     const bidflags PRICEABLE_FLAG = 1 << 1;
@@ -20,7 +21,7 @@ cdef extern from *:
     const bidflags ANCHOR_FLAG = 1 << 5;
     const bidflags CONFIRMED_FLAG = 1 << 6;
 
-    const unsigned short INFINITE_DISTANCE = 0xffff;
+    const distance INFINITE_DISTANCE = 0xffff;
 
 
     class Key128 {
@@ -66,7 +67,7 @@ cdef extern from *:
     class Peg {
     private:
       bidflags flags = 0;
-      unsigned short distance_to_base = INFINITE_DISTANCE;
+      distance distance_to_base = INFINITE_DISTANCE;
       float price = NAN;
       const Key128 peg_debtor_key;
       const i64 peg_debtor_id;
@@ -116,14 +117,14 @@ cdef extern from *:
       std::unordered_map<i64, Peg*> tradables;
       bool prepared_for_queries = false;
 
-      unsigned short calc_distance_to_base(Peg* peg) {
+      distance short calc_distance_to_base(Peg* peg) {
         if (peg != NULL) {
           if (peg->flags & PRICEABILITY_DECIDED_FLAG) {
             return peg->distance_to_base;
           }
           peg->flags |= PRICEABILITY_DECIDED_FLAG;
           Peg* parent = peg->peg_ptr;
-          unsigned short dist;
+          distance dist;
           if ((dist = calc_distance_to_base(parent)) < max_distance_to_base) {
             peg->distance_to_base = dist + 1;
             peg->price = parent->price * peg->peg_exchange_rate;
@@ -137,20 +138,17 @@ cdef extern from *:
     public:
       const Key128 base_debtor_key;
       const i64 base_debtor_id;
-      const unsigned short max_distance_to_base;
+      const distance max_distance_to_base;
 
       PegRegistry(
         Key128 base_debtor_key,
         i64 base_debtor_id,
-        unsigned short max_distance_to_base
+        distance max_distance_to_base
       ) : base_debtor_key(base_debtor_key),
           base_debtor_id(base_debtor_id),
           max_distance_to_base(max_distance_to_base) {
         if (base_debtor_id == 0) {
           throw std::runtime_error("invalid base_debtor_id");
-        }
-        if (max_distance_to_base >= INFINITE_DISTANCE) {
-          throw std::runtime_error("invalid max_distance_to_base");
         }
       }
       ~PegRegistry() {
@@ -419,6 +417,7 @@ cdef extern from *:
     #endif
     """
     ctypedef long long i64
+    ctypedef unsigned short distance
 
     cdef cppclass Key128:
         """An 128-bit opaque hashable identifier.
@@ -463,8 +462,8 @@ cdef extern from *:
         """
         const Key128 base_debtor_key
         const i64 base_debtor_id
-        const unsigned short max_distance_to_base
-        PegRegistry(Key128, i64, unsigned short) except +
+        const distance max_distance_to_base
+        PegRegistry(Key128, i64, distance) except +
         void add_currency(Key128, i64, Key128, i64, float, bool) except +
         void prepare_for_queries() except +
         float get_price(i64) except +
@@ -529,7 +528,7 @@ cdef class BidProcessor:
     cdef readonly str base_debtor_uri
     cdef readonly i64 base_debtor_id
     cdef readonly i64 min_trade_amount
-    cdef readonly unsigned short max_distance_to_base
+    cdef readonly distance max_distance_to_base
     cdef BidRegistry* bid_registry_ptr
     cdef PegRegistry* peg_registry_ptr
     cdef object candidate_offers
