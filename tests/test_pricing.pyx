@@ -140,12 +140,8 @@ def test_peg_registry():
     r.add_currency(Key128(100, 9), 109, Key128(100, 7), 107, 2.0, False)
     r.add_currency(Key128(100, 10), 110, Key128(100, 1), 0, 1.0, True)
 
-    # ignored invalid debtor_id (not confirmed)
+    # ignored invalid debtor_id
     r.add_currency(Key128(100, 20), 0, Key128(100, 1), 101, 2.0, False)
-
-    with pytest.raises(RuntimeError):
-        # invalid confirmed debtor_id
-        r.add_currency(Key128(100, 20), 0, Key128(100, 1), 101, 2.0, True)
 
     with pytest.raises(RuntimeError):
         # duplicated debtor key

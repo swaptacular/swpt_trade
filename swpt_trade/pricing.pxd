@@ -98,9 +98,15 @@ cdef extern from *:
           peg_exchange_rate(peg_exchange_rate) {
       }
       bool anchor() {
+        // To be an "anchor currency" means that the currency is either
+        // tradable or it is the base currency. The base currency is
+        // always an anchor currency, even if it is not tradable.
         return (flags & ANCHOR_FLAG) != 0;
       }
       bool confirmed() {
+        // To be a "confirmed currency" means that a system account has
+        // been successfully created in this currency, and the currency's
+        // debtor info document has been verified as correct.
         return (flags & CONFIRMED_FLAG) != 0;
       }
       bool tradable() {
@@ -171,9 +177,6 @@ cdef extern from *:
         }
         if (debtor_id == 0) {
           // Currencies claiming debtor ID `0` are excluded from the graph.
-          if (confirmed) {
-            throw std::runtime_error("invalid confirmed debtor_id");
-          }
           return;
         }
         Peg*& peg_ptr_ref = pegs[debtor_key];
@@ -201,10 +204,9 @@ cdef extern from *:
       }
       void prepare_for_queries() {
         if (pegs.count(base_debtor_key) == 0) {
+          // Make sure the base currency is always included in the graph.
           add_currency(
-            base_debtor_key, base_debtor_id,
-            Key128(0, 0), 0,
-            0.0, false
+            base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0, false
           );
         }
         for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
@@ -213,7 +215,8 @@ cdef extern from *:
             Peg* parent_peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
             peg_ptr->peg_ptr = (
               (parent_peg_ptr->debtor_id == peg_ptr->peg_debtor_id)
-              ? parent_peg_ptr : NULL
+              ? parent_peg_ptr
+              : NULL
             );
           } catch (const std::out_of_range& oor) {
             peg_ptr->peg_ptr = NULL;
@@ -226,7 +229,7 @@ cdef extern from *:
           if (peg_ptr->tradable()) {
             Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
             if (tradable_ptr_ref != NULL) {
-              throw std::runtime_error("duplicated anchor debtor_id");
+              throw std::runtime_error("duplicated tradable debtor_id");
             }
             peg_ptr->set_anchor();
             tradable_ptr_ref = peg_ptr;
@@ -237,7 +240,9 @@ cdef extern from *:
           && !pegs.at(base_debtor_key)->tradable()
           && tradables.count(base_debtor_id) != 0
         ) {
-          throw std::runtime_error("duplicated anchor debtor_id");
+          throw std::runtime_error(
+            "inconsistent base_debtor_key and base_debtor_id"
+          );
         }
         prepared_for_queries = true;
       }
