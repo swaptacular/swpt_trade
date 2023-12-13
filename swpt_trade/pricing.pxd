@@ -81,6 +81,15 @@ cdef extern from *:
       void set_confirmed() {
         flags |= CONFIRMED_FLAG;
       }
+      void mark_as_base() {
+        flags |= (
+          PRICEABILITY_DECIDED_FLAG
+          | PRICEABLE_FLAG
+          | ANCHOR_FLAG
+        );
+        distance_to_base = 0;
+        price = 1.0;
+      }
 
     public:
       const i64 debtor_id;
@@ -98,15 +107,9 @@ cdef extern from *:
           peg_exchange_rate(peg_exchange_rate) {
       }
       bool anchor() {
-        // To be an "anchor currency" means that the currency is either
-        // tradable or it is the base currency. The base currency is
-        // always an anchor currency, even if it is not tradable.
         return (flags & ANCHOR_FLAG) != 0;
       }
       bool confirmed() {
-        // To be a "confirmed currency" means that a system account has
-        // been successfully created in this currency, and the currency's
-        // debtor info document has been verified as correct.
         return (flags & CONFIRMED_FLAG) != 0;
       }
       bool tradable() {
@@ -222,31 +225,21 @@ cdef extern from *:
             "add_currency called after query preparation"
           );
         }
-        if (debtor_id == 0) {
-          // Currencies claiming debtor ID `0` are excluded from the graph.
-          return;
-        }
-        Peg*& peg_ptr_ref = pegs[debtor_key];
-        if (peg_ptr_ref != NULL) {
-          throw std::runtime_error("duplicated debtor_key");
-        }
-        peg_ptr_ref = new Peg(
-          debtor_id,
-          peg_debtor_key,
-          peg_debtor_id,
-          peg_exchange_rate
-        );
-        if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
-          peg_ptr_ref->flags = (
-            PRICEABILITY_DECIDED_FLAG
-            | PRICEABLE_FLAG
-            | ANCHOR_FLAG
+        // Currencies claiming debtor ID `0` are excluded from the graph.
+        if (debtor_id != 0) {
+          Peg*& peg_ptr_ref = pegs[debtor_key];
+          if (peg_ptr_ref != NULL) {
+            throw std::runtime_error("duplicated debtor_key");
+          }
+          peg_ptr_ref = new Peg(
+            debtor_id, peg_debtor_key, peg_debtor_id, peg_exchange_rate
           );
-          peg_ptr_ref->distance_to_base = 0;
-          peg_ptr_ref->price = 1.0;
-        }
-        if (confirmed) {
-          peg_ptr_ref->set_confirmed();
+          if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
+            peg_ptr_ref->mark_as_base();
+          }
+          if (confirmed) {
+            peg_ptr_ref->set_confirmed();
+          }
         }
       }
       void prepare_for_queries() {
@@ -429,36 +422,49 @@ cdef extern from *:
         size_t calc_hash()
 
     cdef cppclass Peg:
-        """Tells to which other currency a given currency is pegged.
+        """Tells that a given currency is pegged another currency.
 
-        Pegs are organized in tree-like structures, each currency
-        pointing to its peg currency (see the `peg_ptr` field). In
-        addition to this, every bid maintains several flags bits,
-        which are used during the traversal of the peg-tree.
+        The currencies are organized in a tree-like structure, each
+        currency pointing to its peg currency (see the `peg_ptr`
+        field). At the root of the tree is the "base currency". In
+        addition to this, every currency maintains several bit-flags,
+        which are used during the traversal of the currency-tree:
+
+        * To be a "confirmed currency" means that a system account has
+          been successfully created in this currency, and the
+          currency's debtor info document has been confirmed as
+          correct.
+
+        * To be a "tradable currency" means that the currency is both
+          priceable (has a direct or indirect peg to the base
+          currency), and confirmed.
+
+        * To be an "anchor currency" means that the currency is either
+          tradable or it is the base currency. The base currency is
+          always an anchor currency, even if it is not tradable.
         """
         const i64 debtor_id
         const float peg_exchange_rate
         Peg* const peg_ptr
         Peg(i64, Key128, i64, float) except +
-        bool anchor() noexcept
         bool confirmed() noexcept
         bool tradable() noexcept
+        bool anchor() noexcept
 
 
     cdef cppclass PegRegistry:
-        """Given a set of currencies, generates the peg-tree.
+        """Given a set of currencies, generates the currency-tree.
 
-        At the root of the peg tree is the "base currency" (determined
-        by the `base_debtor_key` and `base_debtor_id` fields).
-        Currencies that are directly or indirectly pegged to the base
-        currency, are considered "priceable", and will be included in
-        the generated tree. Currencies that are not priceable, will be
-        excluded from the tree.
+        The base currency is determined by the `base_debtor_key` and
+        `base_debtor_id` fields. Currencies that are separated from
+        the base currency by no more than `max_distance_to_base` pegs,
+        are considered "priceable", and will be included in the
+        generated tree.
 
         The `prepare_for_queries` method must be called before
-        queering the registry, after all currencies have been added to
-        the registry. (A currency can be added to the registry by
-        calling the `add_currency` method.)
+        querying the registry, but only after all currencies have been
+        added to the registry (by calling the `add_currency` method
+        for each currency).
         """
         const Key128 base_debtor_key
         const i64 base_debtor_id
@@ -481,8 +487,8 @@ cdef extern from *:
 
         Bids are organized in tree-like structures, each bid pointing
         to the bid for its peg currency (see the `peg_ptr` field). In
-        addition to this, every bid maintains several flags bits,
-        which are used during the traversal of the bid-tree.
+        addition to this, every bid maintains several bit-flags, which
+        are used during the traversal of the bid-tree.
         """
         const i64 creditor_id
         const i64 debtor_id
