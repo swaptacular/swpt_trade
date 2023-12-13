@@ -140,6 +140,53 @@ cdef extern from *:
         }
         return INFINITE_DISTANCE;
       }
+      void ensure_base_currency() {
+        // Make sure the base currency is always included in the graph.
+        if (pegs.count(base_debtor_key) == 0) {
+          add_currency(
+            base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0, false
+          );
+        }
+      }
+      void set_pointers() {
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          Peg* peg_ptr = pair->second;
+          try {
+            Peg* parent_peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
+            peg_ptr->peg_ptr = (
+              (parent_peg_ptr->debtor_id == peg_ptr->peg_debtor_id)
+              ? parent_peg_ptr
+              : NULL
+            );
+          } catch (const std::out_of_range& oor) {
+            peg_ptr->peg_ptr = NULL;
+          }
+        }
+      }
+      void find_tradables() {
+        tradables.clear();
+        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
+          Peg* peg_ptr = pair->second;
+          calc_distance_to_base(peg_ptr);
+          if (peg_ptr->tradable()) {
+            Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
+            if (tradable_ptr_ref != NULL) {
+              throw std::runtime_error("duplicated tradable debtor_id");
+            }
+            peg_ptr->set_anchor();
+            tradable_ptr_ref = peg_ptr;
+          }
+        }
+        if (
+          tradables.count(base_debtor_id) != 0
+          && !pegs.at(base_debtor_key)->tradable()
+          && pegs.at(base_debtor_key)->anchor()
+        ) {
+          throw std::runtime_error(
+            "inconsistent base_debtor_key and base_debtor_id"
+          );
+        }
+      }
 
     public:
       const Key128 base_debtor_key;
@@ -203,47 +250,9 @@ cdef extern from *:
         }
       }
       void prepare_for_queries() {
-        if (pegs.count(base_debtor_key) == 0) {
-          // Make sure the base currency is always included in the graph.
-          add_currency(
-            base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0, false
-          );
-        }
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          Peg* peg_ptr = pair->second;
-          try {
-            Peg* parent_peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
-            peg_ptr->peg_ptr = (
-              (parent_peg_ptr->debtor_id == peg_ptr->peg_debtor_id)
-              ? parent_peg_ptr
-              : NULL
-            );
-          } catch (const std::out_of_range& oor) {
-            peg_ptr->peg_ptr = NULL;
-          }
-        }
-        tradables.clear();
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          Peg* peg_ptr = pair->second;
-          calc_distance_to_base(peg_ptr);
-          if (peg_ptr->tradable()) {
-            Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
-            if (tradable_ptr_ref != NULL) {
-              throw std::runtime_error("duplicated tradable debtor_id");
-            }
-            peg_ptr->set_anchor();
-            tradable_ptr_ref = peg_ptr;
-          }
-        }
-        if (
-          pegs.at(base_debtor_key)->anchor()
-          && !pegs.at(base_debtor_key)->tradable()
-          && tradables.count(base_debtor_id) != 0
-        ) {
-          throw std::runtime_error(
-            "inconsistent base_debtor_key and base_debtor_id"
-          );
-        }
+        ensure_base_currency();
+        set_pointers();
+        find_tradables();
         prepared_for_queries = true;
       }
       Peg* get_tradable_peg(i64 debtor_id) {
