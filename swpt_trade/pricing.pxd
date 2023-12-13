@@ -248,7 +248,7 @@ cdef extern from *:
         find_tradables();
         prepared_for_queries = true;
       }
-      Peg* get_tradable_peg(i64 debtor_id) {
+      Peg* get_tradable_currency(i64 debtor_id) {
         if (!prepared_for_queries) {
           throw std::runtime_error("issued query before query preparation");
         }
@@ -258,9 +258,9 @@ cdef extern from *:
           return NULL;
         }
       }
-      float get_price(i64 debtor_id) {
-        Peg* tradable_peg = get_tradable_peg(debtor_id);
-        return (tradable_peg == NULL) ? NAN : tradable_peg->price;
+      float get_currency_price(i64 debtor_id) {
+        Peg* peg_ptr = get_tradable_currency(debtor_id);
+        return (peg_ptr == NULL) ? NAN : peg_ptr->price;
       }
     };
 
@@ -419,10 +419,10 @@ cdef extern from *:
         const i64 second
         Key128() noexcept
         Key128(i64, i64) noexcept
-        size_t calc_hash()
+        size_t calc_hash() noexcept
 
     cdef cppclass Peg:
-        """Tells that a given currency is pegged another currency.
+        """Tells that a given currency is pegged to another currency.
 
         The currencies are organized in a tree-like structure, each
         currency pointing to its peg currency (see the `peg_ptr`
@@ -444,8 +444,8 @@ cdef extern from *:
           always an anchor currency, even if it is not tradable.
         """
         const i64 debtor_id
-        const float peg_exchange_rate
         Peg* const peg_ptr
+        const float peg_exchange_rate
         Peg(i64, Key128, i64, float) except +
         bool confirmed() noexcept
         bool tradable() noexcept
@@ -472,8 +472,8 @@ cdef extern from *:
         PegRegistry(Key128, i64, distance) except +
         void add_currency(Key128, i64, Key128, i64, float, bool) except +
         void prepare_for_queries() except +
-        float get_price(i64) except +
-        Peg* get_tradable_peg(i64) except +
+        Peg* get_tradable_currency(i64) except +
+        float get_currency_price(i64) except +
 
     cdef cppclass Bid:
         """Tells the disposition of a given trader to a given currency.
@@ -497,10 +497,10 @@ cdef extern from *:
         const float peg_exchange_rate
         Bid(i64, i64, i64, i64, float) except +
         bool processed() noexcept
-        void set_processed() noexcept
         bool deadend() noexcept
-        void set_deadend() noexcept
         bool anchor() noexcept
+        void set_processed() noexcept
+        void set_deadend() noexcept
         void set_anchor() noexcept
 
     cdef cppclass BidRegistry:
@@ -512,6 +512,9 @@ cdef extern from *:
         considered "priceable", and will be included in the generated
         tree. Bids that are not priceable, will be excluded from the
         tree.
+
+        To obtain all the bids in the generated tree, continue calling
+        the `get_priceable_bid` method, until it returns NULL.
         """
         const i64 base_debtor_id
         BidRegistry(i64) except +

@@ -149,11 +149,11 @@ def test_peg_registry():
 
     with pytest.raises(RuntimeError):
         # not prepared
-        r.get_price(101)
+        r.get_currency_price(101)
 
     with pytest.raises(RuntimeError):
         # not prepared
-        r.get_tradable_peg(101)
+        r.get_tradable_currency(101)
 
     r.prepare_for_queries()
 
@@ -162,21 +162,21 @@ def test_peg_registry():
         r.add_currency(Key128(100, 11), 111, Key128(100, 7), 107, 1.0, False)
 
     for _ in range(2):
-        assert math.isnan(r.get_price(101))
-        assert r.get_price(102) == 2.0
-        assert r.get_price(103) == 2.0 * 3.0
-        assert math.isnan(r.get_price(104))
-        assert math.isnan(r.get_price(105))
-        assert math.isnan(r.get_price(106))
-        assert math.isnan(r.get_price(107))
-        assert r.get_price(108) == 0.5
-        assert math.isnan(r.get_price(109))
-        assert math.isnan(r.get_price(110))
-        assert math.isnan(r.get_price(666))
+        assert math.isnan(r.get_currency_price(101))
+        assert r.get_currency_price(102) == 2.0
+        assert r.get_currency_price(103) == 2.0 * 3.0
+        assert math.isnan(r.get_currency_price(104))
+        assert math.isnan(r.get_currency_price(105))
+        assert math.isnan(r.get_currency_price(106))
+        assert math.isnan(r.get_currency_price(107))
+        assert r.get_currency_price(108) == 0.5
+        assert math.isnan(r.get_currency_price(109))
+        assert math.isnan(r.get_currency_price(110))
+        assert math.isnan(r.get_currency_price(666))
 
-        assert r.get_tradable_peg(101) == NULL
+        assert r.get_tradable_currency(101) == NULL
 
-        p102 = r.get_tradable_peg(102)
+        p102 = r.get_tradable_currency(102)
         assert p102.debtor_id == 102
         assert p102.peg_exchange_rate == 2.0
         assert p102.peg_ptr.debtor_id == 101
@@ -184,7 +184,7 @@ def test_peg_registry():
         assert p102.confirmed()
         assert p102.tradable()
 
-        p103 = r.get_tradable_peg(103)
+        p103 = r.get_tradable_currency(103)
         assert p103.debtor_id == 103
         assert p103.peg_exchange_rate == 3.0
         assert p103.peg_ptr.debtor_id == 102
@@ -192,12 +192,12 @@ def test_peg_registry():
         assert p103.confirmed()
         assert p103.tradable()
 
-        assert r.get_tradable_peg(104) == NULL
-        assert r.get_tradable_peg(105) == NULL
-        assert r.get_tradable_peg(106) == NULL
-        assert r.get_tradable_peg(107) == NULL
+        assert r.get_tradable_currency(104) == NULL
+        assert r.get_tradable_currency(105) == NULL
+        assert r.get_tradable_currency(106) == NULL
+        assert r.get_tradable_currency(107) == NULL
 
-        p108 = r.get_tradable_peg(108)
+        p108 = r.get_tradable_currency(108)
         assert p108.debtor_id == 108
         assert p108.peg_exchange_rate == 1.0
         assert p108.peg_ptr.debtor_id == 107
@@ -205,9 +205,9 @@ def test_peg_registry():
         assert p108.confirmed()
         assert p108.tradable()
 
-        assert r.get_tradable_peg(109) == NULL
-        assert r.get_tradable_peg(110) == NULL
-        assert r.get_tradable_peg(666) == NULL
+        assert r.get_tradable_currency(109) == NULL
+        assert r.get_tradable_currency(110) == NULL
+        assert r.get_tradable_currency(666) == NULL
 
         r.prepare_for_queries()  # this should be possible
 
