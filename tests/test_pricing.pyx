@@ -162,7 +162,7 @@ def test_peg_registry():
         r.add_currency(Key128(100, 11), 111, Key128(100, 7), 107, 1.0, False)
 
     for _ in range(2):
-        assert r.get_price(101) == 1.0
+        assert math.isnan(r.get_price(101))
         assert r.get_price(102) == 2.0
         assert r.get_price(103) == 2.0 * 3.0
         assert math.isnan(r.get_price(104))

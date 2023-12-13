@@ -246,33 +246,19 @@ cdef extern from *:
         }
         prepared_for_queries = true;
       }
-      float get_price(i64 debtor_id) {
-        if (!prepared_for_queries) {
-          throw std::runtime_error(
-            "get_price called before query preparation"
-          );
-        }
-        if (debtor_id == base_debtor_id) {
-          return 1.0;
-        }
-        try {
-          Peg* peg = tradables.at(debtor_id);
-          return peg->price;
-        } catch (const std::out_of_range& oor) {
-          return NAN;
-        }
-      }
       Peg* get_tradable_peg(i64 debtor_id) {
         if (!prepared_for_queries) {
-          throw std::runtime_error(
-            "get_tradable_peg called before query preparation"
-          );
+          throw std::runtime_error("issued query before query preparation");
         }
         try {
           return tradables.at(debtor_id);
         } catch (const std::out_of_range& oor) {
           return NULL;
         }
+      }
+      float get_price(i64 debtor_id) {
+        Peg* tradable_peg = get_tradable_peg(debtor_id);
+        return (tradable_peg == NULL) ? NAN : tradable_peg->price;
       }
     };
 
