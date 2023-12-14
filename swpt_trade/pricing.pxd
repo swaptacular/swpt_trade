@@ -11,18 +11,21 @@ cdef extern from *:
     #include <stdexcept>
 
     typedef long long i64;
-    typedef unsigned char bidflags;
+    typedef unsigned short bitflags;
     typedef unsigned short distance;
 
-    const bidflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
-    const bidflags PRICEABLE_FLAG = 1 << 1;
-    const bidflags PROCESSED_FLAG = 1 << 3;
-    const bidflags DEADEND_FLAG = 1 << 4;
-    const bidflags ANCHOR_FLAG = 1 << 5;
-    const bidflags CONFIRMED_FLAG = 1 << 6;
+    const bitflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
+    const bitflags PRICEABLE_FLAG = 1 << 1;
+    const bitflags CONFIRMED_FLAG = 1 << 2;
+    const bitflags ANCHOR_FLAG = 1 << 3;
 
     const distance INFINITE_DISTANCE = 0xffff;
+    const float EPSILON = 1e-5;
 
+
+    inline bool compare_prices(float price1, float price2) {
+       return (price2 != 0.0) ? abs(1.0 - price1 / price2) < EPSILON : false;
+    }
 
     class Key128 {
     public:
@@ -66,14 +69,16 @@ cdef extern from *:
 
     class Peg {
     private:
-      bidflags flags = 0;
-      distance distance_to_base = INFINITE_DISTANCE;
-      float price = NAN;
       const Key128 peg_debtor_key;
       const i64 peg_debtor_id;
+      bitflags flags = 0;
+      distance distance_to_base = INFINITE_DISTANCE;
 
       bool priceable() {
         return (flags & PRICEABLE_FLAG) != 0;
+      }
+      bool anchor() {
+        return (flags & ANCHOR_FLAG) != 0;
       }
       void set_anchor() {
         flags |= ANCHOR_FLAG;
@@ -88,13 +93,14 @@ cdef extern from *:
           | ANCHOR_FLAG
         );
         distance_to_base = 0;
-        price = 1.0;
+        currency_price = 1.0;
       }
 
     public:
+      float currency_price = NAN;
+      Peg* peg_ptr = NULL;
       const i64 debtor_id;
       const float peg_exchange_rate;
-      Peg* peg_ptr = NULL;
 
       Peg(
         i64 debtor_id,
@@ -105,9 +111,6 @@ cdef extern from *:
           peg_debtor_id(peg_debtor_id),
           debtor_id(debtor_id),
           peg_exchange_rate(peg_exchange_rate) {
-      }
-      bool anchor() {
-        return (flags & ANCHOR_FLAG) != 0;
       }
       bool confirmed() {
         return (flags & CONFIRMED_FLAG) != 0;
@@ -136,7 +139,9 @@ cdef extern from *:
           distance dist;
           if ((dist = calc_distance_to_base(parent)) < max_distance_to_base) {
             peg->distance_to_base = dist + 1;
-            peg->price = parent->price * peg->peg_exchange_rate;
+            peg->currency_price = (
+              parent->currency_price * peg->peg_exchange_rate
+            );
             peg->flags |= PRICEABLE_FLAG;
             return peg->distance_to_base;
           }
@@ -243,10 +248,12 @@ cdef extern from *:
         }
       }
       void prepare_for_queries() {
-        ensure_base_currency();
-        set_pointers();
-        find_tradables();
-        prepared_for_queries = true;
+        if (!prepared_for_queries) {
+          ensure_base_currency();
+          set_pointers();
+          find_tradables();
+          prepared_for_queries = true;
+        }
       }
       Peg* get_tradable_currency(i64 debtor_id) {
         if (!prepared_for_queries) {
@@ -260,26 +267,29 @@ cdef extern from *:
       }
       float get_currency_price(i64 debtor_id) {
         Peg* peg_ptr = get_tradable_currency(debtor_id);
-        return (peg_ptr == NULL) ? NAN : peg_ptr->price;
+        return (peg_ptr == NULL) ? NAN : peg_ptr->currency_price;
       }
     };
 
 
     class Bid {
     private:
-      const i64 peg_debtor_id;
-      bidflags flags = 0;
+      // The `data field holds the debtor ID of the peg currency, but
+      // only until the `peg_ptr` field has been initialized. After
+      // that, the `data` field holds various bit-flags.
+      i64 data;
 
       bool priceable() {
-        return (flags & PRICEABLE_FLAG) != 0;
+        return (data & PRICEABLE_FLAG) != 0;
       }
 
     public:
+      Bid* peg_ptr = NULL;
+      float currency_price = NAN;
       const float peg_exchange_rate;
       const i64 creditor_id;
       const i64 debtor_id;
       const i64 amount;
-      Bid* peg_ptr = NULL;
 
       Bid(
         i64 creditor_id,
@@ -287,29 +297,11 @@ cdef extern from *:
         i64 amount,
         i64 peg_debtor_id,
         float peg_exchange_rate
-      ) : peg_debtor_id(peg_debtor_id),
+      ) : data(peg_debtor_id),
           peg_exchange_rate(peg_exchange_rate),
           creditor_id(creditor_id),
           debtor_id(debtor_id),
           amount(amount) {
-      }
-      bool processed() {
-        return (flags & PROCESSED_FLAG) != 0;
-      }
-      bool deadend() {
-        return (flags & DEADEND_FLAG) != 0;
-      }
-      bool anchor() {
-        return (flags & ANCHOR_FLAG) != 0;
-      }
-      void set_processed() {
-        flags |= PROCESSED_FLAG;
-      }
-      void set_deadend() {
-        flags |= DEADEND_FLAG;
-      }
-      void set_anchor() {
-        flags |= ANCHOR_FLAG;
       }
 
       friend class BidRegistry;
@@ -324,35 +316,46 @@ cdef extern from *:
 
       static bool decide_priceability(Bid* bid) {
         if (bid != NULL) {
-          if (bid->flags & PRICEABILITY_DECIDED_FLAG) {
+          if (bid->data & PRICEABILITY_DECIDED_FLAG) {
             return bid->priceable();
           }
-          bid->flags |= PRICEABILITY_DECIDED_FLAG;
-          if (decide_priceability(bid->peg_ptr)) {
-            bid->flags |= PRICEABLE_FLAG;
+          bid->data |= PRICEABILITY_DECIDED_FLAG;
+          Bid* parent = bid->peg_ptr;
+          if (decide_priceability(parent)) {
+            bid->data |= PRICEABLE_FLAG;
+            bid->currency_price = (
+              parent->currency_price * bid->peg_exchange_rate
+            );
             return true;
           }
         }
         return false;
       }
-
-      void prepare_for_iteration() {
+      void set_pointers() {
         for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
           Bid* bid_ptr = pair->second;
-          if (bid_ptr->debtor_id == base_debtor_id) {
-            bid_ptr->flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
-          }
           try {
             bid_ptr->peg_ptr = bids.at(
-              Key128(bid_ptr->creditor_id, bid_ptr->peg_debtor_id)
+              Key128(bid_ptr->creditor_id, bid_ptr->data)
             );
           } catch (const std::out_of_range& oor) {
             bid_ptr->peg_ptr = NULL;
           }
+          bid_ptr->data = 0;  // `data` will hold bit-flags from now on.
+          if (bid_ptr->debtor_id == base_debtor_id) {
+            bid_ptr->data |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
+            bid_ptr->currency_price = 1.0;
+          }
         }
+      }
+      void calc_currency_prices() {
         for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
           decide_priceability(pair->second);
         }
+      }
+      void prepare_for_iteration() {
+        set_pointers();
+        calc_currency_prices();
       }
 
     public:
@@ -412,6 +415,8 @@ cdef extern from *:
     ctypedef long long i64
     ctypedef unsigned short distance
 
+    cdef bool compare_prices(float, float) noexcept
+
     cdef cppclass Key128:
         """An 128-bit opaque hashable identifier.
         """
@@ -438,18 +443,14 @@ cdef extern from *:
         * To be a "tradable currency" means that the currency is both
           priceable (has a direct or indirect peg to the base
           currency), and confirmed.
-
-        * To be an "anchor currency" means that the currency is either
-          tradable or it is the base currency. The base currency is
-          always an anchor currency, even if it is not tradable.
         """
         const i64 debtor_id
         Peg* const peg_ptr
         const float peg_exchange_rate
+        const float currency_price
         Peg(i64, Key128, i64, float) except +
         bool confirmed() noexcept
         bool tradable() noexcept
-        bool anchor() noexcept
 
 
     cdef cppclass PegRegistry:
@@ -493,15 +494,10 @@ cdef extern from *:
         const i64 creditor_id
         const i64 debtor_id
         const i64 amount
+        const float currency_price
         Bid* const peg_ptr
         const float peg_exchange_rate
         Bid(i64, i64, i64, i64, float) except +
-        bool processed() noexcept
-        bool deadend() noexcept
-        bool anchor() noexcept
-        void set_processed() noexcept
-        void set_deadend() noexcept
-        void set_anchor() noexcept
 
     cdef cppclass BidRegistry:
         """Given a set of `Bid`s, generates a tree of priceable bids.
@@ -534,19 +530,16 @@ cdef class CandidateOffer:
 
 
 cdef class BidProcessor:
-    cdef readonly str base_debtor_uri
+    cdef readonly str base_debtor_info_uri
     cdef readonly i64 base_debtor_id
-    cdef readonly i64 min_trade_amount
     cdef readonly distance max_distance_to_base
+    cdef readonly i64 min_trade_amount
     cdef BidRegistry* bid_registry_ptr
     cdef PegRegistry* peg_registry_ptr
     cdef object candidate_offers
     cdef unordered_set[i64] buyers
     cdef unordered_set[i64] sellers
-    cdef Peg* _find_tradable_peg(self, Bid*) noexcept
-    cdef (i64, float) _calc_endorsed_peg(self, Peg*) noexcept
+    cdef unordered_set[i64] to_be_confirmed
+    cdef Peg* _find_tradable_currency(self, Bid*)
     cdef void _add_candidate_offer(self, Bid*)
-    cdef (i64, float) _calc_anchored_peg(self, Bid*) noexcept
-    cdef bool _validate_peg(self, Bid*, Peg*) noexcept
-    cdef void _process_bid(self, Bid*)
     cdef Key128 _calc_key128(self, str)

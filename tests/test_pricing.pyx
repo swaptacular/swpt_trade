@@ -1,8 +1,10 @@
 # distutils: language = c++
 
 import pytest
+import math
 from . import cytest
 from swpt_trade.pricing cimport (
+    compare_prices,
     Key128,
     Peg,
     PegRegistry,
@@ -10,6 +12,47 @@ from swpt_trade.pricing cimport (
     BidRegistry,
     BidProcessor,
 )
+
+
+@cytest
+def test_compare_prices():
+    assert compare_prices(1.0, 1.0)
+    assert compare_prices(-1.0, -1.0)
+    assert compare_prices(1.0, 1.000001)
+    assert compare_prices(-1.0, -1.000001)
+    assert compare_prices(1e-25, 1.000001e-25)
+    assert compare_prices(1e+25, 1.000001e+25)
+    assert compare_prices(-1e-25, -1.000001e-25)
+    assert compare_prices(-1e+25, -1.000001e+25)
+
+    assert not compare_prices(0.0, 0.000001)
+    assert not compare_prices(0.0, 0.0)
+    assert not compare_prices(1.0, 0.0)
+    assert not compare_prices(0.0, 1.0)
+    assert not compare_prices(-1.0, 0.0)
+    assert not compare_prices(0.0, -1.0)
+    assert not compare_prices(-1.0, 1.0)
+    assert not compare_prices(1.0, -1.0)
+    assert not compare_prices(1.0, 1.000011)
+    assert not compare_prices(1e-25, 1.000011e-25)
+    assert not compare_prices(1e+25, 1.000011e+25)
+    assert not compare_prices(-1e-25, -1.000011e-25)
+    assert not compare_prices(-1e+25, -1.000011e+25)
+    assert not compare_prices(1.0, math.inf)
+    assert not compare_prices(1.0, -math.inf)
+    assert not compare_prices(1.0, math.nan)
+    assert not compare_prices(math.inf, 1.0)
+    assert not compare_prices(math.inf, math.inf)
+    assert not compare_prices(math.inf, -math.inf)
+    assert not compare_prices(math.inf, math.nan)
+    assert not compare_prices(-math.inf, 1.0)
+    assert not compare_prices(-math.inf, math.inf)
+    assert not compare_prices(-math.inf, -math.inf)
+    assert not compare_prices(-math.inf, math.nan)
+    assert not compare_prices(math.nan, 1.0)
+    assert not compare_prices(math.nan, math.nan)
+    assert not compare_prices(math.nan, math.inf)
+    assert not compare_prices(math.nan, -math.inf)
 
 
 @cytest
@@ -21,19 +64,7 @@ def test_bid():
     assert bid.amount == -5000
     assert bid.peg_ptr == NULL
     assert bid.peg_exchange_rate == 1.0
-    assert not bid.processed()
-    assert not bid.deadend()
-    assert not bid.anchor()
     
-    bid.set_processed()
-    assert bid.processed()
-    bid.set_deadend()
-    bid.set_deadend()
-    assert bid.deadend()
-    bid.set_anchor()
-    bid.set_anchor()
-    bid.set_anchor()
-    assert bid.anchor()
     del bid
 
 
@@ -67,15 +98,6 @@ def test_bid_registry():
 
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
-        assert not bid.processed()
-        assert not bid.deadend()
-        assert not bid.anchor()
-        bid.set_processed()
-        bid.set_deadend()
-        bid.set_anchor()
-        assert bid.processed()
-        assert bid.deadend()
-        assert bid.anchor()
         debtor_ids.append(bid.debtor_id)
 
     assert len(debtor_ids) == 5
@@ -114,7 +136,6 @@ def test_peg():
     assert p.debtor_id == 101
     assert p.peg_exchange_rate == 2.0
     assert p.peg_ptr == NULL
-    assert p.anchor() is False
     assert p.confirmed() is False
     assert p.tradable() is False
     del p
@@ -180,7 +201,6 @@ def test_peg_registry():
         assert p102.debtor_id == 102
         assert p102.peg_exchange_rate == 2.0
         assert p102.peg_ptr.debtor_id == 101
-        assert p102.anchor()
         assert p102.confirmed()
         assert p102.tradable()
 
@@ -188,7 +208,6 @@ def test_peg_registry():
         assert p103.debtor_id == 103
         assert p103.peg_exchange_rate == 3.0
         assert p103.peg_ptr.debtor_id == 102
-        assert p103.anchor()
         assert p103.confirmed()
         assert p103.tradable()
 
@@ -201,7 +220,6 @@ def test_peg_registry():
         assert p108.debtor_id == 108
         assert p108.peg_exchange_rate == 1.0
         assert p108.peg_ptr.debtor_id == 107
-        assert p108.anchor()
         assert p108.confirmed()
         assert p108.tradable()
 
