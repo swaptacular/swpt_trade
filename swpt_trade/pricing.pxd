@@ -267,19 +267,19 @@ cdef extern from *:
 
     class Bid {
     private:
-      bidflags flags = 0;
       const i64 peg_debtor_id;
+      bidflags flags = 0;
 
       bool priceable() {
         return (flags & PRICEABLE_FLAG) != 0;
       }
 
     public:
+      const float peg_exchange_rate;
       const i64 creditor_id;
       const i64 debtor_id;
       const i64 amount;
       Bid* peg_ptr = NULL;
-      const float peg_exchange_rate;
 
       Bid(
         i64 creditor_id,
@@ -288,10 +288,10 @@ cdef extern from *:
         i64 peg_debtor_id,
         float peg_exchange_rate
       ) : peg_debtor_id(peg_debtor_id),
+          peg_exchange_rate(peg_exchange_rate),
           creditor_id(creditor_id),
           debtor_id(debtor_id),
-          amount(amount),
-          peg_exchange_rate(peg_exchange_rate) {
+          amount(amount) {
       }
       bool processed() {
         return (flags & PROCESSED_FLAG) != 0;
