@@ -42,6 +42,32 @@ cdef class BidProcessor:
     The attempted trades in all currencies will be for amounts greater
     of equal than the specified `min_trade_amount`. Possible trades
     for lesser amounts will be ignored.
+
+    Usage example:
+
+    >>> bp = BidProcessor('https://x.com/101', 101)
+    >>> bp.register_currency(True, 'https://example.com/101', 101)
+    >>> bp.register_currency(True, 'https://example.com/102', 102,
+    ...   'https://example.com/101', 101, 2.0)
+    >>> bp.register_currency(False, 'https://x.com/103', 103,
+    ...   'https://example.com/101', 101, 1.0)
+    >>> bp.get_currency_price(101)
+    1.0
+    >>> bp.get_currency_price(102)
+    2.0
+    >>> bp.get_currency_price(103)
+    nan
+    >>> bp.register_bid(1, 101, 8000)
+    >>> bp.register_bid(1, 102, -6000, 101, 2.0)
+    >>> bp.generate_candidate_offers()
+    [<CandidateOffer object at ....>, <CandidateOffer object at ....>]
+    >>> bp.register_bid(2, 101, 5000)
+    >>> bp.register_bid(2, 102, -4000, 101, 2.0)
+    >>> bp.register_bid(2, 103, -3000, 101, 1.0)
+    >>> bp.generate_candidate_offers()
+    [<CandidateOffer object at ....>, <CandidateOffer object at ....>]
+    >>> list(bp.currencies_to_be_confirmed())
+    >>> [103]
     """
     def __cinit__(
         self,
