@@ -31,6 +31,9 @@ cdef nodestatus NODE_PATH_FLAG = 1
 
 
 cdef class Digraph:
+    """A directed graph of trading offers.
+    """
+
     def __cinit__(self):
         root_trader = self.traders.create_node(
             ROOT_TRADER_ID, 0.0, NODE_INITIAL_STATUS

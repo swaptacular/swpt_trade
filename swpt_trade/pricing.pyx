@@ -1,6 +1,7 @@
 # distutils: language = c++
 import hashlib
 from cpython cimport array
+from libc.math cimport NAN
 from libcpp cimport bool
 
 cdef i64 DEFAULT_MIN_TRADE_AMOUNT = 1000
@@ -8,6 +9,17 @@ cdef distance DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
 
 cdef class CandidateOffer:
+    """A trader bid, that may eventually become a confirmed offer.
+
+    Instances of this class have the following fields:
+
+    cdef readonly i64 amount
+    cdef readonly i64 debtor_id
+    cdef readonly i64 creditor_id
+
+    The `amount` field can be negative (the trader wants to sell), or
+    positive (the trader wants to buy). The amount can not be zero.
+    """
     def is_buy_offer(self):
         return self.amount > 0
 
@@ -16,6 +28,21 @@ cdef class CandidateOffer:
 
 
 cdef class BidProcessor:
+    """Processes traders' bids, consulting the tree of currencies.
+
+    The currencies are organized in a tree-like structure, each
+    currency pointing to its peg currency. At the root of the tree is
+    the "base currency". The base currency is identified by a ("debtor
+    info URI", "debtor ID") pair.
+
+    Currencies that are separated from the base currency by no more
+    than `max_distance_to_base` pegs will be considered "priceable",
+    and will be included in the currency tree.
+
+    The attempted trades in all currencies will be for amounts greater
+    of equal than the specified `min_trade_amount`. Possible trades
+    for lesser amounts will be ignored.
+    """
     def __cinit__(
         self,
         str base_debtor_info_uri,
@@ -46,8 +73,25 @@ cdef class BidProcessor:
         i64 debtor_id,
         str peg_debtor_info_uri='',
         i64 peg_debtor_id=0,
-        float peg_exchange_rate=0.0,
+        float peg_exchange_rate=NAN,
     ):
+        """Register a currency, which may be pegged to another
+        currency.
+
+        When the `confirmed` flag is `True`, this means that a system
+        account has been successfully created in this currency, and
+        the currency's debtor info document has been confirmed as
+        correct.
+
+        Both the pegged currency and the peg currency are identified
+        by a ("debtor info URI", "debtor ID") pair.
+
+        The given `peg_exchange_rate` specifies the exchange rate
+        between the pegged currency and the peg currency. For example,
+        `2.0` would mean that pegged currency's tokens are twice as
+        valuable as peg currency's tokens. Note that 0.0, +inf, -inf,
+        and NAN are also acceptable exchange rate values.
+        """
         self.peg_registry_ptr.add_currency(
             self._calc_key128(debtor_info_uri),
             debtor_id,
@@ -58,6 +102,16 @@ cdef class BidProcessor:
         )
 
     def get_currency_price(self, i64 debtor_id):
+        """Return the price of a tradable currency.
+
+        This method should be called only after all the participating
+        currencies have been registered (by calling the
+        `register_currency` method for each one of them).
+
+        `NAN` will be returned if the currency determined by the given
+        `debtor_id` is not tradable (that is: the currency it is not
+        both confirmed and priceable).
+        """
         peg_registry = self.peg_registry_ptr
         peg_registry.prepare_for_queries()
         return peg_registry.get_currency_price(debtor_id)
@@ -68,8 +122,21 @@ cdef class BidProcessor:
         i64 debtor_id,
         i64 amount,
         i64 peg_debtor_id=0,
-        float peg_exchange_rate=0.0,
+        float peg_exchange_rate=NAN,
     ):
+        """Tells the disposition of a given trader to a given
+        currency.
+
+        The trader is determined by the `creditor_id` argument. The
+        currency is determined by the `debtor_id` argument.
+
+        The `amount` field can be negative (the trader wants to sell),
+        positive (the trader wants to buy), or zero (the trader do not
+        want to trade). Bids with zero amounts must also be
+        registered, because they may declare an approved by the trader
+        exchange rate to another currency (the `peg_debtor_id` and
+        `peg_exchange_rate` arguments).
+        """
         self.bid_registry_ptr.add_bid(
             creditor_id,
             debtor_id,
@@ -79,6 +146,31 @@ cdef class BidProcessor:
         )
 
     def generate_candidate_offers(self):
+        """Analyze registered bids and return a list of candidate
+        offers.
+
+        This method should be called only after all the participating
+        currencies have been registered (by calling the
+        `register_currency` method for each one of them).
+
+        Note that this method causes all bids that have been
+        registered so far to be analyzed and discarded. This means
+        that an immediate second call to `generate_candidate_offers`
+        will return an empty list.
+
+        It is possible however, after a call to this method, to
+        register a new batch of bids, and call the
+        `generate_candidate_offers` method again. In this case, the
+        second call will analyze and discard the second batch of bids.
+        This process can be repeated as many times as needed.
+
+        IMPORTANT: All bids coming from one trader should be included
+        in a single batch of registered bids. That is: When we start
+        registering bids from a given trader (by calling the
+        `register_bid` method), we should not call
+        `generate_candidate_offers` until all the bids from that
+        trader had been registered.
+        """
         self.peg_registry_ptr.prepare_for_queries()
         bid_registry = self.bid_registry_ptr
 
@@ -113,6 +205,20 @@ cdef class BidProcessor:
         return candidate_offers
 
     def currencies_to_be_confirmed(self):
+        """Return an iterator over debtor IDs of non-confirmed,
+        on-sale currencies.
+
+        While the `generate_candidate_offers` method analyzes the
+        registered bids, it may discover sell offers for currencies
+        for which a system account has not been created yet. Every
+        `BidProcessor` instance will maintain an ever-growing set of
+        debtor IDs of such currencies, so that system accounts could
+        be created for them eventually.
+
+        IMPORTANT: Successive calls to the `generate_candidate_offers`
+        method will not annul the maintained ever-growing set of
+        non-confirmed, on-sale currencies.
+        """
         for debtor_id in self.to_be_confirmed:
             yield debtor_id
 

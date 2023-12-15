@@ -458,7 +458,7 @@ cdef extern from *:
 
         The base currency is determined by the `base_debtor_key` and
         `base_debtor_id` fields. Currencies that are separated from
-        the base currency by no more than `max_distance_to_base` pegs,
+        the base currency by no more than `max_distance_to_base` pegs
         are considered "priceable", and will be included in the
         generated tree.
 
@@ -519,11 +519,6 @@ cdef extern from *:
 
 
 cdef class CandidateOffer:
-    """A trader bid, that may eventually become a confirmed offer.
-
-    The `amount` field can be negative (the trader wants to sell), or
-    positive (the trader wants to buy). The amount can not be zero.
-    """
     cdef readonly i64 amount
     cdef readonly i64 debtor_id
     cdef readonly i64 creditor_id
