@@ -102,7 +102,8 @@ cdef class BidProcessor:
         )
 
     def get_currency_price(self, i64 debtor_id):
-        """Return the price of a tradable currency.
+        """Return the price of a tradable currency, expressed in base
+        currency's tokens.
 
         This method should be called only after all the participating
         currencies have been registered (by calling the
