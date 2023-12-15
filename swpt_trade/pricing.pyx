@@ -7,6 +7,14 @@ cdef i64 DEFAULT_MIN_TRADE_AMOUNT = 1000
 cdef distance DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
 
+cdef class CandidateOffer:
+    def is_buy_offer(self):
+        return self.amount > 0
+
+    def is_sell_offer(self):
+        return self.amount < 0
+
+
 cdef class BidProcessor:
     def __cinit__(
         self,
@@ -48,6 +56,11 @@ cdef class BidProcessor:
             peg_exchange_rate,
             confirmed,
         )
+
+    def get_currency_price(self, i64 debtor_id):
+        peg_registry = self.peg_registry_ptr
+        peg_registry.prepare_for_queries()
+        return peg_registry.get_currency_price(debtor_id)
 
     def register_bid(
         self,
@@ -93,7 +106,7 @@ cdef class BidProcessor:
         # Free unused memory.
         del bid_registry
         self.bid_registry_ptr = new BidRegistry(self.base_debtor_id)
-        self.candidate_offers = []
+        self.candidate_offers.clear()
         self.buyers.clear()
         self.sellers.clear()
 

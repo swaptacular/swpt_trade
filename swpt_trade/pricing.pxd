@@ -129,7 +129,7 @@ cdef extern from *:
       std::unordered_map<i64, Peg*> tradables;
       bool prepared_for_queries = false;
 
-      distance short calc_distance_to_base(Peg* peg) {
+      distance calc_distance_to_base(Peg* peg) {
         if (peg != NULL) {
           if (peg->flags & PRICEABILITY_DECIDED_FLAG) {
             return peg->distance_to_base;

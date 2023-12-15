@@ -248,3 +248,97 @@ def test_bp_calc_key128():
         second = int.from_bytes(digest[8:16], sys.byteorder, signed="True")
         assert first == key.first
         assert second == key.second
+
+
+@cytest
+def test_bp_candidate_offers():
+    bp = BidProcessor('https://x.com/101', 101, 2, 1000)
+    bp.register_currency(False, 'https://x.com/101', 101)  # base
+    bp.register_currency(
+        True, 'https://x.com/102', 102, 'https://x.com/101', 101, 2.0
+    )
+    bp.register_currency(
+        True, 'https://x.com/103', 103, 'https://x.com/102', 102, 3.0
+    )
+    bp.register_currency(
+        True, 'https://x.com/104', 104, 'https://x.com/103', 103, 4.0
+    )
+    bp.register_currency(
+        False, 'https://x.com/105', 105, 'https://x.com/101', 101, 5.0
+    )
+    bp.register_currency(
+        True, 'https://x.com/106', 106, 'https://x.com/105', 105, 6.0
+    )
+    bp.register_currency(
+        False, 'https://x.com/107', 107, 'https://x.com/102', 102, 7.0
+    )
+    bp.register_currency(
+        True, 'https://x.com/108', 108, 'https://x.com/102', 666, 1.0
+    )
+    bp.register_currency(
+        True, 'https://x.com/109', 109, 'https://x.com/666', 102, 1.0
+    )
+    assert math.isnan(bp.get_currency_price(101))
+    assert bp.get_currency_price(102) == 2.0
+    assert bp.get_currency_price(103) == 6.0
+    assert math.isnan(bp.get_currency_price(104))
+    assert math.isnan(bp.get_currency_price(107))
+    assert math.isnan(bp.get_currency_price(108))
+    assert math.isnan(bp.get_currency_price(109))
+    assert math.isnan(bp.get_currency_price(105))
+    assert bp.get_currency_price(106) == 30.0
+
+    bp.register_bid(1, 101, 666666)  # not tradable
+    bp.register_bid(1, 105, -666666, 101, 5.0)  # not tradable
+    bp.register_bid(1, 106, -50000, 105, 6.000005)  # OK!
+    bp.register_bid(1, 102, 10000, 101, 2.0)  # OK!
+    bp.register_bid(1, 103, 100, 102, 3.0)  # abs(amount) is too small
+
+    bp.register_bid(2, 101, 666666)  # not tradable
+    bp.register_bid(2, 105, -666666, 101, 5.0)  # not tradable
+    bp.register_bid(2, 106, -50000, 105, 6.0)  # OK, but no buyer for this!
+    bp.register_bid(2, 102, 10000, 101, 1.999) # wrongly priced
+    bp.register_bid(2, 103, 10000, 102, 3.0)  # pegged to wrongly priced
+
+    bp.register_bid(3, 101, 666666)  # not tradable
+    bp.register_bid(3, 105, -666666, 101, 5.0)  # not tradable
+    bp.register_bid(3, 106, 50000, 105, 6.0)  # OK, but no seller for this!
+    bp.register_bid(3, 102, -100, 101, 2.0)  # abs(amount) is too small
+    bp.register_bid(3, 103, 10000, 102, 3.0)  # OK, but no seller for this!
+    bp.register_bid(3, 104, -10000, 103, 4.0)  # too big distance to base
+
+    bp.register_bid(4, 105, -666666, 101, 5.0)  # no base bid
+    bp.register_bid(4, 106, -50000, 105, 6.000005)  # no base bid
+    bp.register_bid(4, 102, 10000, 101, 2.0)  # no base bid
+    bp.register_bid(4, 103, 100, 102, 3.0)  # no base bid
+
+    offers = bp.generate_candidate_offers()
+    assert len(offers) == 2
+
+    offer0, offer1 = offers
+    if offer0.debtor_id != 102:
+        offer0, offer1 = offer1, offer0
+
+    assert offer0.debtor_id == 102
+    assert offer0.creditor_id == 1
+    assert offer0.amount == 10000
+    assert offer0.is_buy_offer()
+    assert not offer0.is_sell_offer()
+
+    assert offer1.debtor_id == 106
+    assert offer1.creditor_id == 1
+    assert offer1.amount == -50000
+    assert not offer1.is_buy_offer()
+    assert offer1.is_sell_offer()
+
+    assert len(bp.generate_candidate_offers()) == 0
+    assert len(bp.generate_candidate_offers()) == 0
+
+    bp.register_bid(5, 101, 666666)  # not tradable
+    bp.register_bid(5, 105, -666666, 101, 5.0)  # not tradable
+    bp.register_bid(5, 106, -50000, 105, 6.000005)  # OK!
+    bp.register_bid(5, 102, 10000, 101, 2.0)  # OK!
+    bp.register_bid(5, 103, 10000, 102, 3.0)  # OK!
+    assert len(bp.generate_candidate_offers()) == 3
+    assert len(bp.generate_candidate_offers()) == 0
+
