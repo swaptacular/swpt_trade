@@ -331,6 +331,9 @@ def test_bp_candidate_offers():
     assert not offer1.is_buy_offer()
     assert offer1.is_sell_offer()
 
+    l = sorted(list(bp.currencies_to_be_confirmed()))
+    assert l == [104, 105]
+
     assert len(bp.generate_candidate_offers()) == 0
     assert len(bp.generate_candidate_offers()) == 0
 
@@ -339,6 +342,14 @@ def test_bp_candidate_offers():
     bp.register_bid(5, 106, -50000, 105, 6.000005)  # OK!
     bp.register_bid(5, 102, 10000, 101, 2.0)  # OK!
     bp.register_bid(5, 103, 10000, 102, 3.0)  # OK!
+    bp.register_bid(5, 107, -10000, 102, 7.0)  # not tradable
     assert len(bp.generate_candidate_offers()) == 3
     assert len(bp.generate_candidate_offers()) == 0
 
+    with pytest.raises(RuntimeError):
+        bp.register_currency(
+            True, 'https://x.com/110', 110, 'https://x.com/102', 102, 1.0
+        )
+
+    l = sorted(list(bp.currencies_to_be_confirmed()))
+    assert l == [104, 105, 107]
