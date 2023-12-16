@@ -308,9 +308,7 @@ cdef extern from *:
           Bid* peg = bid->peg_ptr;
           if (decide_priceability(peg)) {
             bid->data |= PRICEABLE_FLAG;
-            bid->currency_price = (
-              peg->currency_price * bid->peg_exchange_rate
-            );
+            bid->currency_price = peg->currency_price * bid->peg_exchange_rate;
             return true;
           }
         }
@@ -319,14 +317,13 @@ cdef extern from *:
       void set_pointers() {
         for (auto it = bids.begin(); it != bids.end(); ++it) {
           Bid* bid = it->second;
+          Key128 peg_key = Key128(bid->creditor_id, bid->data);
           try {
-            bid->peg_ptr = bids.at(
-              Key128(bid->creditor_id, bid->data)
-            );
+            bid->peg_ptr = bids.at(peg_key);
           } catch (const std::out_of_range& oor) {
             bid->peg_ptr = NULL;
           }
-          bid->data = 0;  // `data` will hold bit-flags from now on.
+          bid->data = 0;  // `data` will hold the bit-flags from now on.
           if (bid->debtor_id == base_debtor_id) {
             bid->data |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
             bid->currency_price = 1.0;
