@@ -17,7 +17,7 @@ cdef extern from *:
     const bitflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
     const bitflags PRICEABLE_FLAG = 1 << 1;
     const bitflags CONFIRMED_FLAG = 1 << 2;
-    const bitflags ANCHOR_FLAG = 1 << 3;
+    const bitflags BASE_FLAG = 1 << 3;
 
     const distance INFINITE_DISTANCE = 0xffff;
     const float EPSILON = 1e-5;
@@ -67,7 +67,7 @@ cdef extern from *:
     }
 
 
-    class Peg {
+    class Currency {
     private:
       const Key128 peg_debtor_key;
       const i64 peg_debtor_id;
@@ -77,11 +77,11 @@ cdef extern from *:
       bool priceable() {
         return (flags & PRICEABLE_FLAG) != 0;
       }
-      bool anchor() {
-        return (flags & ANCHOR_FLAG) != 0;
+      bool base() {
+        return (flags & BASE_FLAG) != 0;
       }
-      void set_anchor() {
-        flags |= ANCHOR_FLAG;
+      void set_base() {
+        flags |= BASE_FLAG;
       }
       void set_confirmed() {
         flags |= CONFIRMED_FLAG;
@@ -90,7 +90,7 @@ cdef extern from *:
         flags |= (
           PRICEABILITY_DECIDED_FLAG
           | PRICEABLE_FLAG
-          | ANCHOR_FLAG
+          | BASE_FLAG
         );
         distance_to_base = 0;
         currency_price = 1.0;
@@ -98,11 +98,11 @@ cdef extern from *:
 
     public:
       float currency_price = NAN;
-      Peg* peg_ptr = NULL;
+      Currency* peg_ptr = NULL;
       const i64 debtor_id;
       const float peg_exchange_rate;
 
-      Peg(
+      Currency(
         i64 debtor_id,
         Key128 peg_debtor_key,
         i64 peg_debtor_id,
@@ -119,76 +119,76 @@ cdef extern from *:
         return confirmed() && priceable();
       }
 
-      friend class PegRegistry;
+      friend class CurrencyRegistry;
     };
 
 
-    class PegRegistry {
+    class CurrencyRegistry {
     private:
-      std::unordered_map<Key128, Peg*> pegs;
-      std::unordered_map<i64, Peg*> tradables;
+      std::unordered_map<Key128, Currency*> currencies;
+      std::unordered_map<i64, Currency*> tradables;
       bool prepared_for_queries = false;
 
-      distance calc_distance_to_base(Peg* peg) {
-        if (peg != NULL) {
-          if (peg->flags & PRICEABILITY_DECIDED_FLAG) {
-            return peg->distance_to_base;
+      distance calc_distance_to_base(Currency* currency) {
+        if (currency != NULL) {
+          if (currency->flags & PRICEABILITY_DECIDED_FLAG) {
+            return currency->distance_to_base;
           }
-          peg->flags |= PRICEABILITY_DECIDED_FLAG;
-          Peg* parent = peg->peg_ptr;
+          currency->flags |= PRICEABILITY_DECIDED_FLAG;
+          Currency* peg = currency->peg_ptr;
           distance dist;
-          if ((dist = calc_distance_to_base(parent)) < max_distance_to_base) {
-            peg->distance_to_base = dist + 1;
-            peg->currency_price = (
-              parent->currency_price * peg->peg_exchange_rate
+          if ((dist = calc_distance_to_base(peg)) < max_distance_to_base) {
+            currency->distance_to_base = dist + 1;
+            currency->currency_price = (
+              peg->currency_price * currency->peg_exchange_rate
             );
-            peg->flags |= PRICEABLE_FLAG;
-            return peg->distance_to_base;
+            currency->flags |= PRICEABLE_FLAG;
+            return currency->distance_to_base;
           }
         }
         return INFINITE_DISTANCE;
       }
       void ensure_base_currency() {
         // Make sure the base currency is always included in the graph.
-        if (pegs.count(base_debtor_key) == 0) {
+        if (currencies.count(base_debtor_key) == 0) {
           add_currency(
             false, base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0
           );
         }
       }
       void set_pointers() {
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          Peg* peg_ptr = pair->second;
+        for (auto it = currencies.begin(); it != currencies.end(); ++it) {
+          Currency* currency = it->second;
           try {
-            Peg* parent_peg_ptr = pegs.at(peg_ptr->peg_debtor_key);
-            peg_ptr->peg_ptr = (
-              (parent_peg_ptr->debtor_id == peg_ptr->peg_debtor_id)
-              ? parent_peg_ptr
+            Currency* peg = currencies.at(currency->peg_debtor_key);
+            currency->peg_ptr = (
+              (peg->debtor_id == currency->peg_debtor_id)
+              ? peg
               : NULL
             );
           } catch (const std::out_of_range& oor) {
-            peg_ptr->peg_ptr = NULL;
+            currency->peg_ptr = NULL;
           }
         }
       }
       void find_tradables() {
         tradables.clear();
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          Peg* peg_ptr = pair->second;
-          calc_distance_to_base(peg_ptr);
-          if (peg_ptr->tradable()) {
-            Peg*& tradable_ptr_ref = tradables[peg_ptr->debtor_id];
+        for (auto it = currencies.begin(); it != currencies.end(); ++it) {
+          Currency* currency = it->second;
+          calc_distance_to_base(currency);
+          if (currency->tradable()) {
+            Currency*& tradable_ptr_ref = tradables[currency->debtor_id];
             if (tradable_ptr_ref != NULL) {
               throw std::runtime_error("duplicated tradable debtor_id");
             }
-            peg_ptr->set_anchor();
-            tradable_ptr_ref = peg_ptr;
+            currency->set_base();
+            tradable_ptr_ref = currency;
           }
         }
         if (
           tradables.count(base_debtor_id) != 0
-          && !pegs.at(base_debtor_key)->tradable()
-          && pegs.at(base_debtor_key)->anchor()
+          && !currencies.at(base_debtor_key)->tradable()
+          && currencies.at(base_debtor_key)->base()
         ) {
           throw std::runtime_error(
             "inconsistent base_debtor_key and base_debtor_id"
@@ -201,7 +201,7 @@ cdef extern from *:
       const i64 base_debtor_id;
       const distance max_distance_to_base;
 
-      PegRegistry(
+      CurrencyRegistry(
         Key128 base_debtor_key,
         i64 base_debtor_id,
         distance max_distance_to_base
@@ -212,9 +212,9 @@ cdef extern from *:
           throw std::runtime_error("invalid base_debtor_id");
         }
       }
-      ~PegRegistry() {
-        for (auto pair = pegs.begin(); pair != pegs.end(); ++pair) {
-          delete pair->second;
+      ~CurrencyRegistry() {
+        for (auto it = currencies.begin(); it != currencies.end(); ++it) {
+          delete it->second;
         }
       }
       void add_currency(
@@ -232,18 +232,18 @@ cdef extern from *:
         }
         // Currencies claiming debtor ID `0` are excluded from the graph.
         if (debtor_id != 0) {
-          Peg*& peg_ptr_ref = pegs[debtor_key];
-          if (peg_ptr_ref != NULL) {
+          Currency*& currency_ptr_ref = currencies[debtor_key];
+          if (currency_ptr_ref != NULL) {
             throw std::runtime_error("duplicated debtor_key");
           }
-          peg_ptr_ref = new Peg(
+          currency_ptr_ref = new Currency(
             debtor_id, peg_debtor_key, peg_debtor_id, peg_exchange_rate
           );
           if (debtor_key == base_debtor_key && debtor_id == base_debtor_id) {
-            peg_ptr_ref->mark_as_base();
+            currency_ptr_ref->mark_as_base();
           }
           if (confirmed) {
-            peg_ptr_ref->set_confirmed();
+            currency_ptr_ref->set_confirmed();
           }
         }
       }
@@ -255,7 +255,7 @@ cdef extern from *:
           prepared_for_queries = true;
         }
       }
-      Peg* get_tradable_currency(i64 debtor_id) {
+      Currency* get_tradable_currency(i64 debtor_id) {
         if (!prepared_for_queries) {
           throw std::runtime_error("issued query before query preparation");
         }
@@ -266,8 +266,8 @@ cdef extern from *:
         }
       }
       float get_currency_price(i64 debtor_id) {
-        Peg* peg_ptr = get_tradable_currency(debtor_id);
-        return (peg_ptr == NULL) ? NAN : peg_ptr->currency_price;
+        Currency* currency = get_tradable_currency(debtor_id);
+        return (currency == NULL) ? NAN : currency->currency_price;
       }
     };
 
@@ -320,11 +320,11 @@ cdef extern from *:
             return bid->priceable();
           }
           bid->data |= PRICEABILITY_DECIDED_FLAG;
-          Bid* parent = bid->peg_ptr;
-          if (decide_priceability(parent)) {
+          Bid* peg = bid->peg_ptr;
+          if (decide_priceability(peg)) {
             bid->data |= PRICEABLE_FLAG;
             bid->currency_price = (
-              parent->currency_price * bid->peg_exchange_rate
+              peg->currency_price * bid->peg_exchange_rate
             );
             return true;
           }
@@ -332,25 +332,25 @@ cdef extern from *:
         return false;
       }
       void set_pointers() {
-        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
-          Bid* bid_ptr = pair->second;
+        for (auto it = bids.begin(); it != bids.end(); ++it) {
+          Bid* bid = it->second;
           try {
-            bid_ptr->peg_ptr = bids.at(
-              Key128(bid_ptr->creditor_id, bid_ptr->data)
+            bid->peg_ptr = bids.at(
+              Key128(bid->creditor_id, bid->data)
             );
           } catch (const std::out_of_range& oor) {
-            bid_ptr->peg_ptr = NULL;
+            bid->peg_ptr = NULL;
           }
-          bid_ptr->data = 0;  // `data` will hold bit-flags from now on.
-          if (bid_ptr->debtor_id == base_debtor_id) {
-            bid_ptr->data |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
-            bid_ptr->currency_price = 1.0;
+          bid->data = 0;  // `data` will hold bit-flags from now on.
+          if (bid->debtor_id == base_debtor_id) {
+            bid->data |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
+            bid->currency_price = 1.0;
           }
         }
       }
       void calc_currency_prices() {
-        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
-          decide_priceability(pair->second);
+        for (auto it = bids.begin(); it != bids.end(); ++it) {
+          decide_priceability(it->second);
         }
       }
       void prepare_for_iteration() {
@@ -365,8 +365,8 @@ cdef extern from *:
         : base_debtor_id(base_debtor_id) {
       }
       ~BidRegistry() {
-        for (auto pair = bids.begin(); pair != bids.end(); ++pair) {
-          delete pair->second;
+        for (auto it = bids.begin(); it != bids.end(); ++it) {
+          delete it->second;
         }
       }
       void add_bid(
@@ -426,10 +426,10 @@ cdef extern from *:
         Key128(i64, i64) noexcept
         size_t calc_hash() noexcept
 
-    cdef cppclass Peg:
-        """Tells that a given currency is pegged to another currency.
+    cdef cppclass Currency:
+        """Contains information about a currency.
 
-        The currencies are organized in a tree-like structure, each
+        Currencies are organized in a tree-like structure, each
         currency pointing to its peg currency (see the `peg_ptr`
         field). At the root of the tree is the "base currency". In
         addition to this, every currency maintains a `currency_price`
@@ -445,15 +445,15 @@ cdef extern from *:
           currency), and confirmed.
         """
         const i64 debtor_id
-        Peg* const peg_ptr
+        Currency* const peg_ptr
         const float peg_exchange_rate
         const float currency_price
-        Peg(i64, Key128, i64, float) except +
+        Currency(i64, Key128, i64, float) except +
         bool confirmed() noexcept
         bool tradable() noexcept
 
 
-    cdef cppclass PegRegistry:
+    cdef cppclass CurrencyRegistry:
         """Given a set of currencies, generates the currency-tree.
 
         The base currency is determined by the `base_debtor_key` and
@@ -470,10 +470,10 @@ cdef extern from *:
         const Key128 base_debtor_key
         const i64 base_debtor_id
         const distance max_distance_to_base
-        PegRegistry(Key128, i64, distance) except +
+        CurrencyRegistry(Key128, i64, distance) except +
         void add_currency(bool, Key128, i64, Key128, i64, float) except +
         void prepare_for_queries() except +
-        Peg* get_tradable_currency(i64) except +
+        Currency* get_tradable_currency(i64) except +
         float get_currency_price(i64) except +
 
     cdef cppclass Bid:
@@ -530,11 +530,11 @@ cdef class BidProcessor:
     cdef readonly distance max_distance_to_base
     cdef readonly i64 min_trade_amount
     cdef BidRegistry* bid_registry_ptr
-    cdef PegRegistry* peg_registry_ptr
+    cdef CurrencyRegistry* currency_registry_ptr
     cdef list[CandidateOffer] candidate_offers
     cdef unordered_set[i64] buyers
     cdef unordered_set[i64] sellers
     cdef unordered_set[i64] to_be_confirmed
-    cdef Peg* _find_tradable_currency(self, Bid*)
+    cdef Currency* _find_tradable_currency(self, Bid*)
     cdef void _add_candidate_offer(self, Bid*)
     cdef Key128 _calc_key128(self, str)

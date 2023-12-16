@@ -82,7 +82,7 @@ cdef class BidProcessor:
         self.max_distance_to_base = max_distance_to_base
         self.min_trade_amount = min_trade_amount
         self.bid_registry_ptr = new BidRegistry(base_debtor_id)
-        self.peg_registry_ptr = new PegRegistry(
+        self.currency_registry_ptr = new CurrencyRegistry(
             self._calc_key128(base_debtor_info_uri),
             base_debtor_id,
             max_distance_to_base,
@@ -91,7 +91,7 @@ cdef class BidProcessor:
 
     def __dealloc__(self):
         del self.bid_registry_ptr
-        del self.peg_registry_ptr
+        del self.currency_registry_ptr
 
     def register_currency(
         self,
@@ -102,7 +102,7 @@ cdef class BidProcessor:
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
     ):
-        """Register a currency, which may be pegged to another
+        """Register a currency, which might be pegged to another
         currency.
 
         When the `confirmed` flag is `True`, this means that a system
@@ -119,7 +119,7 @@ cdef class BidProcessor:
         valuable as peg currency's tokens. Note that 0.0, +inf, -inf,
         and NAN are also acceptable exchange rate values.
         """
-        self.peg_registry_ptr.add_currency(
+        self.currency_registry_ptr.add_currency(
             confirmed,
             self._calc_key128(debtor_info_uri),
             debtor_id,
@@ -140,9 +140,9 @@ cdef class BidProcessor:
         `debtor_id` is not tradable (that is: the currency it is not
         both confirmed and priceable).
         """
-        peg_registry = self.peg_registry_ptr
-        peg_registry.prepare_for_queries()
-        return peg_registry.get_currency_price(debtor_id)
+        currency_registry = self.currency_registry_ptr
+        currency_registry.prepare_for_queries()
+        return currency_registry.get_currency_price(debtor_id)
 
     def register_bid(
         self,
@@ -198,7 +198,7 @@ cdef class BidProcessor:
         `register_bid` method), we should not call `analyze_bids`
         until all the bids from that trader had been registered.
         """
-        self.peg_registry_ptr.prepare_for_queries()
+        self.currency_registry_ptr.prepare_for_queries()
         bid_registry = self.bid_registry_ptr
 
         while (bid := bid_registry.get_priceable_bid()) != NULL:
@@ -255,14 +255,14 @@ cdef class BidProcessor:
         cdef i64[:] data = array.array('q', m.digest())
         return Key128(data[0], data[1])
 
-    cdef Peg* _find_tradable_currency(self, Bid* bid):
-        currency = self.peg_registry_ptr.get_tradable_currency(bid.debtor_id)
-        if currency == NULL and bid.amount <= -self.min_trade_amount:
+    cdef Currency* _find_tradable_currency(self, Bid* bid):
+        tc = self.currency_registry_ptr.get_tradable_currency(bid.debtor_id)
+        if tc == NULL and bid.amount <= -self.min_trade_amount:
             # We must try to create a system account for this
             # currency, so that it can be traded in the future.
             self.to_be_confirmed.insert(bid.debtor_id)
 
-        return currency
+        return tc
 
     cdef void _add_candidate_offer(self, Bid* bid):
         if bid.amount > 0:

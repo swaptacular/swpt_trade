@@ -6,8 +6,8 @@ from . import cytest
 from swpt_trade.pricing cimport (
     compare_prices,
     Key128,
-    Peg,
-    PegRegistry,
+    Currency,
+    CurrencyRegistry,
     Bid,
     BidRegistry,
     BidProcessor,
@@ -130,22 +130,22 @@ def test_key128_calc_hash():
 
 
 @cytest
-def test_peg():
-    cdef Peg* p = new Peg(101, Key128(0, 0), 102, 2.0)
-    assert p != NULL
-    assert p.debtor_id == 101
-    assert p.peg_exchange_rate == 2.0
-    assert p.peg_ptr == NULL
-    assert p.confirmed() is False
-    assert p.tradable() is False
-    del p
+def test_currency():
+    cdef Currency* c = new Currency(101, Key128(0, 0), 102, 2.0)
+    assert c != NULL
+    assert c.debtor_id == 101
+    assert c.peg_exchange_rate == 2.0
+    assert c.peg_ptr == NULL
+    assert c.confirmed() is False
+    assert c.tradable() is False
+    del c
 
 
 @cytest
-def test_peg_registry():
+def test_currency_registry():
     import math
 
-    cdef PegRegistry* r = new PegRegistry(Key128(100, 1), 101, 2)
+    cdef CurrencyRegistry* r = new CurrencyRegistry(Key128(100, 1), 101, 2)
     assert r.base_debtor_key.first == 100
     assert r.base_debtor_key.second == 1
     assert r.base_debtor_id == 101
@@ -197,31 +197,31 @@ def test_peg_registry():
 
         assert r.get_tradable_currency(101) == NULL
 
-        p102 = r.get_tradable_currency(102)
-        assert p102.debtor_id == 102
-        assert p102.peg_exchange_rate == 2.0
-        assert p102.peg_ptr.debtor_id == 101
-        assert p102.confirmed()
-        assert p102.tradable()
+        c102 = r.get_tradable_currency(102)
+        assert c102.debtor_id == 102
+        assert c102.peg_exchange_rate == 2.0
+        assert c102.peg_ptr.debtor_id == 101
+        assert c102.confirmed()
+        assert c102.tradable()
 
-        p103 = r.get_tradable_currency(103)
-        assert p103.debtor_id == 103
-        assert p103.peg_exchange_rate == 3.0
-        assert p103.peg_ptr.debtor_id == 102
-        assert p103.confirmed()
-        assert p103.tradable()
+        c103 = r.get_tradable_currency(103)
+        assert c103.debtor_id == 103
+        assert c103.peg_exchange_rate == 3.0
+        assert c103.peg_ptr.debtor_id == 102
+        assert c103.confirmed()
+        assert c103.tradable()
 
         assert r.get_tradable_currency(104) == NULL
         assert r.get_tradable_currency(105) == NULL
         assert r.get_tradable_currency(106) == NULL
         assert r.get_tradable_currency(107) == NULL
 
-        p108 = r.get_tradable_currency(108)
-        assert p108.debtor_id == 108
-        assert p108.peg_exchange_rate == 1.0
-        assert p108.peg_ptr.debtor_id == 107
-        assert p108.confirmed()
-        assert p108.tradable()
+        c108 = r.get_tradable_currency(108)
+        assert c108.debtor_id == 108
+        assert c108.peg_exchange_rate == 1.0
+        assert c108.peg_ptr.debtor_id == 107
+        assert c108.confirmed()
+        assert c108.tradable()
 
         assert r.get_tradable_currency(109) == NULL
         assert r.get_tradable_currency(110) == NULL
