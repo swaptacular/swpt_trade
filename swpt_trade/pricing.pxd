@@ -157,7 +157,6 @@ cdef extern from *:
         }
       }
       void find_tradables() {
-        tradables.clear();
         for (auto it = currencies.begin(); it != currencies.end(); ++it) {
           Currency* currency = it->second;
           calc_distance_to_base(currency);
