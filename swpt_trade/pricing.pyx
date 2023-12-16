@@ -59,13 +59,13 @@ cdef class BidProcessor:
     nan
     >>> bp.register_bid(1, 101, 8000)
     >>> bp.register_bid(1, 102, -6000, 101, 2.0)
-    >>> bp.generate_candidate_offers()
+    >>> bp.analyze_bids()
     [<CandidateOffer object at ....>, <CandidateOffer object at ....>]
     >>> bp.register_bid(2, 101, 5000)
     >>> bp.register_bid(2, 102, -4000, 101, 2.0)
     >>> bp.register_bid(2, 103, -3000, 101, 1.0)
     >>> bp.register_bid(3, 101, 2000)  # another trader
-    >>> bp.generate_candidate_offers()
+    >>> bp.analyze_bids()
     [<CandidateOffer object at ....>, <CandidateOffer object at ....>]
     >>> list(bp.currencies_to_be_confirmed())
     >>> [103]
@@ -173,7 +173,7 @@ cdef class BidProcessor:
             peg_exchange_rate,
         )
 
-    def generate_candidate_offers(self):
+    def analyze_bids(self):
         """Analyze registered bids and return a list of candidate
         offers.
 
@@ -183,21 +183,20 @@ cdef class BidProcessor:
 
         Note that this method causes all bids that have been
         registered so far to be analyzed and discarded. This means
-        that an immediate second call to `generate_candidate_offers`
-        will return an empty list.
+        that an immediate second call to `analyze_bids` will return an
+        empty list or candidate offers.
 
         It is possible however, after a call to this method, to
-        register a new batch of bids, and call the
-        `generate_candidate_offers` method again. In this case, the
-        second call will analyze and discard the second batch of bids.
-        This process can be repeated as many times as needed.
+        register a new batch of bids, and call the `analyze_bids`
+        method again. In this case, the second call will analyze and
+        discard the second batch of bids. This process can be repeated
+        as many times as needed.
 
         IMPORTANT: All bids coming from one trader should be included
         in a single batch of registered bids. That is: When we start
         registering bids from a given trader (by calling the
-        `register_bid` method), we should not call
-        `generate_candidate_offers` until all the bids from that
-        trader had been registered.
+        `register_bid` method), we should not call `analyze_bids`
+        until all the bids from that trader had been registered.
         """
         self.peg_registry_ptr.prepare_for_queries()
         bid_registry = self.bid_registry_ptr
@@ -236,16 +235,16 @@ cdef class BidProcessor:
         """Return an iterator over debtor IDs of non-confirmed,
         on-sale currencies.
 
-        While the `generate_candidate_offers` method analyzes the
-        registered bids, it may discover sell offers for currencies
-        for which a system account has not been created yet. Every
-        `BidProcessor` instance will maintain an ever-growing set of
-        debtor IDs of such currencies, so that system accounts could
-        be created for them eventually.
+        While the `analyze_bids` method analyzes the registered bids,
+        it may discover sell offers for currencies for which a system
+        account has not been created yet. Every `BidProcessor`
+        instance will maintain an ever-growing set of debtor IDs of
+        such currencies, so that system accounts could be created for
+        them eventually.
 
-        IMPORTANT: Successive calls to the `generate_candidate_offers`
-        method will not annul the maintained ever-growing set of
-        non-confirmed, on-sale currencies.
+        IMPORTANT: Successive calls to the `analyze_bids` method will
+        not annul the maintained ever-growing set of non-confirmed,
+        on-sale currencies.
         """
         for debtor_id in self.to_be_confirmed:
             yield debtor_id

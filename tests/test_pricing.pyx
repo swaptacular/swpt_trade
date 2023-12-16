@@ -312,7 +312,7 @@ def test_bp_candidate_offers():
     bp.register_bid(4, 102, 10000, 101, 2.0)  # no base bid
     bp.register_bid(4, 103, 100, 102, 3.0)  # no base bid
 
-    offers = bp.generate_candidate_offers()
+    offers = bp.analyze_bids()
     assert len(offers) == 2
 
     offer0, offer1 = offers
@@ -334,8 +334,8 @@ def test_bp_candidate_offers():
     l = sorted(list(bp.currencies_to_be_confirmed()))
     assert l == [104, 105]
 
-    assert len(bp.generate_candidate_offers()) == 0
-    assert len(bp.generate_candidate_offers()) == 0
+    assert len(bp.analyze_bids()) == 0
+    assert len(bp.analyze_bids()) == 0
 
     bp.register_bid(5, 101, 666666)  # not tradable
     bp.register_bid(5, 105, -666666, 101, 5.0)  # not tradable
@@ -343,8 +343,8 @@ def test_bp_candidate_offers():
     bp.register_bid(5, 102, 10000, 101, 2.0)  # OK!
     bp.register_bid(5, 103, 10000, 102, 3.0)  # OK!
     bp.register_bid(5, 107, -10000, 102, 7.0)  # not tradable
-    assert len(bp.generate_candidate_offers()) == 3
-    assert len(bp.generate_candidate_offers()) == 0
+    assert len(bp.analyze_bids()) == 3
+    assert len(bp.analyze_bids()) == 0
 
     with pytest.raises(RuntimeError):
         bp.register_currency(

@@ -531,7 +531,7 @@ cdef class BidProcessor:
     cdef readonly i64 min_trade_amount
     cdef BidRegistry* bid_registry_ptr
     cdef PegRegistry* peg_registry_ptr
-    cdef object candidate_offers
+    cdef list[CandidateOffer] candidate_offers
     cdef unordered_set[i64] buyers
     cdef unordered_set[i64] sellers
     cdef unordered_set[i64] to_be_confirmed
