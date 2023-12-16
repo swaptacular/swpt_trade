@@ -170,9 +170,11 @@ cdef extern from *:
         }
         Currency* base_currency = currencies.at(base_debtor_key);
         if (
-          tradables.count(base_debtor_id) != 0
-          && base_currency->debtor_id == base_debtor_id
-          && !base_currency->tradable()
+          base_currency->debtor_id != base_debtor_id
+          || (
+            tradables.count(base_debtor_id) != 0
+            && !base_currency->tradable()
+          )
         ) {
           throw std::runtime_error(
             "inconsistent base_debtor_key and base_debtor_id"
