@@ -205,7 +205,7 @@ cdef class BidProcessor:
             currency = self._find_tradable_currency(bid)
             if (
                 currency != NULL
-                and compare_prices(bid.currency_price, currency.currency_price)
+                and compare_prices(bid.currency_price, currency.price)
                 and abs(bid.amount) >= self.min_trade_amount
             ):
                 self._add_candidate_offer(bid)

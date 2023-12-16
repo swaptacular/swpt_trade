@@ -93,11 +93,11 @@ cdef extern from *:
           | BASE_FLAG
         );
         distance_to_base = 0;
-        currency_price = 1.0;
+        price = 1.0;
       }
 
     public:
-      float currency_price = NAN;
+      float price = NAN;
       Currency* peg_ptr = NULL;
       const i64 debtor_id;
       const float peg_exchange_rate;
@@ -139,9 +139,7 @@ cdef extern from *:
           distance dist;
           if ((dist = calc_distance_to_base(peg)) < max_distance_to_base) {
             currency->distance_to_base = dist + 1;
-            currency->currency_price = (
-              peg->currency_price * currency->peg_exchange_rate
-            );
+            currency->price = peg->price * currency->peg_exchange_rate;
             currency->flags |= PRICEABLE_FLAG;
             return currency->distance_to_base;
           }
@@ -267,7 +265,7 @@ cdef extern from *:
       }
       float get_currency_price(i64 debtor_id) {
         Currency* currency = get_tradable_currency(debtor_id);
-        return (currency == NULL) ? NAN : currency->currency_price;
+        return (currency == NULL) ? NAN : currency->price;
       }
     };
 
@@ -432,7 +430,7 @@ cdef extern from *:
         Currencies are organized in a tree-like structure, each
         currency pointing to its peg currency (see the `peg_ptr`
         field). At the root of the tree is the "base currency". In
-        addition to this, every currency maintains a `currency_price`
+        addition to this, every currency maintains a `price` field
         (expressed in base currency's tokens), and several bit-flags:
 
         * To be a "confirmed currency" means that a system account has
@@ -447,7 +445,7 @@ cdef extern from *:
         const i64 debtor_id
         Currency* const peg_ptr
         const float peg_exchange_rate
-        const float currency_price
+        const float price
         Currency(i64, Key128, i64, float) except +
         bool confirmed() noexcept
         bool tradable() noexcept
