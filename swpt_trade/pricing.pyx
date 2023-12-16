@@ -64,6 +64,7 @@ cdef class BidProcessor:
     >>> bp.register_bid(2, 101, 5000)
     >>> bp.register_bid(2, 102, -4000, 101, 2.0)
     >>> bp.register_bid(2, 103, -3000, 101, 1.0)
+    >>> bp.register_bid(3, 101, 2000)  # another trader
     >>> bp.generate_candidate_offers()
     [<CandidateOffer object at ....>, <CandidateOffer object at ....>]
     >>> list(bp.currencies_to_be_confirmed())
