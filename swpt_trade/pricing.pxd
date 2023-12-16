@@ -259,7 +259,7 @@ cdef extern from *:
 
     class Bid {
     private:
-      // The `data field holds the debtor ID of the peg currency, but
+      // The `data` field holds the debtor ID of the peg currency, but
       // only until the `peg_ptr` field has been initialized. After
       // that, the `data` field holds various bit-flags.
       i64 data;
