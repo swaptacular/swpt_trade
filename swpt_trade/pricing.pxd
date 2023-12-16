@@ -17,7 +17,6 @@ cdef extern from *:
     const bitflags PRICEABILITY_DECIDED_FLAG = 1 << 0;
     const bitflags PRICEABLE_FLAG = 1 << 1;
     const bitflags CONFIRMED_FLAG = 1 << 2;
-    const bitflags BASE_FLAG = 1 << 3;
 
     const distance INFINITE_DISTANCE = 0xffff;
     const float EPSILON = 1e-5;
@@ -77,21 +76,11 @@ cdef extern from *:
       bool priceable() {
         return (flags & PRICEABLE_FLAG) != 0;
       }
-      bool base() {
-        return (flags & BASE_FLAG) != 0;
-      }
-      void set_base() {
-        flags |= BASE_FLAG;
-      }
       void set_confirmed() {
         flags |= CONFIRMED_FLAG;
       }
       void mark_as_base() {
-        flags |= (
-          PRICEABILITY_DECIDED_FLAG
-          | PRICEABLE_FLAG
-          | BASE_FLAG
-        );
+        flags |= PRICEABILITY_DECIDED_FLAG | PRICEABLE_FLAG;
         distance_to_base = 0;
         price = 1.0;
       }
@@ -160,9 +149,7 @@ cdef extern from *:
           try {
             Currency* peg = currencies.at(currency->peg_debtor_key);
             currency->peg_ptr = (
-              (peg->debtor_id == currency->peg_debtor_id)
-              ? peg
-              : NULL
+              peg->debtor_id == currency->peg_debtor_id ? peg : NULL
             );
           } catch (const std::out_of_range& oor) {
             currency->peg_ptr = NULL;
@@ -179,14 +166,14 @@ cdef extern from *:
             if (tradable_ptr_ref != NULL) {
               throw std::runtime_error("duplicated tradable debtor_id");
             }
-            currency->set_base();
             tradable_ptr_ref = currency;
           }
         }
+        Currency* base_currency = currencies.at(base_debtor_key);
         if (
           tradables.count(base_debtor_id) != 0
-          && !currencies.at(base_debtor_key)->tradable()
-          && currencies.at(base_debtor_key)->base()
+          && base_currency->debtor_id == base_debtor_id
+          && !base_currency->tradable()
         ) {
           throw std::runtime_error(
             "inconsistent base_debtor_key and base_debtor_id"
