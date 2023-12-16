@@ -151,22 +151,22 @@ def test_peg_registry():
     assert r.base_debtor_id == 101
     assert r.max_distance_to_base == 2
 
-    r.add_currency(Key128(100, 2), 102, Key128(100, 1), 101, 2.0, True)
-    r.add_currency(Key128(100, 3), 103, Key128(100, 2), 102, 3.0, True)
-    r.add_currency(Key128(100, 4), 104, Key128(100, 2), 102, 4.0, False)
-    r.add_currency(Key128(100, 5), 105, Key128(100, 3), 103, 5.0, False)
-    r.add_currency(Key128(100, 6), 106, Key128(100, 4), 104, 6.0, True)
-    r.add_currency(Key128(100, 7), 107, Key128(100, 1), 101, 0.5, False)
-    r.add_currency(Key128(100, 8), 108, Key128(100, 7), 107, 1.0, True)
-    r.add_currency(Key128(100, 9), 109, Key128(100, 7), 107, 2.0, False)
-    r.add_currency(Key128(100, 10), 110, Key128(100, 1), 0, 1.0, True)
+    r.add_currency(True, Key128(100, 2), 102, Key128(100, 1), 101, 2.0)
+    r.add_currency(True, Key128(100, 3), 103, Key128(100, 2), 102, 3.0)
+    r.add_currency(False, Key128(100, 4), 104, Key128(100, 2), 102, 4.0)
+    r.add_currency(False, Key128(100, 5), 105, Key128(100, 3), 103, 5.0)
+    r.add_currency(True, Key128(100, 6), 106, Key128(100, 4), 104, 6.0)
+    r.add_currency(False, Key128(100, 7), 107, Key128(100, 1), 101, 0.5)
+    r.add_currency(True, Key128(100, 8), 108, Key128(100, 7), 107, 1.0)
+    r.add_currency(False, Key128(100, 9), 109, Key128(100, 7), 107, 2.0)
+    r.add_currency(True, Key128(100, 10), 110, Key128(100, 1), 0, 1.0)
 
     # ignored invalid debtor_id
-    r.add_currency(Key128(100, 20), 0, Key128(100, 1), 101, 2.0, False)
+    r.add_currency(False, Key128(100, 20), 0, Key128(100, 1), 101, 2.0)
 
     with pytest.raises(RuntimeError):
         # duplicated debtor key
-        r.add_currency(Key128(100, 2), 102, Key128(100, 1), 101, 2.0, True)
+        r.add_currency(True, Key128(100, 2), 102, Key128(100, 1), 101, 2.0)
 
     with pytest.raises(RuntimeError):
         # not prepared
@@ -180,7 +180,7 @@ def test_peg_registry():
 
     with pytest.raises(RuntimeError):
         # after preparation
-        r.add_currency(Key128(100, 11), 111, Key128(100, 7), 107, 1.0, False)
+        r.add_currency(False, Key128(100, 11), 111, Key128(100, 7), 107, 1.0)
 
     for _ in range(2):
         assert math.isnan(r.get_currency_price(101))

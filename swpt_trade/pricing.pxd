@@ -152,7 +152,7 @@ cdef extern from *:
         // Make sure the base currency is always included in the graph.
         if (pegs.count(base_debtor_key) == 0) {
           add_currency(
-            base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0, false
+            false, base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0
           );
         }
       }
@@ -218,12 +218,12 @@ cdef extern from *:
         }
       }
       void add_currency(
+        bool confirmed,
         Key128 debtor_key,
         i64 debtor_id,
         Key128 peg_debtor_key,
         i64 peg_debtor_id,
-        float peg_exchange_rate,
-        bool confirmed
+        float peg_exchange_rate
       ) {
         if (prepared_for_queries) {
           throw std::runtime_error(
@@ -432,8 +432,8 @@ cdef extern from *:
         The currencies are organized in a tree-like structure, each
         currency pointing to its peg currency (see the `peg_ptr`
         field). At the root of the tree is the "base currency". In
-        addition to this, every currency maintains several bit-flags,
-        which are used during the traversal of the currency-tree:
+        addition to this, every currency maintains a `currency_price`
+        (expressed in base currency's tokens), and several bit-flags:
 
         * To be a "confirmed currency" means that a system account has
           been successfully created in this currency, and the
@@ -471,7 +471,7 @@ cdef extern from *:
         const i64 base_debtor_id
         const distance max_distance_to_base
         PegRegistry(Key128, i64, distance) except +
-        void add_currency(Key128, i64, Key128, i64, float, bool) except +
+        void add_currency(bool, Key128, i64, Key128, i64, float) except +
         void prepare_for_queries() except +
         Peg* get_tradable_currency(i64) except +
         float get_currency_price(i64) except +
@@ -488,8 +488,8 @@ cdef extern from *:
 
         Bids are organized in tree-like structures, each bid pointing
         to the bid for its peg currency (see the `peg_ptr` field). In
-        addition to this, every bid maintains several bit-flags, which
-        are used during the traversal of the bid-tree.
+        addition to this, for every bid, a `currency_price` expressed
+        in base currency's tokens will be calculated.
         """
         const i64 creditor_id
         const i64 debtor_id

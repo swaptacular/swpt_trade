@@ -120,12 +120,12 @@ cdef class BidProcessor:
         and NAN are also acceptable exchange rate values.
         """
         self.peg_registry_ptr.add_currency(
+            confirmed,
             self._calc_key128(debtor_info_uri),
             debtor_id,
             self._calc_key128(peg_debtor_info_uri),
             peg_debtor_id,
             peg_exchange_rate,
-            confirmed,
         )
 
     def get_currency_price(self, i64 debtor_id):
