@@ -135,25 +135,6 @@ cdef extern from *:
         }
         return INFINITE_DISTANCE;
       }
-      void validate_base_currency() {
-        Currency* base_currency;
-        try {
-          base_currency = currencies.at(base_debtor_key);
-        } catch (const std::out_of_range& oor) {
-          return;
-        }
-        if (
-          base_currency->debtor_id != base_debtor_id
-          || (
-            !base_currency->tradable()
-            && tradables.count(base_debtor_id) != 0
-          )
-        ) {
-          throw std::runtime_error(
-            "inconsistent base_debtor_key and base_debtor_id"
-          );
-        }
-      }
       void set_pointers() {
         for (auto it = currencies.begin(); it != currencies.end(); ++it) {
           Currency* currency = it->second;
@@ -178,6 +159,25 @@ cdef extern from *:
             }
             tradable_ptr_ref = currency;
           }
+        }
+      }
+      void validate_base_currency() {
+        Currency* base_currency;
+        try {
+          base_currency = currencies.at(base_debtor_key);
+        } catch (const std::out_of_range& oor) {
+          return;
+        }
+        if (
+          base_currency->debtor_id != base_debtor_id
+          || (
+            !base_currency->tradable()
+            && tradables.count(base_debtor_id) != 0
+          )
+        ) {
+          throw std::runtime_error(
+            "inconsistent base_debtor_key and base_debtor_id"
+          );
         }
       }
 
