@@ -171,15 +171,17 @@ cdef extern from *:
           // because we still have a consistent (empty) currency-tree.
           return;
         }
-        if (
-          base_currency->debtor_id != base_debtor_id
-          || (
-            !base_currency->tradable()
-            && tradables.count(base_debtor_id) != 0
-          )
-        ) {
+        if (base_currency->debtor_id != base_debtor_id) {
           throw std::runtime_error(
             "inconsistent base_debtor_key and base_debtor_id"
+          );
+        }
+        if (
+          !base_currency->tradable()
+          && tradables.count(base_debtor_id) != 0
+        ) {
+          throw std::runtime_error(
+            "the base_debtor_id has been claimed by another tradable currency"
           );
         }
       }
