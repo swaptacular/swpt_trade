@@ -166,6 +166,9 @@ cdef extern from *:
         try {
           base_currency = currencies.at(base_debtor_key);
         } catch (const std::out_of_range& oor) {
+          // No base currency has been registered. In this case there will
+          // be no priceable and no tradable currencies. But this is fine,
+          // because we still have a consistent (empty) currency-tree.
           return;
         }
         if (
