@@ -193,9 +193,6 @@ cdef extern from *:
       ) : base_debtor_key(base_debtor_key),
           base_debtor_id(base_debtor_id),
           max_distance_to_base(max_distance_to_base) {
-        if (base_debtor_id == 0) {
-          throw std::runtime_error("invalid base_debtor_id");
-        }
       }
       ~CurrencyRegistry() {
         for (auto it = currencies.begin(); it != currencies.end(); ++it) {
