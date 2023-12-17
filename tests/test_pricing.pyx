@@ -151,6 +151,7 @@ def test_currency_registry():
     assert r.base_debtor_id == 101
     assert r.max_distance_to_base == 2
 
+    r.add_currency(False, Key128(100, 1), 101, Key128(0, 0), 0, math.nan)
     r.add_currency(True, Key128(100, 2), 102, Key128(100, 1), 101, 2.0)
     r.add_currency(True, Key128(100, 3), 103, Key128(100, 2), 102, 3.0)
     r.add_currency(False, Key128(100, 4), 104, Key128(100, 2), 102, 4.0)

@@ -135,11 +135,22 @@ cdef extern from *:
         }
         return INFINITE_DISTANCE;
       }
-      void ensure_base_currency() {
-        // Make sure the base currency is always included in the graph.
-        if (currencies.count(base_debtor_key) == 0) {
-          add_currency(
-            false, base_debtor_key, base_debtor_id, base_debtor_key, 0, 0.0
+      void validate_base_currency() {
+        Currency* base_currency;
+        try {
+          base_currency = currencies.at(base_debtor_key);
+        } catch (const std::out_of_range& oor) {
+          return;
+        }
+        if (
+          base_currency->debtor_id != base_debtor_id
+          || (
+            !base_currency->tradable()
+            && tradables.count(base_debtor_id) != 0
+          )
+        ) {
+          throw std::runtime_error(
+            "inconsistent base_debtor_key and base_debtor_id"
           );
         }
       }
@@ -167,18 +178,6 @@ cdef extern from *:
             }
             tradable_ptr_ref = currency;
           }
-        }
-        Currency* base_currency = currencies.at(base_debtor_key);
-        if (
-          base_currency->debtor_id != base_debtor_id
-          || (
-            tradables.count(base_debtor_id) != 0
-            && !base_currency->tradable()
-          )
-        ) {
-          throw std::runtime_error(
-            "inconsistent base_debtor_key and base_debtor_id"
-          );
         }
       }
 
@@ -235,9 +234,9 @@ cdef extern from *:
       }
       void prepare_for_queries() {
         if (!prepared_for_queries) {
-          ensure_base_currency();
           set_pointers();
           find_tradables();
+          validate_base_currency();
           prepared_for_queries = true;
         }
       }
