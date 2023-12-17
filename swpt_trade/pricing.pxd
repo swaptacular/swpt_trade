@@ -301,14 +301,14 @@ cdef extern from *:
       std::unordered_map<Key128, Bid*>::const_iterator iter_curr, iter_stop;
       bool iter_started = false;
 
-      static bool decide_priceability(Bid* bid) {
+      static bool calc_currency_price(Bid* bid) {
         if (bid != NULL) {
           if (bid->data & PRICEABILITY_DECIDED_FLAG) {
             return bid->priceable();
           }
           bid->data |= PRICEABILITY_DECIDED_FLAG;
           Bid* peg = bid->peg_ptr;
-          if (decide_priceability(peg)) {
+          if (calc_currency_price(peg)) {
             bid->data |= PRICEABLE_FLAG;
             bid->currency_price = peg->currency_price * bid->peg_exchange_rate;
             return true;
@@ -332,14 +332,14 @@ cdef extern from *:
           }
         }
       }
-      void calc_currency_prices() {
+      void calc_prices() {
         for (auto it = bids.begin(); it != bids.end(); ++it) {
-          decide_priceability(it->second);
+          calc_currency_price(it->second);
         }
       }
       void prepare_for_iteration() {
         set_pointers();
-        calc_currency_prices();
+        calc_prices();
       }
 
     public:
