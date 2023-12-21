@@ -1,0 +1,42 @@
+.gitignore
+.dockerignore
+.env
+.git/
+example/
+
+# Distribution / packaging
+*.egg-info/
+build/
+dist/
+sdist/
+wheels/
+MANIFEST
+
+# Other unneeded directories
+htmlcov/
+submodules/
+hooks/
+.mypy_cache/
+.pytest_cache/
+
+# Byte-compiled files
+**/__pycache__/
+**/*.py[cod]
+
+# Translation-related
+*/babel.cfg
+*/translations/**/*.mo
+*/*.pot
+
+# Cython-generated files
+swpt_trade/*.cpp
+swpt_trade/*.html
+tests/**/*.cpp
+tests/**/*.html
+**/*.so
+
+# Emacs files
+**/*~
+**/TAGS
+**/.projectile
+**/.dir-locals.el

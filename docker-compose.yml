@@ -1,0 +1,44 @@
+version: '3.6'
+
+services:
+
+  tests-pg:
+    image: postgres:$POSTGRES_VERSION
+    environment:
+      - 'POSTGRES_DB=$POSTGRES_DB'
+      - 'POSTGRES_USER=$POSTGRES_USER'
+      - 'POSTGRES_PASSWORD=$POSTGRES_PASSWORD'
+    volumes:
+      - ./docker/pg/create-users.sql:/docker-entrypoint-initdb.d/create-users.sql
+    ports:
+      - $POSTGRES_LOCAL_PORT:5432
+
+
+  tests-config:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      - 'PYTHONDONTWRITEBYTECODE=1'
+      - 'POSTGRES_URL=postgresql+psycopg://swpt_trade:swpt_trade@tests-pg:5432/${POSTGRES_DB}'
+    command: configure
+    depends_on:
+      - tests-pg
+
+
+  tests-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      - 'WEBSERVER_PORT=8080'
+      - 'POSTGRES_URL=postgresql+psycopg://swpt_trade:swpt_trade@tests-pg:5432/${POSTGRES_DB}'
+      - 'PYTHONDONTWRITEBYTECODE=1'
+      - 'PYTHONBREAKPOINT=web_pdb.set_trace'
+    ports:
+      - $WEBSERVER_PORT:8080
+    command: develop-run-flask
+    depends_on:
+      - tests-pg
