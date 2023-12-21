@@ -36,7 +36,6 @@ services:
       - 'WEBSERVER_PORT=8080'
       - 'POSTGRES_URL=postgresql+psycopg://swpt_trade:swpt_trade@tests-pg:5432/${POSTGRES_DB}'
       - 'PYTHONDONTWRITEBYTECODE=1'
-      - 'PYTHONBREAKPOINT=web_pdb.set_trace'
     ports:
       - $WEBSERVER_PORT:8080
     command: develop-run-flask
