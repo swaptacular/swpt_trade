@@ -99,6 +99,15 @@ perform_db_initialization() {
     return 0
 }
 
+generate_oathkeeper_configuration() {
+    envsubst '$WEBSERVER_PORT $OAUTH2_INTROSPECT_URL' \
+             < "$APP_ROOT_DIR/oathkeeper/config.yaml.template" \
+             > "$APP_ROOT_DIR/oathkeeper/config.yaml"
+    envsubst '$RESOURCE_SERVER' \
+             < "$APP_ROOT_DIR/oathkeeper/rules.json.template" \
+             > "$APP_ROOT_DIR/oathkeeper/rules.json"
+}
+
 case $1 in
     develop-run-flask)
         # Do not run this in production!
@@ -118,7 +127,8 @@ case $1 in
         fi
         ;;
     webserver)
-        exec gunicorn --config "$APP_ROOT_DIR/gunicorn.conf.py" -b :${WEBSERVER_PORT:-8080} wsgi:app
+        generate_oathkeeper_configuration
+        exec supervisord -c "$APP_ROOT_DIR/supervisord-webserver.conf"
         ;;
     consume_messages)
         exec flask swpt_trade "$@"
@@ -143,7 +153,8 @@ case $1 in
         ;;
     all)
         # Spawns all the necessary processes in one container.
-        exec supervisord -c "$APP_ROOT_DIR/supervisord.conf"
+        generate_oathkeeper_configuration
+        exec supervisord -c "$APP_ROOT_DIR/supervisord-all.conf"
         ;;
     *)
         exec "$@"

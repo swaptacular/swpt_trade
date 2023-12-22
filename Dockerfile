@@ -1,3 +1,5 @@
+FROM oryd/oathkeeper:v0.40.6 as oathkeeper-image
+
 FROM python:3.11.5-alpine3.18 AS venv-image
 WORKDIR /usr/src/app
 
@@ -49,17 +51,20 @@ RUN apk add --no-cache \
 
 WORKDIR /usr/src/app
 
+COPY --from=oathkeeper-image /usr/bin/oathkeeper /usr/bin/oathkeeper
 COPY --from=venv-image /opt/venv /opt/venv
 COPY --from=venv-image /usr/src/app/swpt_trade/*.so swpt_trade/
 COPY --from=venv-image /usr/src/app/tests/*.so tests/
 
 COPY docker/entrypoint.sh \
      docker/gunicorn.conf.py \
-     docker/supervisord.conf \
+     docker/supervisord-webserver.conf \
+     docker/supervisord-all.conf \
      docker/trigger_supervisor_process.py \
      wsgi.py \
      pytest.ini \
      ./
+COPY docker/oathkeeper/ oathkeeper/
 COPY migrations/ migrations/
 COPY $FLASK_APP/ $FLASK_APP/
 COPY tests/ tests/

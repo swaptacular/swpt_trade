@@ -18,10 +18,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: app-image
     env_file: .env
     environment:
-      - 'PYTHONDONTWRITEBYTECODE=1'
       - 'POSTGRES_URL=postgresql+psycopg://swpt_trade:swpt_trade@tests-pg:5432/${POSTGRES_DB}'
+      - 'PYTHONDONTWRITEBYTECODE=1'
     command: configure
     depends_on:
       - tests-pg
@@ -31,6 +32,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: app-image
     env_file: .env
     environment:
       - 'WEBSERVER_PORT=8080'
