@@ -71,7 +71,24 @@ COPY tests/ tests/
 RUN python -m compileall -x '^\./(migrations|tests)/' . \
     && rm -f .env \
     && chown -R "$FLASK_APP:$FLASK_APP" .
+RUN SQLALCHEMY_DATABASE_URI=sqlite:// SQLALCHEMY_ENGINE_OPTIONS={} \
+    flask openapi write openapi.json
 
 USER $FLASK_APP
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 CMD ["all"]
+
+
+# This is the swagger-ui image. Starting from the final app image, it
+# copies the auto-generated OpenAPI spec file. The entrypoint
+# substitutes the placeholders in the spec file with values from
+# environment variables.
+FROM swaggerapi/swagger-ui:v3.42.0 AS swagger-ui-image
+
+ENV SWAGGER_JSON=/openapi.json
+
+COPY --from=app-image /usr/src/app/openapi.json /openapi.template
+COPY docker/swagger-ui/entrypoint.sh /
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["sh", "/usr/share/nginx/run.sh"]
