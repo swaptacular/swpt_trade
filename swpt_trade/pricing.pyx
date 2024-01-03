@@ -164,6 +164,10 @@ cdef class BidProcessor:
         registered, because they may declare an approved by the trader
         exchange rate to another currency (the `peg_debtor_id` and
         `peg_exchange_rate` arguments).
+
+        NOTE: A dummy base currency bid will be registered implicitly
+        for traders that have registered at least one bid, but do not
+        have a bid for the base currency.
         """
         self.bid_registry_ptr.add_bid(
             creditor_id,

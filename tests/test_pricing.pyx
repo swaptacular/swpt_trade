@@ -91,17 +91,18 @@ def test_bid_registry():
     r.add_bid(1, 107, 800, 106, 1.0)
 
     # not priceable (a different trader)
-    r.add_bid(2, 123, 5000, 101, 1.0)
+    r.add_bid(2, 123, 5000, 102, 1.0)
 
     with pytest.raises(RuntimeError):
-        r.add_bid(2, 123, 5000, 101, 1.0)  # duplicated
+        r.add_bid(2, 123, 5000, 102, 1.0)  # duplicated
 
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
         debtor_ids.append(bid.debtor_id)
 
-    assert len(debtor_ids) == 5
-    assert sorted(debtor_ids) == [101, 102, 103, 122, 133]
+    # The base (101) bid for trader `2` has been added automatically.
+    assert len(debtor_ids) == 6
+    assert sorted(debtor_ids) == [101, 101, 102, 103, 122, 133]
 
     with pytest.raises(RuntimeError):
         r.add_bid(1, 108, 700, 0, 1.0)
@@ -289,7 +290,7 @@ def test_bp_candidate_offers():
     assert math.isnan(bp.get_currency_price(105))
     assert bp.get_currency_price(106) == 30.0
 
-    bp.register_bid(1, 101, 666666)  # not tradable
+    # No base bid is registered, but it will be added automatically!
     bp.register_bid(1, 105, -666666, 101, 5.0)  # not tradable
     bp.register_bid(1, 106, -50000, 105, 6.000005)  # OK!
     bp.register_bid(1, 102, 10000, 101, 2.0)  # OK!
@@ -307,11 +308,6 @@ def test_bp_candidate_offers():
     bp.register_bid(3, 102, -100, 101, 2.0)  # abs(amount) is too small
     bp.register_bid(3, 103, 10000, 102, 3.0)  # OK, but no seller for this!
     bp.register_bid(3, 104, -10000, 103, 4.0)  # too big distance to base
-
-    bp.register_bid(4, 105, -666666, 101, 5.0)  # no base bid
-    bp.register_bid(4, 106, -50000, 105, 6.000005)  # no base bid
-    bp.register_bid(4, 102, 10000, 101, 2.0)  # no base bid
-    bp.register_bid(4, 103, 100, 102, 3.0)  # no base bid
 
     offers = bp.analyze_bids()
     assert len(offers) == 2

@@ -299,6 +299,7 @@ cdef extern from *:
     private:
       std::unordered_map<Key128, Bid*> bids;
       std::unordered_map<Key128, Bid*>::const_iterator iter_curr, iter_stop;
+      std::unordered_set<i64> traders;
       bool iter_started = false;
 
       static bool calc_currency_price(Bid* bid) {
@@ -315,6 +316,16 @@ cdef extern from *:
           }
         }
         return false;
+      }
+      void ensure_base_bids() {
+        // For traders that have at least one bid, but do not have a bid
+        // for the base currency, add a dummy base currency bid.
+        for (auto it = traders.begin(); it != traders.end(); ++it) {
+          i64 creditor_id = *it;
+          if (bids.count(Key128(creditor_id, base_debtor_id)) == 0) {
+            add_bid(creditor_id, base_debtor_id, 0, 0, NAN);
+          }
+        }
       }
       void set_pointers() {
         for (auto it = bids.begin(); it != bids.end(); ++it) {
@@ -338,6 +349,7 @@ cdef extern from *:
         }
       }
       void prepare_for_iteration() {
+        ensure_base_bids();
         set_pointers();
         calc_prices();
       }
@@ -374,6 +386,7 @@ cdef extern from *:
           bid_ptr_ref = new Bid(
             creditor_id, debtor_id, amount, peg_debtor_id, peg_exchange_rate
           );
+          traders.insert(creditor_id);
         }
       }
       Bid* get_priceable_bid() {
