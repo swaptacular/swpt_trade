@@ -36,11 +36,11 @@ cdef class CandidateOfferAuxData:
         self.data.last_transfer_number = last_transfer_number
 
     @property
-    def creation_date(self) -> date:
+    def creation_date(self):
         return date.fromordinal(719163 + self.data.creation_date)
 
     @property
-    def last_transfer_number(self) -> int:
+    def last_transfer_number(self):
         return self.data.last_transfer_number
 
 
