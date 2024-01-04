@@ -259,6 +259,12 @@ cdef extern from *:
     };
 
 
+    class AuxData {
+    public:
+       int creation_date = 0;  // number of days since 1970-01-01
+       i64 last_transfer_number = 0;
+    };
+
     class Bid {
     private:
       // The `data` field holds the debtor ID of the peg currency, but
@@ -277,18 +283,21 @@ cdef extern from *:
       const i64 creditor_id;
       const i64 debtor_id;
       const i64 amount;
+      const AuxData aux_data;
 
       Bid(
         i64 creditor_id,
         i64 debtor_id,
         i64 amount,
         i64 peg_debtor_id,
-        float peg_exchange_rate
+        float peg_exchange_rate,
+        AuxData aux_data=AuxData()
       ) : data(peg_debtor_id),
           peg_exchange_rate(peg_exchange_rate),
           creditor_id(creditor_id),
           debtor_id(debtor_id),
-          amount(amount) {
+          amount(amount),
+          aux_data(aux_data) {
       }
 
       friend class BidRegistry;
@@ -370,7 +379,8 @@ cdef extern from *:
         i64 debtor_id,
         i64 amount,
         i64 peg_debtor_id,
-        float peg_exchange_rate
+        float peg_exchange_rate,
+        AuxData aux_data=AuxData()
       ) {
         if (iter_started) {
           throw std::runtime_error("add_bid called after iteration stared");
@@ -384,7 +394,12 @@ cdef extern from *:
             throw std::runtime_error("duplicated bid");
           }
           bid_ptr_ref = new Bid(
-            creditor_id, debtor_id, amount, peg_debtor_id, peg_exchange_rate
+            creditor_id,
+            debtor_id,
+            amount,
+            peg_debtor_id,
+            peg_exchange_rate,
+            aux_data
           );
           traders.insert(creditor_id);
         }
@@ -473,6 +488,13 @@ cdef extern from *:
         Currency* get_tradable_currency(i64) except +
         float get_currency_price(i64) except +
 
+    cdef cppclass AuxData:
+       """Auxiliary bid data.
+       """
+       int creation_date
+       i64 last_transfer_number
+       AuxData()
+
     cdef cppclass Bid:
         """Tells the disposition of a given trader to a given currency.
 
@@ -494,7 +516,9 @@ cdef extern from *:
         const float currency_price
         Bid* const peg_ptr
         const float peg_exchange_rate
+        const AuxData aux_data
         Bid(i64, i64, i64, i64, float) except +
+        Bid(i64, i64, i64, i64, float, AuxData) except +
 
     cdef cppclass BidRegistry:
         """Given a set of `Bid`s, generates a tree of priceable bids.
@@ -512,13 +536,19 @@ cdef extern from *:
         const i64 base_debtor_id
         BidRegistry(i64) except +
         void add_bid(i64, i64, i64, i64, float) except +
+        void add_bid(i64, i64, i64, i64, float, AuxData) except +
         Bid* get_priceable_bid() noexcept
+
+
+cdef class CandidateOfferAuxData:
+    cdef AuxData data
 
 
 cdef class CandidateOffer:
     cdef readonly i64 amount
     cdef readonly i64 debtor_id
     cdef readonly i64 creditor_id
+    cdef readonly CandidateOfferAuxData aux_data
 
 
 cdef class BidProcessor:

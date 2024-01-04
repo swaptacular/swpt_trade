@@ -3,6 +3,7 @@ import hashlib
 from cpython cimport array
 from libc.math cimport NAN
 from libcpp cimport bool
+from datetime import date
 
 cdef i64 DEFAULT_MIN_TRADE_AMOUNT = 1000
 cdef distance DEFAULT_MAX_DISTANCE_TO_BASE = 10
@@ -25,6 +26,30 @@ cdef class CandidateOffer:
 
     def is_sell_offer(self):
         return self.amount < 0
+
+
+cdef class CandidateOfferAuxData:
+    """Auxiliary candidate offer data.
+    """
+    def __init__(self, *, object creation_date, i64 last_transfer_number):
+        self.data.creation_date = creation_date.toordinal() - 719163
+        self.data.last_transfer_number = last_transfer_number
+
+    @property
+    def creation_date(self) -> date:
+        return date.fromordinal(719163 + self.data.creation_date)
+
+    @property
+    def last_transfer_number(self) -> int:
+        return self.data.last_transfer_number
+
+
+cdef object _create_candidate_offer_aux_data(AuxData data):
+    cdef CandidateOfferAuxData obj = CandidateOfferAuxData.__new__(
+        CandidateOfferAuxData
+    )
+    obj.data = data
+    return obj
 
 
 cdef class BidProcessor:
@@ -151,6 +176,7 @@ cdef class BidProcessor:
         i64 amount,
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
+        CandidateOfferAuxData aux_data=None,
     ):
         """Tells the disposition of a given trader to a given
         currency.
@@ -163,19 +189,32 @@ cdef class BidProcessor:
         want to trade). Bids with zero amounts must also be
         registered, because they may declare an approved by the trader
         exchange rate to another currency (the `peg_debtor_id` and
-        `peg_exchange_rate` arguments).
+        `peg_exchange_rate` arguments). The `aux_data` field may
+        provide additional information which will not be processed,
+        but will be included verbatim in the corresponding candidate
+        offer.
 
         NOTE: A dummy base currency bid will be registered implicitly
         for traders that have registered at least one bid, but do not
         have a bid for the base currency.
         """
-        self.bid_registry_ptr.add_bid(
-            creditor_id,
-            debtor_id,
-            amount,
-            peg_debtor_id,
-            peg_exchange_rate,
-        )
+        if aux_data is None:
+            self.bid_registry_ptr.add_bid(
+                creditor_id,
+                debtor_id,
+                amount,
+                peg_debtor_id,
+                peg_exchange_rate,
+            )
+        else:
+            self.bid_registry_ptr.add_bid(
+                creditor_id,
+                debtor_id,
+                amount,
+                peg_debtor_id,
+                peg_exchange_rate,
+                aux_data.data,
+            )
 
     def analyze_bids(self):
         """Analyze registered bids and return a list of candidate
@@ -278,4 +317,5 @@ cdef class BidProcessor:
         o.amount = bid.amount
         o.debtor_id = bid.debtor_id
         o.creditor_id = bid.creditor_id
+        o.aux_data = _create_candidate_offer_aux_data(bid.aux_data)
         self.candidate_offers.append(o)

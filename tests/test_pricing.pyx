@@ -2,16 +2,19 @@
 
 import pytest
 import math
+from datetime import date
 from . import cytest
 from swpt_trade.pricing cimport (
     compare_prices,
     Key128,
     Currency,
     CurrencyRegistry,
+    AuxData,
     Bid,
     BidRegistry,
     BidProcessor,
 )
+from swpt_trade.pricing import CandidateOfferAuxData
 
 
 @cytest
@@ -64,22 +67,46 @@ def test_bid():
     assert bid.amount == -5000
     assert bid.peg_ptr == NULL
     assert bid.peg_exchange_rate == 1.0
+    assert bid.aux_data.creation_date == 0
+    assert bid.aux_data.last_transfer_number == 0
     
+    del bid
+
+
+@cytest
+def test_bid_aux_data():
+    cdef AuxData aux_data = AuxData()
+    aux_data.creation_date = 1
+    aux_data.last_transfer_number = 2
+    cdef Bid* bid = new Bid(1, 101, -5000, 0, 1.0, aux_data)
+    assert bid != NULL
+    assert bid.creditor_id == 1
+    assert bid.debtor_id == 101
+    assert bid.amount == -5000
+    assert bid.peg_ptr == NULL
+    assert bid.peg_exchange_rate == 1.0
+    assert bid.aux_data.creation_date == 1
+    assert bid.aux_data.last_transfer_number == 2
+
     del bid
 
 
 @cytest
 def test_bid_registry():
     cdef BidRegistry* r = new BidRegistry(101)
+    cdef AuxData aux_data = AuxData()
+    aux_data.creation_date = 1
+    aux_data.last_transfer_number = 2
+
     assert r.base_debtor_id == 101
-    r.add_bid(1, 0, 1000, 101, 1.0)  # ignored
+    r.add_bid(1, 0, 1000, 101, 1.0, aux_data)  # ignored
 
     # priceable
     r.add_bid(1, 101, 6000, 0, 0.0)
-    r.add_bid(1, 102, 5000, 101, 1.0)
-    r.add_bid(1, 122, 5000, 101, 1.0)
-    r.add_bid(1, 103, 4000, 102, 10.0)
-    r.add_bid(1, 133, 4000, 102, 10.0)
+    r.add_bid(1, 102, 5000, 101, 1.0, aux_data)
+    r.add_bid(1, 122, 5000, 101, 1.0, aux_data)
+    r.add_bid(1, 103, 4000, 102, 10.0, aux_data)
+    r.add_bid(1, 133, 4000, 102, 10.0, aux_data)
 
     # not priceable
     r.add_bid(1, 104, 3000, 0, 1.0)
@@ -98,6 +125,9 @@ def test_bid_registry():
 
     debtor_ids = []
     while (bid := r.get_priceable_bid()) != NULL:
+        if bid.debtor_id != 101:
+            assert bid.aux_data.creation_date == 1
+            assert bid.aux_data.last_transfer_number == 2
         debtor_ids.append(bid.debtor_id)
 
     # The base (101) bid for trader `2` has been added automatically.
@@ -290,9 +320,17 @@ def test_bp_candidate_offers():
     assert math.isnan(bp.get_currency_price(105))
     assert bp.get_currency_price(106) == 30.0
 
+    aux_data = CandidateOfferAuxData(
+        creation_date=date(2023, 1, 4),
+        last_transfer_number=1234,
+    )
+
+    with pytest.raises(TypeError):
+        bp.register_bid(1, 105, -666666, 101, 5.0, "WRONG OBJECT TYPE")
+
     # No base bid is registered, but it will be added automatically!
     bp.register_bid(1, 105, -666666, 101, 5.0)  # not tradable
-    bp.register_bid(1, 106, -50000, 105, 6.000005)  # OK!
+    bp.register_bid(1, 106, -50000, 105, 6.000005, aux_data)  # OK!
     bp.register_bid(1, 102, 10000, 101, 2.0)  # OK!
     bp.register_bid(1, 103, 100, 102, 3.0)  # abs(amount) is too small
 
@@ -319,12 +357,16 @@ def test_bp_candidate_offers():
     assert offer0.debtor_id == 102
     assert offer0.creditor_id == 1
     assert offer0.amount == 10000
+    assert offer0.aux_data.creation_date == date(1970, 1, 1)
+    assert offer0.aux_data.last_transfer_number == 0
     assert offer0.is_buy_offer()
     assert not offer0.is_sell_offer()
 
     assert offer1.debtor_id == 106
     assert offer1.creditor_id == 1
     assert offer1.amount == -50000
+    assert offer1.aux_data.creation_date == date(2023, 1, 4)
+    assert offer1.aux_data.last_transfer_number == 1234
     assert not offer1.is_buy_offer()
     assert offer1.is_sell_offer()
 
