@@ -153,11 +153,12 @@ def test_empty_bid_registry():
 @cytest
 def test_key128_calc_hash():
     seen_values = set()
-    for i in range(100):
-        for j in range(100):
+    for i in range(0, 500000, 5000):
+        for j in range(1000000, 1700000, 7000):
             k = Key128(i, j)
             h = k.calc_hash()
             assert h not in seen_values
+            seen_values.add(h)
 
 
 @cytest

@@ -25,7 +25,7 @@ cdef extern from *:
         : creditor_id(0), debtor_id(0) {
       }
       Account(i64 creditor_id, i64 debtor_id)
-        : creditor_id(creditor_id), debtor_id(creditor_id) {
+        : creditor_id(creditor_id), debtor_id(debtor_id) {
       }
       Account(const Account& other) {
         creditor_id = other.creditor_id;

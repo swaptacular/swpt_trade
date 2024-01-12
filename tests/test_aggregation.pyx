@@ -3,9 +3,22 @@
 import pytest
 from . import cytest
 from swpt_trade.aggregation cimport (
+    Account,
     CollectorAccount,
     Solver,
 )
+
+
+@cytest
+def test_account_calc_hash():
+    seen_values = set()
+    for i in range(0, 500000, 5000):
+        for j in range(1000000, 1700000, 7000):
+            account = Account(i, j)
+            h = account.calc_hash()
+            assert h not in seen_values
+            seen_values.add(h)
+
 
 @cytest
 def test_collector_account_calc_hash():
@@ -14,13 +27,12 @@ def test_collector_account_calc_hash():
         obj = CollectorAccount(i, i)
         h = obj.calc_hash()
         assert h not in seen_values
+        seen_values.add(h)
 
     h0 = CollectorAccount(0, 1).calc_hash()
     for i in range(100):
         obj = CollectorAccount(i, 1)
         h = obj.calc_hash()
-        print(h)
-        print(h0)
         assert h == h0
 
 
