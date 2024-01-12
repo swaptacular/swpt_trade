@@ -169,13 +169,20 @@ cdef class Solver:
         amount_ptr[0] = deref(amount_ptr) + amt
 
     @cython.cdivision(True)
-    cdef i64 _get_random_collector_id(self, i64 creditor_id, i64 debtor_id):
-        account = CollectorAccount(creditor_id, debtor_id)
+    cdef i64 _get_random_collector_id(
+        self,
+        i64 giver_collector_id,
+        i64 debtor_id
+    ):
+        account = CollectorAccount(giver_collector_id, debtor_id)
         cdef size_t count = self.collector_accounts.count(account)
         cdef int n
 
         if count == 0:
-            return creditor_id
+            # NOTE: Normally this should never happen. Nevertheless,
+            # using the giver's collector account to pay the taker
+            # seems to be a pretty reliable fallback.
+            return giver_collector_id
         else:
             n = rand() % count
             pair = self.collector_accounts.equal_range(account)
