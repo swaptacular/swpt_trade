@@ -1,8 +1,9 @@
 # distutils: language = c++
+import cython
+from cython.operator cimport dereference as deref, postincrement
+from libc.stdlib cimport rand
 from libc.math cimport NAN
 from libcpp cimport bool
-from libcpp.unordered_set cimport unordered_set
-from libcpp.unordered_map cimport unordered_map
 from swpt_trade.pricing cimport distance, BidProcessor
 from swpt_trade.pricing import (
     DEFAULT_MAX_DISTANCE_TO_BASE,
@@ -20,16 +21,6 @@ AccountChange = namedtuple(
 cdef class Solver:
     """Builds a digraph, then finds the cycles and aggregates them.
     """
-    cdef readonly str base_debtor_info_uri
-    cdef readonly i64 base_debtor_id
-    cdef readonly distance max_distance_to_base
-    cdef readonly i64 min_trade_amount
-    cdef BidProcessor bid_processor
-    cdef Digraph graph
-    cdef unordered_set[i64] debtor_ids
-    cdef unordered_map[Account, AccountData] givings
-    cdef unordered_map[Account, AccountData] takings
-
     def __cinit__(
         self,
         str base_debtor_info_uri,
@@ -81,9 +72,10 @@ cdef class Solver:
                 self.graph.add_currency(debtor_id,  min_trade_amount * price)
         self.debtor_ids.clear()
 
-    def register_collector(self, i64 creditor_id, i64 debtor_id):
-        # TODO: implement!
-        pass
+    def register_collector_account(self, i64 creditor_id, i64 debtor_id):
+        self.collector_accounts.insert(
+            CollectorAccount(creditor_id, debtor_id)
+        )
 
     def register_sell_offer(
         self,
@@ -96,7 +88,7 @@ cdef class Solver:
         if price > 0.0:
             self.graph.add_supply(amount * price, debtor_id, creditor_id)
             seller_account = Account(creditor_id, debtor_id)
-            self.takings[seller_account] = AccountData(0, collector_id)
+            self.changes[seller_account] = AccountData(0, collector_id)
 
     def register_buy_offer(
         self,
@@ -111,30 +103,13 @@ cdef class Solver:
     def analyze_offers(self):
         cdef double amount
         cdef i64[:] cycle
-        cdef i64 n
-        cdef i64 i
-        cdef i64 debtor_id
-        cdef double price
-        cdef i64 amt
-        cdef AccountData* giver_data
-        cdef AccountData* taker_data
+
         for amount, cycle in self.graph.cycles():
-            n = len(cycle)
-            i = 0
-            while i < n:
-                debtor_id = cycle[i]
-                price = self.bid_processor.get_currency_price(debtor_id)
-                amt = int(amount / price)  # TODO: check!
-                giver_data = &self.givings[Account(cycle[i - 1], debtor_id)]
-                giver_data.amount_change -= amt
-                taker_data = &self.takings[Account(cycle[i + 1], debtor_id)]
-                taker_data.amount_change += amt
-                # TODO: set taker_data.collector_id!
-                i += 2
+            self._process_cycle(amount, cycle)
 
     def takings_iter(self):
         t = AccountChange
-        for pair in self.takings:
+        for pair in self.changes:
             account = pair.first
             data = pair.second
             if data.amount_change < 0:
@@ -147,7 +122,7 @@ cdef class Solver:
 
     def givings_iter(self):
         t = AccountChange
-        for pair in self.givings:
+        for pair in self.changes:
             account = pair.first
             data = pair.second
             if data.amount_change > 0:
@@ -157,3 +132,55 @@ cdef class Solver:
                     data.amount_change,
                     data.collector_id,
                 )
+
+    cdef void _process_cycle(self, double amount, i64[:] cycle):
+        cdef i64 n = len(cycle)
+        cdef i64 i = 0
+        cdef i64 debtor_id
+        cdef double price
+        cdef i64 amt
+        cdef AccountData* giver_data
+        cdef AccountData* taker_data
+
+        while i < n:
+            debtor_id = cycle[i]
+            price = self.bid_processor.get_currency_price(debtor_id)
+            amt = int(amount / price)  # TODO: check!
+
+            giver_data = &self.changes[Account(cycle[i - 1], debtor_id)]
+            giver_data.amount_change -= amt
+            if giver_data.collector_id == 0:
+                raise RuntimeError("invalid collector_id")
+
+            taker_data = &self.changes[Account(cycle[i + 1], debtor_id)]
+            taker_data.amount_change += amt
+            if taker_data.collector_id == 0:
+                taker_data.collector_id = self._get_random_collector_id(
+                    giver_data.collector_id, debtor_id
+                )
+
+            self._update_collector(giver_data.collector_id, debtor_id, +amt)
+            self._update_collector(taker_data.collector_id, debtor_id, -amt)
+            i += 2
+
+    cdef void _update_collector(self, i64 creditor_id, i64 debtor_id, i64 amt):
+        cdef Account account = Account(creditor_id, debtor_id)
+        cdef i64* amount_ptr = &self.collection_amounts[account]
+        amount_ptr[0] = deref(amount_ptr) + amt
+
+    @cython.cdivision(True)
+    cdef i64 _get_random_collector_id(self, i64 creditor_id, i64 debtor_id):
+        account = CollectorAccount(creditor_id, debtor_id)
+        cdef size_t count = self.collector_accounts.count(account)
+        cdef int n
+
+        if count == 0:
+            return creditor_id
+        else:
+            n = rand() % count
+            pair = self.collector_accounts.equal_range(account)
+            it = pair.first
+            while n > 0:
+                postincrement(it)
+                n -= 1
+            return deref(it).creditor_id

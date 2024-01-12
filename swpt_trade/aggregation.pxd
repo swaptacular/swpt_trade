@@ -1,4 +1,10 @@
 # distutils: language = c++
+from libcpp.unordered_set cimport unordered_set
+from libcpp.unordered_set cimport unordered_multiset
+from libcpp.unordered_map cimport unordered_map
+from swpt_trade.pricing cimport distance, BidProcessor
+from swpt_trade.matching cimport Digraph
+
 
 cdef extern from *:
     """
@@ -65,6 +71,42 @@ cdef extern from *:
       }
     };
 
+    class CollectorAccount {
+    public:
+      i64 creditor_id;
+      i64 debtor_id;
+
+      CollectorAccount()
+        : creditor_id(0), debtor_id(0) {
+      }
+      CollectorAccount(i64 creditor_id, i64 debtor_id)
+        : creditor_id(creditor_id), debtor_id(debtor_id) {
+      }
+      CollectorAccount(const CollectorAccount& other) {
+        creditor_id = other.creditor_id;
+        debtor_id = other.debtor_id;
+      }
+      bool operator== (const CollectorAccount& other) const {
+        return debtor_id == other.debtor_id;
+      }
+      size_t calc_hash();
+    };
+
+    namespace std {
+      template <> struct hash<CollectorAccount>
+      {
+        inline size_t operator()(const CollectorAccount& account) const
+        {
+          // Ignore creditor_id and use only debtor_id.
+          return hash<i64>()(account.debtor_id);
+        }
+      };
+    }
+
+    inline size_t CollectorAccount::calc_hash() {
+      return std::hash<CollectorAccount>()(*this);
+    }
+
     #endif
     """
     ctypedef long long i64
@@ -85,3 +127,35 @@ cdef extern from *:
         i64 collector_id
         AccountData() noexcept
         AccountData(i64, i64) noexcept
+
+    cdef cppclass CollectorAccount:
+        """Uniquely indetifies an account.
+
+        The only difference between this class and the `Account` class
+        is that the `creditor_id` field will be ignored during
+        comparisons between `CollectorAccount` instances. This allows
+        us to store collector accounts in an unordered miltiset, so
+        that we can quickly find all registered collector accounts for
+        a given debtor ID.
+        """
+        const i64 creditor_id
+        const i64 debtor_id
+        CollectorAccount() noexcept
+        CollectorAccount(i64, i64) noexcept
+        size_t calc_hash() noexcept
+
+
+cdef class Solver:
+    cdef readonly str base_debtor_info_uri
+    cdef readonly i64 base_debtor_id
+    cdef readonly distance max_distance_to_base
+    cdef readonly i64 min_trade_amount
+    cdef BidProcessor bid_processor
+    cdef Digraph graph
+    cdef unordered_set[i64] debtor_ids
+    cdef unordered_map[Account, AccountData] changes
+    cdef unordered_multiset[CollectorAccount] collector_accounts
+    cdef unordered_map[Account, i64] collection_amounts
+    cdef void _process_cycle(self, double, i64[:])
+    cdef void _update_collector(self, i64, i64, i64)
+    cdef i64 _get_random_collector_id(self, i64, i64)

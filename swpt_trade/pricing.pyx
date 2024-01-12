@@ -5,8 +5,8 @@ from libc.math cimport NAN
 from libcpp cimport bool
 from datetime import date
 
-cdef i64 DEFAULT_MIN_TRADE_AMOUNT = 1000
-cdef distance DEFAULT_MAX_DISTANCE_TO_BASE = 10
+DEFAULT_MIN_TRADE_AMOUNT = 1000
+DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
 
 cdef class CandidateOffer:
