@@ -565,3 +565,4 @@ cdef class BidProcessor:
     cdef Currency* _find_tradable_currency(self, Bid*)
     cdef void _add_candidate_offer(self, Bid*)
     cdef Key128 _calc_key128(self, str)
+    cpdef float get_currency_price(self, i64)

@@ -153,7 +153,7 @@ cdef class BidProcessor:
             peg_exchange_rate,
         )
 
-    def get_currency_price(self, i64 debtor_id):
+    cpdef float get_currency_price(self, i64 debtor_id):
         """Return the price of a tradable currency, expressed in base
         currency's tokens.
 

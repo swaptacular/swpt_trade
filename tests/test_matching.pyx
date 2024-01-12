@@ -145,14 +145,14 @@ def test_digraph_value_errors():
         (0.0, 666, huge_int),
     ]:
         with pytest.raises((ValueError, OverflowError)):
-            g.add_supply(*params)
+            g.add_supply(params[0], params[1], params[2])
 
     for params in [
         (0.0, huge_int, 1),
         (0.0, 666, huge_int),
     ]:
         with pytest.raises((ValueError, OverflowError)):
-            g.add_demand(*params)
+            g.add_demand(params[0], params[1], params[2])
 
 
 @cytest
