@@ -192,8 +192,8 @@ cdef class Solver:
                 n -= 1
             return deref(it).creditor_id
         else:
-            # There are only no matching collector accounts. Normally
-            # this should never happen. Nevertheless, using the
-            # giver's collector account to pay the taker seems to be a
-            # pretty reliable fallback.
+            # There are no matching collector accounts. Normally this
+            # should never happen. Nevertheless, using the giver's
+            # collector account to pay the taker seems to be a pretty
+            # reliable fallback.
             return giver_collector_id
