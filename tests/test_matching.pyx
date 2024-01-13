@@ -228,6 +228,18 @@ def test_digraph_simple_cylcle():
 
 
 @cytest
+def test_digraph_self_cylcle():
+    g = Digraph()
+    g.add_currency(666, 100.0)
+    g.add_demand(1000.0, 666, 1)
+    g.add_supply(2000.0, 666, 1)
+    amount, cycle = g.find_cycle()
+    assert amount == 1000.0
+    assert list(cycle) == [666, 1]
+    assert g.find_cycle() is None
+
+
+@cytest
 def test_digraph_overlapping_cylcles():
     g = Digraph()
     g.add_currency(101, 50.0)

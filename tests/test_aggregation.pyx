@@ -58,3 +58,71 @@ def test_get_random_collector_id():
         assert 0, "non-random collector ids"
 
     assert s._get_random_collector_id(123, 777) == 1
+
+
+@cytest
+def test_register_offers():
+    s = Solver('https://example.com/101', 101)
+    s.register_currency(True, 'https://example.com/101', 101)
+    s.register_currency(
+        True,
+        'https://example.com/102', 102,
+        'https://example.com/101', 101,
+        2.0,
+    )
+    s.register_currency(
+        True,
+        'https://example.com/103', 103,
+        'https://example.com/101', 101,
+        0.5,
+    )
+    s.analyze_currencies()
+
+    # creditor 1
+    s.register_sell_offer(1, 101, 200000, 999)
+    s.register_buy_offer(1, 102, 50000)
+    s.register_buy_offer(1, 103, 50000)
+
+    # creditor 2
+    s.register_sell_offer(2, 102, 50000, 999)
+    s.register_buy_offer(2, 101, 50000)
+
+    # creditor 3
+    s.register_sell_offer(3, 103, 50000, 999)
+    s.register_buy_offer(3, 101, 50000)
+
+    s.analyze_offers()
+
+    takings = sorted(
+        list(s.takings_iter()),
+        key=lambda x: (x.debtor_id, x.creditor_id),
+    )
+    assert len(takings) == 3
+    assert takings[0] == (1, 101, -75000, 999)
+    assert takings[1] == (2, 102, -25000, 999)
+    assert takings[2] == (3, 103, -50000, 999)
+
+    givings = sorted(
+        list(s.givings_iter()),
+        key=lambda x: (x.debtor_id, x.creditor_id),
+    )
+    assert len(givings) == 4
+    assert givings[0] == (2, 101, 50000, 999)
+    assert givings[1] == (3, 101, 25000, 999)
+    assert givings[2] == (1, 102, 25000, 999)
+    assert givings[3] == (1, 103, 50000, 999)
+
+
+@cytest
+def test_self_trade():
+    s = Solver('https://example.com/101', 101)
+    s.register_currency(True, 'https://example.com/101', 101)
+    s.analyze_currencies()
+    s.register_sell_offer(1, 101, 10000, 999)
+    s.register_buy_offer(1, 101, 20000)
+    s.analyze_offers()
+
+    assert s.collection_amounts.count(Account(999, 101)) == 1
+    assert s.collection_amounts.at(Account(999, 101)) == 0
+    assert len(list(s.takings_iter())) == 0
+    assert len(list(s.givings_iter())) == 0
