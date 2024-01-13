@@ -112,6 +112,10 @@ def test_register_offers():
     assert givings[2] == (1, 102, 25000, 999)
     assert givings[3] == (1, 103, 50000, 999)
 
+    assert s.collection_amounts.at(Account(999, 101)) == 0
+    assert s.collection_amounts.at(Account(999, 102)) == 0
+    assert s.collection_amounts.at(Account(999, 103)) == 0
+
 
 @cytest
 def test_self_trade():
