@@ -178,12 +178,12 @@ cdef class Solver:
         cdef size_t count = self.collector_accounts.count(account)
         cdef int n
 
-        if count == 0:
-            # NOTE: Normally this should never happen. Nevertheless,
-            # using the giver's collector account to pay the taker
-            # seems to be a pretty reliable fallback.
-            return giver_collector_id
-        else:
+        if count == 1:
+            # There is only one matching collector account. (This
+            # should be by far the most common case.)
+            return deref(self.collector_accounts.find(account)).creditor_id
+        elif count > 1:
+            # Randomly select one of the matching collector accounts.
             n = rand() % count
             pair = self.collector_accounts.equal_range(account)
             it = pair.first
@@ -191,3 +191,9 @@ cdef class Solver:
                 postincrement(it)
                 n -= 1
             return deref(it).creditor_id
+        else:
+            # There are only no matching collector accounts. Normally
+            # this should never happen. Nevertheless, using the
+            # giver's collector account to pay the taker seems to be a
+            # pretty reliable fallback.
+            return giver_collector_id
