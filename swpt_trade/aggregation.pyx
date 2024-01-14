@@ -206,6 +206,7 @@ cdef class Solver:
         """
         cdef unordered_multimap[CollectorAccount, i64] collection_amounts
         cdef unordered_set[i64] debtor_ids
+        cdef i64 amt, giver_amount, taker_amount
 
         for pair in self.collection_amounts:
             if pair.second != 0:
@@ -237,18 +238,17 @@ cdef class Solver:
                 if deref(givers.first).second > 0:
                     while takers.first != takers.second:
                         if deref(takers.first).second < 0:
-                            amount = min(
-                                deref(givers.first).second,
-                                -deref(takers.first).second,
-                            )
-                            deref(givers.first).second = deref(givers.first).second - amount
-                            deref(takers.first).second = deref(takers.first).second + amount
+                            giver_amount = deref(givers.first).second
+                            taker_amount = deref(takers.first).second
+                            amt = min(giver_amount, -taker_amount)
+                            deref(givers.first).second = giver_amount - amt
+                            deref(takers.first).second = taker_amount + amt
                             self.collector_transfers.push_back(
                                 Transfer(
                                     debtor_id,
                                     deref(givers.first).first.creditor_id,
                                     deref(takers.first).first.creditor_id,
-                                    amount,
+                                    amt,
                                 )
                             )
                             if deref(givers.first).second == 0:
