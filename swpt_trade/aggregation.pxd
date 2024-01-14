@@ -2,6 +2,7 @@
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_set cimport unordered_multiset
 from libcpp.unordered_map cimport unordered_map
+from libcpp.vector cimport vector
 from swpt_trade.pricing cimport distance, BidProcessor
 from swpt_trade.matching cimport Digraph
 
@@ -107,6 +108,25 @@ cdef extern from *:
       return std::hash<CollectorAccount>()(*this);
     }
 
+    class Transfer {
+    public:
+      i64 debtor_id;
+      i64 from_creditor_id;
+      i64 to_creditor_id;
+      i64 amount;
+
+      Transfer(
+        i64 debtor_id,
+        i64 from_creditor_id,
+        i64 to_creditor_id,
+        i64 amount
+      ) : debtor_id(debtor_id),
+          from_creditor_id(from_creditor_id),
+          to_creditor_id(to_creditor_id),
+          amount(amount) {
+      }
+    };
+
     #endif
     """
     ctypedef long long i64
@@ -144,6 +164,13 @@ cdef extern from *:
         CollectorAccount(i64, i64) noexcept
         size_t calc_hash() noexcept
 
+    cdef cppclass Transfer:
+        const i64 debtor_id
+        const i64 from_creditor_id
+        const i64 to_creditor_id
+        const i64 amount
+        Transfer(i64, i64, i64, i64)
+
 
 cdef class Solver:
     cdef readonly str base_debtor_info_uri
@@ -156,6 +183,8 @@ cdef class Solver:
     cdef unordered_map[Account, AccountData] changes
     cdef unordered_multiset[CollectorAccount] collector_accounts
     cdef unordered_map[Account, i64] collection_amounts
+    cdef vector[Transfer] collector_transfers
     cdef void _process_cycle(self, double, i64[:])
     cdef void _update_collector(self, i64, i64, i64)
     cdef i64 _get_random_collector_id(self, i64, i64)
+    cdef void _calc_collector_transfers(self)

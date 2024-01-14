@@ -130,3 +130,25 @@ def test_self_trade():
     assert s.collection_amounts.at(Account(999, 101)) == 0
     assert len(list(s.takings_iter())) == 0
     assert len(list(s.givings_iter())) == 0
+
+
+@cytest
+def test_collector_transfers():
+    s = Solver('https://example.com/101', 101)
+    s._calc_collector_transfers()
+    assert len(list(s.collector_transfers_iter())) == 0
+
+    s._update_collector(1, 101, 10000)
+    with pytest.raises(RuntimeError):
+        s._calc_collector_transfers()
+
+    s._update_collector(2, 101, -20000)
+    with pytest.raises(RuntimeError):
+        s._calc_collector_transfers()
+
+    s._update_collector(1, 101, 10000)
+    s._calc_collector_transfers()
+    transfers = list(s.collector_transfers_iter())
+    assert len(transfers) == 1
+    assert transfers[0] == (101, 1, 2, 20000)
+
