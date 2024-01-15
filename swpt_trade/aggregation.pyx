@@ -194,6 +194,7 @@ cdef class Solver:
             self._process_cycle(amount, cycle)
 
         self._calc_collector_transfers()
+        self.currencies_analysis_done = True
         self.offers_analysis_done = True
 
     cdef void _process_cycle(self, double amount, i64[:] cycle):

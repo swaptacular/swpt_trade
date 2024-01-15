@@ -61,6 +61,18 @@ def test_get_random_collector_id():
 
 
 @cytest
+def test_register_no_offers():
+    s = Solver('https://example.com/101', 101)
+    s.register_currency(True, 'https://example.com/101', 101)
+    assert len(list(s.givings_iter())) == 0
+    assert len(list(s.takings_iter())) == 0
+    assert len(list(s.collector_transfers_iter())) == 0
+
+    with pytest.raises(RuntimeError):
+        s.register_currency(True, 'https://example.com/102', 102)
+
+
+@cytest
 def test_register_offers():
     s = Solver('https://example.com/101', 101)
     s.register_currency(True, 'https://example.com/101', 101)
