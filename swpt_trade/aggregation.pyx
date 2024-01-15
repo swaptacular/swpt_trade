@@ -83,8 +83,8 @@ cdef class Solver:
        creditor_id=1, debtor_id=101, amount=-5000, collector_id=999)]
 
     Note that when there are lots and lots of registered offers, the
-    production of the first item from the `s.takings_iter()`,
-    `s.collector_transfers_iter()`, or `s.givings_iter()` generator
+    production of the first item from the `s.takings_iter`,
+    `s.collector_transfers_iter`, or `s.givings_iter` generator
     functions may take a significant amount of time, during which the
     offers will be analyzed.
 
