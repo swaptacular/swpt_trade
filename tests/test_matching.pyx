@@ -136,7 +136,7 @@ def test_digraph_value_errors():
         (666, math.nan),
     ]:
         with pytest.raises((ValueError, OverflowError)):
-            g.add_currency(*params)
+            g.add_currency(params[0], params[1])
 
     g.add_currency(666, 100.0)
 

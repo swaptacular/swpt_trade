@@ -40,7 +40,7 @@ cdef class Digraph:
         )
         self.path.push_back(root_trader)
 
-    def add_currency(self, i64 currency_id, double min_amount):
+    cpdef void add_currency(self, i64 currency_id, double min_amount):
         """Declares a currency.
 
         All arranged trades in this currency will be for amounts
@@ -94,7 +94,7 @@ cdef class Digraph:
         currency, buyer = self._ensure_nodes(currency_id, buyer_id)
         buyer.add_arc(currency, amount)
 
-    def find_cycle(self):
+    cpdef object find_cycle(self):
         """Try to find a trading cycle in the graph.
 
         Returns an (amount, node_ids_sequence) tuple when a cycle has

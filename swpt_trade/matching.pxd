@@ -162,5 +162,7 @@ cdef class Digraph:
     cdef bool _find_cycle(self) except? False
     cdef object _process_cycle(self)
     cdef void _sort_arcs(self)
+    cpdef void add_currency(self, i64, double)
     cpdef void add_supply(self, double, i64, i64)
     cpdef void add_demand(self, double, i64, i64)
+    cpdef object find_cycle(self)

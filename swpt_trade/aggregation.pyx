@@ -182,10 +182,15 @@ cdef class Solver:
         self.currencies_analysis_done = True
 
     cdef void _analyze_offers(self):
+        cdef tuple t
         cdef double amount
         cdef i64[:] cycle
 
-        for amount, cycle in self.graph.cycles():
+        while True:
+            t = self.graph.find_cycle()
+            if t is None:
+                break
+            amount, cycle = t
             self._process_cycle(amount, cycle)
 
         self._calc_collector_transfers()
