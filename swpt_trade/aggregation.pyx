@@ -52,13 +52,13 @@ cdef class Solver:
 
     >>> s = Solver('https://example.com/101', 101)
 
-    Registering currencies:
+    To register currencies:
 
     >>> s.register_currency(True, 'https://example.com/101', 101)
     >>> s.register_currency(True, 'https://example.com/102', 102,
     ...   'https://example.com/101', 101, 2.0)
 
-    Registering collector accounts:
+    To register collector accounts:
 
     >>> s.register_collector_account(998, 101)
     >>> s.register_collector_account(998, 102)
@@ -89,8 +89,8 @@ cdef class Solver:
     offers will be analyzed.
 
     Before we start giving to buyers, we should perform some transfers
-    between collector accounts, so that collector account receives
-    exactly the same amount as it should give to buyers.
+    between collector accounts, so that each collector account
+    receives exactly the same amount as it should give to buyers.
 
     >>> list(s.collector_transfers_iter())
     [CollectorTransfer(
@@ -98,7 +98,7 @@ cdef class Solver:
      CollectorTransfer(
         debtor_id=101, from_creditor_id=999, to_creditor_id=998, amount=5000)]
 
-    An finally, we can see all the amounts that should be given to
+    And finally, we can see all the amounts that should be given to
     buyers. These amounts will be taken from the corresponding
     collector accounts:
 
