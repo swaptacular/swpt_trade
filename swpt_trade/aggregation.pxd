@@ -1,4 +1,5 @@
 # distutils: language = c++
+from libcpp cimport bool
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_set cimport unordered_multiset
 from libcpp.unordered_map cimport unordered_map
@@ -184,6 +185,10 @@ cdef class Solver:
     cdef unordered_multiset[CollectorAccount] collector_accounts
     cdef unordered_map[Account, i64] collection_amounts
     cdef vector[Transfer] collector_transfers
+    cdef bool currencies_analysis_done
+    cdef bool offers_analysis_done
+    cdef void _analyze_currencies(self)
+    cdef void _analyze_offers(self)
     cdef void _process_cycle(self, double, i64[:])
     cdef void _update_collector(self, i64, i64, i64)
     cdef i64 _get_random_collector_id(self, i64, i64)

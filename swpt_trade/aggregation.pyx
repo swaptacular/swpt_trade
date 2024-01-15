@@ -56,6 +56,8 @@ cdef class Solver:
             min_trade_amount,
         )
         self.graph = Digraph()
+        self.currencies_analysis_done = False
+        self.offers_analysis_done = False
 
     def register_currency(
         self,
@@ -66,6 +68,9 @@ cdef class Solver:
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
     ):
+        if self.currencies_analysis_done:
+            raise RuntimeError("Currencies analysis has been done already.")
+
         self.bid_processor.register_currency(
             confirmed,
             debtor_info_uri,
@@ -75,16 +80,6 @@ cdef class Solver:
             peg_exchange_rate,
         )
         self.debtor_ids.insert(debtor_id)
-
-    def analyze_currencies(self):
-        cdef double min_trade_amount = float(self.min_trade_amount)
-        cdef double price
-        self.bid_processor.analyze_bids()
-        for debtor_id in self.debtor_ids:
-            price = self.bid_processor.get_currency_price(debtor_id)
-            if price > 0.0:
-                self.graph.add_currency(debtor_id,  min_trade_amount * price)
-        self.debtor_ids.clear()
 
     def register_collector_account(self, i64 creditor_id, i64 debtor_id):
         self.collector_accounts.insert(
@@ -98,6 +93,11 @@ cdef class Solver:
         i64 amount,
         i64 collector_id,
     ):
+        if self.offers_analysis_done:
+            raise RuntimeError("Offers analysis has been done already.")
+        if not self.currencies_analysis_done:
+            self._analyze_currencies()
+
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
             self.graph.add_supply(amount * price, debtor_id, creditor_id)
@@ -110,20 +110,19 @@ cdef class Solver:
         i64 debtor_id,
         i64 amount,
     ):
+        if self.offers_analysis_done:
+            raise RuntimeError("Offers analysis has been done already.")
+        if not self.currencies_analysis_done:
+            self._analyze_currencies()
+
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
             self.graph.add_demand(amount * price, debtor_id, creditor_id)
 
-    def analyze_offers(self):
-        cdef double amount
-        cdef i64[:] cycle
-
-        for amount, cycle in self.graph.cycles():
-            self._process_cycle(amount, cycle)
-
-        self._calc_collector_transfers()
-
     def takings_iter(self):
+        if not self.offers_analysis_done:
+            self._analyze_offers()
+
         t = AccountChange
         for pair in self.changes:
             account = pair.first
@@ -137,6 +136,9 @@ cdef class Solver:
                 )
 
     def givings_iter(self):
+        if not self.offers_analysis_done:
+            self._analyze_offers()
+
         t = AccountChange
         for pair in self.changes:
             account = pair.first
@@ -150,6 +152,9 @@ cdef class Solver:
                 )
 
     def collector_transfers_iter(self):
+        if not self.offers_analysis_done:
+            self._analyze_offers()
+
         t = CollectorTransfer
         it = self.collector_transfers.cbegin()
         end = self.collector_transfers.cend()
@@ -162,6 +167,29 @@ cdef class Solver:
                 ct.amount,
             )
             postincrement(it)
+
+    cdef void _analyze_currencies(self):
+        cdef double min_trade_amount = float(self.min_trade_amount)
+        cdef double price
+        self.bid_processor.analyze_bids()
+
+        for debtor_id in self.debtor_ids:
+            price = self.bid_processor.get_currency_price(debtor_id)
+            if price > 0.0:
+                self.graph.add_currency(debtor_id,  min_trade_amount * price)
+
+        self.debtor_ids.clear()
+        self.currencies_analysis_done = True
+
+    cdef void _analyze_offers(self):
+        cdef double amount
+        cdef i64[:] cycle
+
+        for amount, cycle in self.graph.cycles():
+            self._process_cycle(amount, cycle)
+
+        self._calc_collector_transfers()
+        self.offers_analysis_done = True
 
     cdef void _process_cycle(self, double amount, i64[:] cycle):
         cdef i64 n = len(cycle)
@@ -203,10 +231,10 @@ cdef class Solver:
         to be performed between collector accounts, so that each
         collector account takes exactly the same amount as it gives.
         """
-        self.collector_transfers.clear()
         cdef unordered_multimap[CollectorAccount, i64] collector_amounts
         cdef unordered_set[i64] debtor_ids
         cdef i64 amt, giver_amount, taker_amount
+        self.collector_transfers.clear()
 
         # Gather all "giver" and "taker" collector accounts into an
         # `unordered_multimap`. This multimap is used to efficiently

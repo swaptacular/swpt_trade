@@ -76,10 +76,11 @@ def test_register_offers():
         'https://example.com/101', 101,
         0.5,
     )
-    s.analyze_currencies()
+    assert not s.currencies_analysis_done
 
     # creditor 1
     s.register_sell_offer(1, 101, 200000, 999)
+    assert s.currencies_analysis_done
     s.register_buy_offer(1, 102, 50000)
     s.register_buy_offer(1, 103, 50000)
 
@@ -91,8 +92,7 @@ def test_register_offers():
     s.register_sell_offer(3, 103, 50000, 999)
     s.register_buy_offer(3, 101, 50000)
 
-    s.analyze_offers()
-
+    assert not s.offers_analysis_done
     takings = sorted(
         list(s.takings_iter()),
         key=lambda x: (x.debtor_id, x.creditor_id),
@@ -101,6 +101,12 @@ def test_register_offers():
     assert takings[0] == (1, 101, -75000, 999)
     assert takings[1] == (2, 102, -25000, 999)
     assert takings[2] == (3, 103, -50000, 999)
+
+    assert s.offers_analysis_done
+    with pytest.raises(RuntimeError):
+        s.register_sell_offer(4, 103, 50000, 999)
+    with pytest.raises(RuntimeError):
+        s.register_buy_offer(4, 101, 50000)
 
     givings = sorted(
         list(s.givings_iter()),
@@ -121,10 +127,16 @@ def test_register_offers():
 def test_self_trade():
     s = Solver('https://example.com/101', 101)
     s.register_currency(True, 'https://example.com/101', 101)
-    s.analyze_currencies()
-    s.register_sell_offer(1, 101, 10000, 999)
+    assert not s.currencies_analysis_done
+
     s.register_buy_offer(1, 101, 20000)
-    s.analyze_offers()
+    assert s.currencies_analysis_done
+
+    with pytest.raises(RuntimeError):
+        s.register_currency(True, 'https://example.com/102', 102)
+
+    s.register_sell_offer(1, 101, 10000, 999)
+    s._analyze_offers()
 
     assert s.collection_amounts.count(Account(999, 101)) == 1
     assert s.collection_amounts.at(Account(999, 101)) == 0
