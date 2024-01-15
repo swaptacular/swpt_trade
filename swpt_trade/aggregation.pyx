@@ -34,6 +34,77 @@ CollectorTransfer = namedtuple('CollectorTransfer', [
 
 cdef class Solver:
     """Builds a digraph, then finds the cycles and aggregates them.
+
+    The currencies are organized in a tree-like structure, each
+    currency pointing to its peg currency. At the root of the tree is
+    the "base currency". The base currency is identified by a ("debtor
+    info URI", "debtor ID") pair.
+
+    Currencies that are separated from the base currency by more than
+    `max_distance_to_base` pegs will be ignored, and will not be
+    included in the currency tree.
+
+    All suggested trades will be for amounts greater or equal than the
+    specified `min_trade_amount`. Possible trades for lesser amounts
+    will be ignored.
+
+    Usage example:
+
+    >>> s = Solver('https://example.com/101', 101)
+
+    Registering currencies:
+
+    >>> s.register_currency(True, 'https://example.com/101', 101)
+    >>> s.register_currency(True, 'https://example.com/102', 102,
+    ...   'https://example.com/101', 101, 2.0)
+
+    Registering collector accounts:
+
+    >>> s.register_collector_account(998, 101)
+    >>> s.register_collector_account(998, 102)
+
+    Sell and buy offer can be registered in any order, but this must
+    happen only after all the currencies, and all the collector
+    accounts have been registered.
+
+    >>> s.register_sell_offer(1, 101, 8000, 999)
+    >>> s.register_buy_offer(1, 102, 6000)
+    >>> s.register_sell_offer(2, 102, 3000, 999)
+    >>> s.register_buy_offer(2, 101, 5000)
+
+    Only after all sell and buy offers have been registered, we can
+    see all the amounts that should be taken from sellers. These
+    amounts will be received to the corresponding collector accounts:
+
+    >>> list(s.takings_iter())
+    [AccountChange(
+       creditor_id=2, debtor_id=102, amount=-2500, collector_id=999),
+     AccountChange(
+       creditor_id=1, debtor_id=101, amount=-5000, collector_id=999)]
+
+    Note that when there are lots and lots of registered offers, the
+    first call to `s.takings_iter()`, `s.collector_transfers_iter()`,
+    or `s.givings_iter()` may take a significant amount of time,
+    during which the offers will be analyzed.
+
+    To see all the transfers that must be performed between collector
+    accounts before we start giving to buyers:
+
+    >>> list(s.collector_transfers_iter())
+    [CollectorTransfer(
+       debtor_id=102, from_creditor_id=999, to_creditor_id=998, amount=2500),
+     CollectorTransfer(
+        debtor_id=101, from_creditor_id=999, to_creditor_id=998, amount=5000)]
+
+    An finally, we can see all the amounts that should be given to
+    buyers. These amounts will be taken the corresponding collector
+    accounts:
+
+    >>> list(s.givings_iter())
+    [AccountChange(
+       creditor_id=2, debtor_id=101, amount=5000, collector_id=998),
+     AccountChange(
+       creditor_id=1, debtor_id=102, amount=2500, collector_id=998)]
     """
     def __cinit__(
         self,

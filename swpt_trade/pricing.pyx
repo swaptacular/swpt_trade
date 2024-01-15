@@ -65,7 +65,7 @@ cdef class BidProcessor:
     and will be included in the currency tree.
 
     The attempted trades in all currencies will be for amounts greater
-    of equal than the specified `min_trade_amount`. Possible trades
+    or equal than the specified `min_trade_amount`. Possible trades
     for lesser amounts will be ignored.
 
     Usage example:
