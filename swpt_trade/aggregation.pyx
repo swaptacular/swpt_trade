@@ -88,8 +88,9 @@ cdef class Solver:
     functions may take a significant amount of time, during which the
     offers will be analyzed.
 
-    To see all the transfers that must be performed between collector
-    accounts before we start giving to buyers:
+    Before we start giving to buyers, we should perform some transfers
+    between collector accounts, so that collector account receives
+    exactly the same amount as it should give to buyers.
 
     >>> list(s.collector_transfers_iter())
     [CollectorTransfer(
@@ -98,8 +99,8 @@ cdef class Solver:
         debtor_id=101, from_creditor_id=999, to_creditor_id=998, amount=5000)]
 
     An finally, we can see all the amounts that should be given to
-    buyers. These amounts will be taken the corresponding collector
-    accounts:
+    buyers. These amounts will be taken from the corresponding
+    collector accounts:
 
     >>> list(s.givings_iter())
     [AccountChange(
@@ -143,10 +144,10 @@ cdef class Solver:
         """Register a currency, which might be pegged to another
         currency.
 
-        When the `confirmed` flag is `True`, this means that a system
-        account has been successfully created in this currency, and
-        the currency's debtor info document has been confirmed as
-        correct.
+        When the `confirmed` flag is `True`, this means that a
+        collector account has been successfully created in this
+        currency, and the currency's debtor info document has been
+        confirmed as correct.
 
         Both the pegged currency and the peg currency are identified
         by a ("debtor info URI", "debtor ID") pair.
@@ -183,14 +184,14 @@ cdef class Solver:
         for each tradable currency (each currency is uniquely
         identified a `debtor_id`). However, if no collector accounts
         are registered for some or all of the traded currencies, the
-        sell offers' `collector_id` parameters (see the
+        sell offers' `collector_id` parameter (see the
         `register_sell_offer` method) will determine which collector
         account will be used for each trade.
 
         When more than one collector accounts are registered for a
         given currency, the outgoing transfers to the buyers of this
-        currency will be evenly distributed between all collector
-        accounts.
+        currency will be evenly distributed between the registered
+        collector accounts.
         """
         if self.currencies_analysis_done:
             raise RuntimeError(
@@ -261,8 +262,8 @@ cdef class Solver:
         sellers.
 
         Each returned item will be a `AccountChange` namedtuple
-        containing four `i64` numbers. The `amount` field specifies
-        the amount that will be taken, and it will always be a
+        containing four `i64` numbers. The `amount` field determines
+        the amount that should be taken, and it will always be a
         negative number.
         """
         if not self.offers_analysis_done:
@@ -286,7 +287,7 @@ cdef class Solver:
         receives exactly the same amount as it should give to buyers.
 
         Each returned item will be `CollectorTransfer` namedtuple
-        containing four `i64` numbers. The `amount` field specifies
+        containing four `i64` numbers. The `amount` field determines
         the amount that should be transferred, and it will always be a
         positive number.
         """
@@ -311,8 +312,8 @@ cdef class Solver:
         buyers.
 
         Each returned item will be a `AccountChange` namedtuple
-        containing four `i64` numbers. The `amount` field specifies
-        the amount that will be given, and it will always be a
+        containing four `i64` numbers. The `amount` field determines
+        the amount that should be given, and it will always be a
         positive number.
         """
         if not self.offers_analysis_done:
