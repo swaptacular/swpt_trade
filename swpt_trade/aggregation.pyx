@@ -69,7 +69,9 @@ cdef class Solver:
         float peg_exchange_rate=NAN,
     ):
         if self.currencies_analysis_done:
-            raise RuntimeError("Currencies analysis has been done already.")
+            raise RuntimeError(
+                "A currency has been registered after currencies analysis."
+            )
 
         self.bid_processor.register_currency(
             confirmed,
@@ -82,6 +84,12 @@ cdef class Solver:
         self.debtor_ids.insert(debtor_id)
 
     def register_collector_account(self, i64 creditor_id, i64 debtor_id):
+        if self.currencies_analysis_done:
+            raise RuntimeError(
+                "A collector account has been registered after currencies"
+                " analysis."
+            )
+
         self.collector_accounts.insert(
             CollectorAccount(creditor_id, debtor_id)
         )
@@ -94,7 +102,9 @@ cdef class Solver:
         i64 collector_id,
     ):
         if self.offers_analysis_done:
-            raise RuntimeError("Offers analysis has been done already.")
+            raise RuntimeError(
+                "A sell offer has been registered after offer analysis."
+            )
         if not self.currencies_analysis_done:
             self._analyze_currencies()
 
@@ -111,7 +121,9 @@ cdef class Solver:
         i64 amount,
     ):
         if self.offers_analysis_done:
-            raise RuntimeError("Offers analysis has been done already.")
+            raise RuntimeError(
+                "A buy offer has been registered after offer analysis."
+            )
         if not self.currencies_analysis_done:
             self._analyze_currencies()
 

@@ -70,6 +70,8 @@ def test_register_no_offers():
 
     with pytest.raises(RuntimeError):
         s.register_currency(True, 'https://example.com/102', 102)
+    with pytest.raises(RuntimeError):
+        s.register_collector_account(1, 101)
 
 
 @cytest
