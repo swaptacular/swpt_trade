@@ -68,6 +68,23 @@ cdef class Solver:
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
     ):
+        """Register a currency, which might be pegged to another
+        currency.
+
+        When the `confirmed` flag is `True`, this means that a system
+        account has been successfully created in this currency, and
+        the currency's debtor info document has been confirmed as
+        correct.
+
+        Both the pegged currency and the peg currency are identified
+        by a ("debtor info URI", "debtor ID") pair.
+
+        The given `peg_exchange_rate` specifies the exchange rate
+        between the pegged currency and the peg currency. For example,
+        `2.0` would mean that pegged currency's tokens are twice as
+        valuable as peg currency's tokens. Note that 0.0, +inf, -inf,
+        and NAN are also acceptable exchange rate values.
+        """
         if self.currencies_analysis_done:
             raise RuntimeError(
                 "A currency has been registered after currencies analysis."
@@ -84,6 +101,25 @@ cdef class Solver:
         self.debtor_ids.insert(debtor_id)
 
     def register_collector_account(self, i64 creditor_id, i64 debtor_id):
+        """Registers a collector account.
+
+        Collector accounts are used to receive traded amounts from
+        sellers, so that they can be later transferred to the
+        buyer(s).
+
+        Normally, at least one collector account should be registered
+        for each tradable currency (each currency is uniquely
+        identified a `debtor_id`). However, if no collector accounts
+        are registered for some or all of the traded currencies, the
+        sell offers' `collector_id` parameters (see the
+        `register_sell_offer` method) will determine which collector
+        account will be used for each trade.
+
+        When more than one collector accounts are registered for a
+        given currency, the outgoing transfers to the buyers of this
+        currency will be evenly distributed between all collector
+        accounts.
+        """
         if self.currencies_analysis_done:
             raise RuntimeError(
                 "A collector account has been registered after currencies"
@@ -96,11 +132,21 @@ cdef class Solver:
 
     def register_sell_offer(
         self,
-        i64 creditor_id,
+        i64 seller_creditor_id,
         i64 debtor_id,
         i64 amount,
         i64 collector_id,
     ):
+        """Declares that a given seller (`seller_creditor_id`) wants
+        to sell a given amount of a given currency (`debtor_id`).
+
+        The `amount` should be positive.
+
+        The `collector_id` argument is the creditor ID of the
+        collector account that will eventually receive the traded
+        amount from the seller, so that it can be transferred to the
+        buyer(s).
+        """
         if self.offers_analysis_done:
             raise RuntimeError(
                 "A sell offer has been registered after offer analysis."
@@ -110,16 +156,23 @@ cdef class Solver:
 
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
-            self.graph.add_supply(amount * price, debtor_id, creditor_id)
-            seller_account = Account(creditor_id, debtor_id)
+            self.graph.add_supply(
+                amount * price, debtor_id, seller_creditor_id
+            )
+            seller_account = Account(seller_creditor_id, debtor_id)
             self.changes[seller_account] = AccountData(0, collector_id)
 
     def register_buy_offer(
         self,
-        i64 creditor_id,
+        i64 buyer_creditor_id,
         i64 debtor_id,
         i64 amount,
     ):
+        """Declares that a given buyer (`buyer_creditor_id`) wants to
+        buy a given amount of a given currency (`debtor_id`).
+
+        The `amount` should be positive.
+        """
         if self.offers_analysis_done:
             raise RuntimeError(
                 "A buy offer has been registered after offer analysis."
@@ -129,9 +182,17 @@ cdef class Solver:
 
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
-            self.graph.add_demand(amount * price, debtor_id, creditor_id)
+            self.graph.add_demand(amount * price, debtor_id, buyer_creditor_id)
 
     def takings_iter(self):
+        """Iterate over the amounts that should be taken from the
+        sellers.
+
+        Each returned item will be a `AccountChange` namedtuple
+        containing four `i64` numbers. The `amount` field specifies
+        the amount that will be taken, and it will always be a
+        negative number.
+        """
         if not self.offers_analysis_done:
             self._analyze_offers()
 
@@ -147,23 +208,16 @@ cdef class Solver:
                     data.collector_id,
                 )
 
-    def givings_iter(self):
-        if not self.offers_analysis_done:
-            self._analyze_offers()
-
-        t = AccountChange
-        for pair in self.changes:
-            account = pair.first
-            data = pair.second
-            if data.amount_change > 0:
-                yield t(
-                    account.creditor_id,
-                    account.debtor_id,
-                    data.amount_change,
-                    data.collector_id,
-                )
-
     def collector_transfers_iter(self):
+        """Iterate over the transfers that must be performed between
+        collector accounts, so that at the end, each collector account
+        receives exactly the same amount as it should give to buyers.
+
+        Each returned item will be `CollectorTransfer` namedtuple
+        containing four `i64` numbers. The `amount` field specifies
+        the amount that should be transferred, and it will always be a
+        positive number.
+        """
         if not self.offers_analysis_done:
             self._analyze_offers()
 
@@ -179,6 +233,30 @@ cdef class Solver:
                 ct.amount,
             )
             postincrement(it)
+
+    def givings_iter(self):
+        """Iterate over the amounts that should be given to the
+        buyers.
+
+        Each returned item will be a `AccountChange` namedtuple
+        containing four `i64` numbers. The `amount` field specifies
+        the amount that will be given, and it will always be a
+        positive number.
+        """
+        if not self.offers_analysis_done:
+            self._analyze_offers()
+
+        t = AccountChange
+        for pair in self.changes:
+            account = pair.first
+            data = pair.second
+            if data.amount_change > 0:
+                yield t(
+                    account.creditor_id,
+                    account.debtor_id,
+                    data.amount_change,
+                    data.collector_id,
+                )
 
     cdef void _analyze_currencies(self):
         cdef double min_trade_amount = float(self.min_trade_amount)
@@ -247,7 +325,8 @@ cdef class Solver:
     cdef void _calc_collector_transfers(self):
         """Generate the list of transfers (`self.collector_transfers`)
         to be performed between collector accounts, so that each
-        collector account takes exactly the same amount as it gives.
+        collector account receives exactly the same amount as it
+        gives.
         """
         cdef unordered_multimap[CollectorAccount, i64] collector_amounts
         cdef unordered_set[i64] debtor_ids
