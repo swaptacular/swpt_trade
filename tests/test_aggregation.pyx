@@ -152,3 +152,24 @@ def test_collector_transfers():
     assert len(transfers) == 1
     assert transfers[0] == (101, 1, 2, 20000)
 
+    s._update_collector(2, 101, 5000)
+    s._update_collector(3, 101, -4000)
+    s._update_collector(4, 101, -7000)
+    s._update_collector(5, 101, 2000)
+    s._update_collector(6, 101, 4000)
+    s._update_collector(1, 102, -5000)
+    s._update_collector(999, 102, 5000)
+    s._calc_collector_transfers()
+    transfers = sorted(
+        list(s.collector_transfers_iter()),
+        key=lambda x: (x.debtor_id, x.from_creditor_id, x.to_creditor_id),
+    )
+    print(transfers)
+    assert len(transfers) == 6
+    assert transfers[0] == (101, 1, 2, 15000)
+    assert transfers[1] == (101, 1, 3, 4000)
+    assert transfers[2] == (101, 1, 4, 1000)
+    assert transfers[3] == (101, 5, 4, 2000)
+    assert transfers[4] == (101, 6, 4, 4000)
+    assert transfers[5] == (102, 999, 1, 5000)
+

@@ -200,46 +200,48 @@ cdef class Solver:
 
     cdef void _calc_collector_transfers(self):
         """Generate the list of transfers (`self.collector_transfers`)
-        that have to be performed between collector accounts, so that
-        each collector account takes exactly the same amount that it
-        gives.
+        to be performed between collector accounts, so that each
+        collector account takes exactly the same amount as it gives.
         """
-        cdef unordered_multimap[CollectorAccount, i64] collection_amounts
+        self.collector_transfers.clear()
+        cdef unordered_multimap[CollectorAccount, i64] collector_amounts
         cdef unordered_set[i64] debtor_ids
         cdef i64 amt, giver_amount, taker_amount
 
+        # Gather all "giver" and "taker" collector accounts into an
+        # `unordered_multimap`. This multimap is used to efficiently
+        # group collector accounts by their `debtor_id`s.
         for pair in self.collection_amounts:
             if pair.second != 0:
                 creditor_id = pair.first.creditor_id
                 debtor_id = pair.first.debtor_id
-                collection_amounts.insert(
+                collector_amounts.insert(
                     Pair[CollectorAccount, i64](
-                        CollectorAccount(creditor_id, debtor_id), pair.second
+                        CollectorAccount(creditor_id, debtor_id),
+                        pair.second,
                     )
                 )
                 debtor_ids.insert(debtor_id)
-
-        self.collector_transfers.clear()
 
         for debtor_id in debtor_ids:
             # For each `debtor_id` we create two iterators: one for
             # iterating over "giver" collector accounts (amount > 0),
             # and one for iterating over "taker" collector accounts
             # (amount < 0).
-            debtor_collector_account = CollectorAccount(0, debtor_id)
-            givers = collection_amounts.equal_range(debtor_collector_account)
-            takers = collection_amounts.equal_range(debtor_collector_account)
+            debtor_root_account = CollectorAccount(0, debtor_id)
+            givers = collector_amounts.equal_range(debtor_root_account)
+            takers = collector_amounts.equal_range(debtor_root_account)
 
             # Continue advancing both iterators, and generate
             # transfers from "giver" collector accounts to "taker"
             # collector accounts, until all collector accounts are
-            # equalized (amount = 0).
+            # equalized (amount == 0).
             while givers.first != givers.second:
                 if deref(givers.first).second > 0:
                     while takers.first != takers.second:
-                        if deref(takers.first).second < 0:
-                            giver_amount = deref(givers.first).second
-                            taker_amount = deref(takers.first).second
+                        giver_amount = deref(givers.first).second
+                        taker_amount = deref(takers.first).second
+                        if taker_amount < 0:
                             amt = min(giver_amount, -taker_amount)
                             deref(givers.first).second = giver_amount - amt
                             deref(takers.first).second = taker_amount + amt
@@ -253,15 +255,16 @@ cdef class Solver:
                             )
                             if deref(givers.first).second == 0:
                                 break
+                            assert deref(takers.first).second == 0
                         postincrement(takers.first)
                     else:
                        raise RuntimeError("can not equalize collectors")
 
                 postincrement(givers.first)
 
-            # Ensure that there are no taker collectors accounts left.
+            # Ensure there are no "taker" collectors accounts left.
             while takers.first != takers.second:
-                if deref(takers.first).second != 0:
+                if deref(takers.first).second < 0:
                     raise RuntimeError("can not equalize collectors")
                 postincrement(takers.first)
 
