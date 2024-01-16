@@ -8,6 +8,8 @@ from datetime import date
 DEFAULT_MIN_TRADE_AMOUNT = 1000
 DEFAULT_MAX_DISTANCE_TO_BASE = 10
 
+cdef i64 MIN_I64 = -0x7fffffffffffffff
+
 
 cdef class CandidateOffer:
     """A trader bid, that may eventually become a confirmed offer.
@@ -198,6 +200,10 @@ cdef class BidProcessor:
         for traders that have registered at least one bid, but do not
         have a bid for the base currency.
         """
+        # Make sure that `abs(amount)` will work correctly.
+        if amount < MIN_I64:
+            amount = MIN_I64
+
         if aux_data is None:
             self.bid_registry_ptr.add_bid(
                 creditor_id,
