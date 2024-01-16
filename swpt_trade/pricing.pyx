@@ -132,10 +132,10 @@ cdef class BidProcessor:
         """Register a currency, which might be pegged to another
         currency.
 
-        When the `confirmed` flag is `True`, this means that a system
-        account has been successfully created in this currency, and
-        the currency's debtor info document has been confirmed as
-        correct.
+        When the `confirmed` flag is `True`, this means that a
+        collector account has been successfully created in this
+        currency, and the currency's debtor info document has been
+        confirmed as correct.
 
         Both the pegged currency and the peg currency are identified
         by a ("debtor info URI", "debtor ID") pair.
@@ -285,11 +285,11 @@ cdef class BidProcessor:
         on-sale currencies.
 
         While the `analyze_bids` method analyzes the registered bids,
-        it may discover sell offers for currencies for which a system
-        account has not been created yet. Every `BidProcessor`
-        instance will maintain an ever-growing set of debtor IDs of
-        such currencies, so that system accounts could be created for
-        them eventually.
+        it may discover sell offers for currencies for which a
+        collector account has not been created yet. Every
+        `BidProcessor` instance will maintain an ever-growing set of
+        debtor IDs of such currencies, so that collector accounts
+        could be created for them eventually.
 
         IMPORTANT: Successive calls to the `analyze_bids` method will
         not annul the maintained ever-growing set of non-confirmed,
@@ -307,7 +307,7 @@ cdef class BidProcessor:
     cdef Currency* _find_tradable_currency(self, Bid* bid):
         tc = self.currency_registry_ptr.get_tradable_currency(bid.debtor_id)
         if tc == NULL and bid.amount <= -self.min_trade_amount:
-            # We must try to create a system account for this
+            # We must try to create a collector account for this
             # currency, so that it can be traded in the future.
             self.to_be_confirmed.insert(bid.debtor_id)
 

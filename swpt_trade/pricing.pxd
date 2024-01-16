@@ -447,8 +447,8 @@ cdef extern from *:
         addition to this, every currency maintains a `price` field
         (expressed in base currency's tokens), and several bit-flags:
 
-        * To be a "confirmed currency" means that a system account has
-          been successfully created in this currency, and the
+        * To be a "confirmed currency" means that a collector account
+          has been successfully created in this currency, and the
           currency's debtor info document has been confirmed as
           correct.
 
