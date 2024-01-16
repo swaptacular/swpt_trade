@@ -3,6 +3,7 @@
 import pytest
 from . import cytest
 from swpt_trade.aggregation cimport (
+    check_add,
     Account,
     CollectorAccount,
     Solver,
@@ -183,8 +184,7 @@ def test_collector_transfers():
     s._update_collector(4, 101, -7000)
     s._update_collector(5, 101, 2000)
     s._update_collector(6, 101, 4000)
-    s._update_collector(1, 102, -5000)
-    s._update_collector(999, 102, 5000)
+    s._update_collectors(999, 1, 102, 5000)
     s._calc_collector_transfers()
     transfers = sorted(
         list(s.collector_transfers_iter()),
@@ -199,3 +199,57 @@ def test_collector_transfers():
     assert transfers[4] == (101, 6, 4, 4000)
     assert transfers[5] == (102, 999, 1, 5000)
 
+
+@cytest
+def test_check_add():
+    assert check_add(1, 2) == 2
+    assert check_add(0x7ffffffffffffffd, 2) == 2
+    assert check_add(0x7ffffffffffffffe, 2) == 1
+    assert check_add(0x7fffffffffffffff, 2) == 0
+    assert check_add(-0x7ffffffffffffffd, -2) == -2
+    assert check_add(-0x7ffffffffffffffe, -2) == -1
+    assert check_add(-0x7fffffffffffffff, -2) == 0
+
+
+@cytest
+def test_update_collectors():
+    s = Solver('https://example.com/101', 101)
+    assert s._update_collector(1, 101, 5000) == 5000
+    assert s._update_collector(1, 101, 0x7fffffffffffffff) == (
+        0x7fffffffffffffff - 5000
+    )
+    assert s._update_collector(1, 101, -0x7fffffffffffffff) == (
+        -0x7fffffffffffffff
+    )
+    s._calc_collector_transfers()
+    assert len(list(s.collector_transfers_iter())) == 0
+
+    assert s._update_collector(1, 101, -5000) == -5000
+    assert s._update_collector(1, 101, -0x7fffffffffffffff) == (
+        -0x7fffffffffffffff + 5000
+    )
+    assert s._update_collector(1, 101, 0x7fffffffffffffff) == (
+        0x7fffffffffffffff
+    )
+    s._calc_collector_transfers()
+    assert len(list(s.collector_transfers_iter())) == 0
+
+    assert s._update_collectors(1, 2, 101, 5000) == 5000
+    assert s._update_collectors(1, 2, 101, 0x7fffffffffffffff) == (
+        0x7fffffffffffffff - 5000
+    )
+    assert s._update_collectors(1, 2, 101, -0x7fffffffffffffff) == (
+        -0x7fffffffffffffff
+    )
+    s._calc_collector_transfers()
+    assert len(list(s.collector_transfers_iter())) == 0
+
+    assert s._update_collectors(1, 2, 101, -5000) == -5000
+    assert s._update_collectors(1, 2, 101, -0x7fffffffffffffff) == (
+        -0x7fffffffffffffff + 5000
+    )
+    assert s._update_collectors(1, 2, 101, 0x7fffffffffffffff) == (
+        0x7fffffffffffffff
+    )
+    s._calc_collector_transfers()
+    assert len(list(s.collector_transfers_iter())) == 0

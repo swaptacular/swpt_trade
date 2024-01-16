@@ -375,25 +375,58 @@ cdef class Solver:
             amt = int(amount / price)  # TODO: check!
 
             giver_data = &self.changes[Account(cycle[i - 1], debtor_id)]
-            giver_data.amount_change -= amt
             if giver_data.collector_id == 0:
                 raise RuntimeError("invalid collector_id")
 
             taker_data = &self.changes[Account(cycle[i + 1], debtor_id)]
-            taker_data.amount_change += amt
             if taker_data.collector_id == 0:
                 taker_data.collector_id = self._get_random_collector_id(
                     giver_data.collector_id, debtor_id
                 )
 
-            self._update_collector(giver_data.collector_id, debtor_id, +amt)
-            self._update_collector(taker_data.collector_id, debtor_id, -amt)
+            # If the transferring `amt` would cause an i64 overflow,
+            # here we will decrease `amt`'s value to avoid the
+            # overflow. In theory, a negligible overflowing may occur
+            # in some edge cases, as a result of rounding errors.
+            amt = -check_add(giver_data.amount_change, -amt)
+            amt = +check_add(taker_data.amount_change, +amt)
+            amt = self._update_collectors(
+                giver_data.collector_id,
+                taker_data.collector_id,
+                debtor_id,
+                amt,
+            )
+
+            giver_data.amount_change -= amt
+            taker_data.amount_change += amt
+
             i += 2
 
-    cdef void _update_collector(self, i64 creditor_id, i64 debtor_id, i64 amt):
-        cdef Account account = Account(creditor_id, debtor_id)
-        cdef i64* amount_ptr = &self.collection_amounts[account]
+    cdef i64 _update_collector(self, i64 creditor_id, i64 debtor_id, i64 amt):
+        account = Account(creditor_id, debtor_id)
+        amount_ptr = &self.collection_amounts[account]
+        amt = check_add(deref(amount_ptr), amt)
         amount_ptr[0] = deref(amount_ptr) + amt
+        return amt
+
+    cdef i64 _update_collectors(
+        self,
+        i64 giver_collector_id,
+        i64 taker_collector_id,
+        i64 debtor_id,
+        i64 amt,
+    ):
+        giver_account = Account(giver_collector_id, debtor_id)
+        giver_amount_ptr = &self.collection_amounts[giver_account]
+        amt = +check_add(deref(giver_amount_ptr), +amt)
+
+        taker_account = Account(taker_collector_id, debtor_id)
+        taker_amount_ptr = &self.collection_amounts[taker_account]
+        amt = -check_add(deref(taker_amount_ptr), -amt)
+
+        giver_amount_ptr[0] = deref(giver_amount_ptr) + amt
+        taker_amount_ptr[0] = deref(taker_amount_ptr) - amt
+        return amt
 
     cdef void _calc_collector_transfers(self):
         """Generate the list of transfers (`self.collector_transfers`)

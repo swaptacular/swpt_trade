@@ -15,6 +15,7 @@ cdef extern from *:
 
     #include <unordered_map>
     #include <stdexcept>
+    #include <climits>
 
     typedef long long i64;
 
@@ -128,6 +129,31 @@ cdef extern from *:
       }
     };
 
+    inline i64 check_add(i64 n, i64 amt)
+    {
+      // Returns the closest integer which can be added to `n` without
+      // causing an overflow. If adding `amt` to `n` does not cause an
+      // overflow, this function will return `amt` unmodified . Note that
+      // when the result of the addition is -0x800000000000000, this is
+      // treated as an overflow.
+      if (n > 0) {
+        if (LLONG_MAX - n < amt) {
+          // would overflow
+          return LLONG_MAX - n;
+        }
+      } else if (n < -LLONG_MAX) {
+        if (amt < 0) {
+          // already underflown
+          return 0;
+        }
+      } else {
+        if (amt < -(LLONG_MAX + n)) {
+          // would underflow
+          return -(LLONG_MAX + n);
+        }
+      }
+      return amt;
+    }
     #endif
     """
     ctypedef long long i64
@@ -172,6 +198,8 @@ cdef extern from *:
         const i64 amount
         Transfer(i64, i64, i64, i64)
 
+    cdef i64 check_add(i64, i64)
+
 
 cdef class Solver:
     cdef readonly str base_debtor_info_uri
@@ -190,6 +218,7 @@ cdef class Solver:
     cdef void _analyze_currencies(self)
     cdef void _analyze_offers(self)
     cdef void _process_cycle(self, double, i64[:])
-    cdef void _update_collector(self, i64, i64, i64)
+    cdef i64 _update_collector(self, i64, i64, i64)
+    cdef i64 _update_collectors(self, i64, i64, i64, i64)
     cdef i64 _get_random_collector_id(self, i64, i64)
     cdef void _calc_collector_transfers(self)
