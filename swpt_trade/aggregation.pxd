@@ -215,8 +215,8 @@ cdef class Solver:
     cdef vector[Transfer] collector_transfers
     cdef bool currencies_analysis_done
     cdef bool offers_analysis_done
-    cdef void _analyze_currencies(self)
-    cdef void _analyze_offers(self)
+    cdef void analyze_currencies(self)
+    cdef void analyze_offers(self)
     cdef void _process_cycle(self, double, i64[:])
     cdef i64 _update_collector(self, i64, i64, i64)
     cdef i64 _update_collectors(self, i64, i64, i64, i64)

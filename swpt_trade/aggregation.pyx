@@ -65,7 +65,13 @@ cdef class Solver:
 
     Sell and buy offer can be registered in any order, but this must
     happen only after all the currencies, and all the collector
-    accounts have been registered.
+    accounts have been registered. Note that when there are lots and
+    lots of registered currencies, the first call to
+    `register_sell_offer` or `register_buy_offer` methods may take
+    some time, during which the registered currencies will be
+    analyzed. To avoid this, the `analyze_currencies` method can be
+    called, explicitly requesting the processing of the registered
+    currencies.
 
     >>> s.register_sell_offer(1, 101, 8000, 999)
     >>> s.register_buy_offer(1, 102, 6000)
@@ -86,7 +92,9 @@ cdef class Solver:
     production of the first item from the `s.takings_iter`,
     `s.collector_transfers_iter`, or `s.givings_iter` generator
     functions may take a significant amount of time, during which the
-    offers will be analyzed.
+    registered offers will be analyzed. To avoid this, the
+    `analyze_offers` method can be called, explicitly requesting the
+    processing of the registered offers.
 
     Before we start giving to buyers, we should perform some transfers
     between collector accounts, so that each collector account
@@ -203,6 +211,32 @@ cdef class Solver:
             CollectorAccount(creditor_id, debtor_id)
         )
 
+    cdef void analyze_currencies(self):
+        """Analyze registered currencies.
+
+        This may take some time when there are lots and lots of
+        registered currencies.
+
+        After this method has been called, no currencies or collector
+        accounts can be registered.
+        """
+        cdef double min_trade_amount
+        cdef double price
+
+        if not self.currencies_analysis_done:
+            self.bid_processor.analyze_bids()
+            min_trade_amount = float(self.min_trade_amount)
+
+            for debtor_id in self.debtor_ids:
+                price = self.bid_processor.get_currency_price(debtor_id)
+                if price > 0.0:
+                    self.graph.add_currency(
+                        debtor_id,  min_trade_amount * price
+                    )
+
+            self.debtor_ids.clear()
+            self.currencies_analysis_done = True
+
     def register_sell_offer(
         self,
         i64 seller_creditor_id,
@@ -225,7 +259,7 @@ cdef class Solver:
                 "A sell offer has been registered after offer analysis."
             )
         if not self.currencies_analysis_done:
-            self._analyze_currencies()
+            self.analyze_currencies()
 
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
@@ -251,11 +285,37 @@ cdef class Solver:
                 "A buy offer has been registered after offer analysis."
             )
         if not self.currencies_analysis_done:
-            self._analyze_currencies()
+            self.analyze_currencies()
 
         cdef double price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
             self.graph.add_demand(amount * price, debtor_id, buyer_creditor_id)
+
+    cdef void analyze_offers(self):
+        """Analyze registered offers.
+
+        This may take a significant amount of time when there are lots
+        and lots of registered offers.
+
+        After this method has been called, no buying or selling offers
+        can be registered.
+        """
+        cdef tuple t
+        cdef double amount
+        cdef i64[:] cycle
+
+        if not self.offers_analysis_done:
+            self.currencies_analysis_done = True
+
+            while True:
+                t = self.graph.find_cycle()
+                if t is None:
+                    break
+                amount, cycle = t
+                self._process_cycle(amount, cycle)
+
+            self._calc_collector_transfers()
+            self.offers_analysis_done = True
 
     def takings_iter(self):
         """Iterate over the amounts that should be taken from the
@@ -266,8 +326,7 @@ cdef class Solver:
         the amount that should be taken, and it will always be a
         negative number.
         """
-        if not self.offers_analysis_done:
-            self._analyze_offers()
+        self.analyze_offers()
 
         t = AccountChange
         for pair in self.changes:
@@ -291,8 +350,7 @@ cdef class Solver:
         the amount that should be transferred, and it will always be a
         positive number.
         """
-        if not self.offers_analysis_done:
-            self._analyze_offers()
+        self.analyze_offers()
 
         t = CollectorTransfer
         it = self.collector_transfers.cbegin()
@@ -316,8 +374,7 @@ cdef class Solver:
         the amount that should be given, and it will always be a
         positive number.
         """
-        if not self.offers_analysis_done:
-            self._analyze_offers()
+        self.analyze_offers()
 
         t = AccountChange
         for pair in self.changes:
@@ -330,35 +387,6 @@ cdef class Solver:
                     data.amount_change,
                     data.collector_id,
                 )
-
-    cdef void _analyze_currencies(self):
-        cdef double min_trade_amount = float(self.min_trade_amount)
-        cdef double price
-        self.bid_processor.analyze_bids()
-
-        for debtor_id in self.debtor_ids:
-            price = self.bid_processor.get_currency_price(debtor_id)
-            if price > 0.0:
-                self.graph.add_currency(debtor_id,  min_trade_amount * price)
-
-        self.debtor_ids.clear()
-        self.currencies_analysis_done = True
-
-    cdef void _analyze_offers(self):
-        cdef tuple t
-        cdef double amount
-        cdef i64[:] cycle
-
-        while True:
-            t = self.graph.find_cycle()
-            if t is None:
-                break
-            amount, cycle = t
-            self._process_cycle(amount, cycle)
-
-        self._calc_collector_transfers()
-        self.currencies_analysis_done = True
-        self.offers_analysis_done = True
 
     cdef void _process_cycle(self, double amount, i64[:] cycle):
         cdef i64 n = len(cycle)

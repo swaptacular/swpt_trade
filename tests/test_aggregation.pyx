@@ -144,14 +144,16 @@ def test_self_trade():
     s.register_currency(True, 'https://example.com/101', 101)
     assert not s.currencies_analysis_done
 
-    s.register_buy_offer(1, 101, 20000)
+    s.analyze_currencies()
     assert s.currencies_analysis_done
+
+    s.register_buy_offer(1, 101, 20000)
 
     with pytest.raises(RuntimeError):
         s.register_currency(True, 'https://example.com/102', 102)
 
     s.register_sell_offer(1, 101, 10000, 999)
-    s._analyze_offers()
+    s.analyze_offers()
 
     assert s.collection_amounts.count(Account(999, 101)) == 1
     assert s.collection_amounts.at(Account(999, 101)) == 0
