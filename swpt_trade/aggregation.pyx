@@ -305,7 +305,7 @@ cdef class Solver:
         cdef i64[:] cycle
 
         if not self.offers_analysis_done:
-            self.currencies_analysis_done = True
+            self.analyze_currencies()
 
             while True:
                 t = self.graph.find_cycle()
@@ -427,7 +427,6 @@ cdef class Solver:
 
             giver_data.amount_change -= amt
             taker_data.amount_change += amt
-
             i += 2
 
     cdef i64 _update_collector(self, i64 creditor_id, i64 debtor_id, i64 amt):
