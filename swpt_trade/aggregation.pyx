@@ -400,7 +400,7 @@ cdef class Solver:
         while i < n:
             debtor_id = cycle[i]
             price = self.bid_processor.get_currency_price(debtor_id)
-            amt = int(amount / price)  # TODO: check!
+            amt = calc_amt(amount, price)
 
             giver_data = &self.changes[Account(cycle[i - 1], debtor_id)]
             if giver_data.collector_id == 0:

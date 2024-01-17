@@ -16,6 +16,7 @@ cdef extern from *:
     #include <unordered_map>
     #include <stdexcept>
     #include <climits>
+    #include <cmath>
 
     typedef long long i64;
 
@@ -154,6 +155,18 @@ cdef extern from *:
       }
       return amt;
     }
+
+    inline i64 calc_amt(double amount, double price) {
+      double amt = amount / price;
+      if (amt > 0.0) {
+        if (amt < LLONG_MAX) {
+          return llround(amt);
+        }
+        return LLONG_MAX;
+      }
+      return 0;
+    }
+
     #endif
     """
     ctypedef long long i64
@@ -199,6 +212,7 @@ cdef extern from *:
         Transfer(i64, i64, i64, i64)
 
     cdef i64 check_add(i64, i64)
+    cdef i64 calc_amt(double, double)
 
 
 cdef class Solver:

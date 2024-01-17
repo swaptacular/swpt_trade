@@ -1,9 +1,11 @@
 # distutils: language = c++
 
 import pytest
+import math
 from . import cytest
 from swpt_trade.aggregation cimport (
     check_add,
+    calc_amt,
     Account,
     CollectorAccount,
     Solver,
@@ -211,6 +213,36 @@ def test_check_add():
     assert check_add(-0x7ffffffffffffffd, -2) == -2
     assert check_add(-0x7ffffffffffffffe, -2) == -1
     assert check_add(-0x7fffffffffffffff, -2) == 0
+
+
+@cytest
+def test_calc_amt():
+    assert calc_amt(1000.0, 10.0) == 100
+    assert calc_amt(math.nan, 10.0) == 0
+    assert calc_amt(1000.0, math.nan) == 0
+    assert calc_amt(1000.0, math.inf) == 0
+    assert calc_amt(1000.0, -math.inf) == 0
+    assert calc_amt(-math.inf, 10.0) == 0
+    assert calc_amt(math.inf, math.inf) == 0
+    assert calc_amt(math.inf, -math.inf) == 0
+    assert calc_amt(-math.inf, -math.inf) == 0
+    assert calc_amt(-math.inf, math.nan) == 0
+    assert calc_amt(math.inf, math.nan) == 0
+    assert calc_amt(math.nan, math.nan) == 0
+    assert calc_amt(math.nan, math.inf) == 0
+    assert calc_amt(math.nan, -math.inf) == 0
+    assert calc_amt(-1e200, 10.0) == 0
+    assert calc_amt(1e-200, 10.0) == 0
+    assert calc_amt(-1e-200, 10.0) == 0
+    assert calc_amt(math.inf, 10.0) == 0x7fffffffffffffff
+    assert calc_amt(math.inf, 1e200) == 0x7fffffffffffffff
+    assert calc_amt(math.inf, 1e-200) == 0x7fffffffffffffff
+    assert calc_amt(1e200, 10.0) == 0x7fffffffffffffff
+    assert calc_amt(0x7ffffffffffe0000, 1) == 0x7ffffffffffe0000
+    assert calc_amt(0x7fffffffffff0000, 1) == 0x7fffffffffff0000
+
+    for n in range(0x7fffffffffffff00, 0x7fffffffffffff00 + 100000, 0xff):
+        assert calc_amt(n, 1) == 0x7fffffffffffffff
 
 
 @cytest
