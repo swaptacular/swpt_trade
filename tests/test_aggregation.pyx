@@ -235,8 +235,8 @@ def test_calc_amt():
     assert calc_amt(1e-200, 10.0) == 0
     assert calc_amt(-1e-200, 10.0) == 0
     assert calc_amt(math.inf, 10.0) == 0x7fffffffffffffff
-    assert calc_amt(math.inf, 1e200) == 0x7fffffffffffffff
-    assert calc_amt(math.inf, 1e-200) == 0x7fffffffffffffff
+    assert calc_amt(math.inf, 1e30) == 0x7fffffffffffffff
+    assert calc_amt(math.inf, 1e-30) == 0x7fffffffffffffff
     assert calc_amt(1e200, 10.0) == 0x7fffffffffffffff
     assert calc_amt(0x7ffffffffffe0000, 1) == 0x7ffffffffffe0000
     assert calc_amt(0x7fffffffffff0000, 1) == 0x7fffffffffff0000

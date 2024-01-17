@@ -156,7 +156,7 @@ cdef extern from *:
       return amt;
     }
 
-    inline i64 calc_amt(double amount, double price) {
+    inline i64 calc_amt(double amount, float price) {
       double amt = amount / price;
       if (amt > 0.0) {
         if (amt < LLONG_MAX) {

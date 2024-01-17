@@ -221,7 +221,6 @@ cdef class Solver:
         accounts can be registered.
         """
         cdef double min_trade_amount
-        cdef double price
 
         if not self.currencies_analysis_done:
             self.bid_processor.analyze_bids()
@@ -261,7 +260,7 @@ cdef class Solver:
         if not self.currencies_analysis_done:
             self.analyze_currencies()
 
-        cdef double price = self.bid_processor.get_currency_price(debtor_id)
+        price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
             self.graph.add_supply(
                 amount * price, debtor_id, seller_creditor_id
@@ -287,7 +286,7 @@ cdef class Solver:
         if not self.currencies_analysis_done:
             self.analyze_currencies()
 
-        cdef double price = self.bid_processor.get_currency_price(debtor_id)
+        price = self.bid_processor.get_currency_price(debtor_id)
         if price > 0.0:
             self.graph.add_demand(amount * price, debtor_id, buyer_creditor_id)
 
@@ -389,19 +388,12 @@ cdef class Solver:
                 )
 
     cdef void _process_cycle(self, double amount, i64[:] cycle):
-        cdef i64 n = len(cycle)
-        cdef i64 i = 0
-        cdef i64 debtor_id
-        cdef double price
+        cdef int n = len(cycle)
+        cdef int i = 0
         cdef i64 amt
-        cdef AccountData* giver_data
-        cdef AccountData* taker_data
 
         while i < n:
             debtor_id = cycle[i]
-            price = self.bid_processor.get_currency_price(debtor_id)
-            amt = calc_amt(amount, price)
-
             giver_data = &self.changes[Account(cycle[i - 1], debtor_id)]
             if giver_data.collector_id == 0:
                 raise RuntimeError("invalid collector_id")
@@ -411,6 +403,9 @@ cdef class Solver:
                 taker_data.collector_id = self._get_random_collector_id(
                     giver_data.collector_id, debtor_id
                 )
+
+            price = self.bid_processor.get_currency_price(debtor_id)
+            amt = calc_amt(amount, price)
 
             # If the transferring `amt` would cause an i64 overflow,
             # here we will decrease `amt`'s value to avoid the
