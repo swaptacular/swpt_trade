@@ -220,8 +220,6 @@ cdef class Solver:
         After this method has been called, no currencies or collector
         accounts can be registered.
         """
-        cdef double min_trade_amount
-
         if not self.currencies_analysis_done:
             self.bid_processor.analyze_bids()
             min_trade_amount = float(self.min_trade_amount)
@@ -326,8 +324,8 @@ cdef class Solver:
         negative number.
         """
         self.analyze_offers()
-
         t = AccountChange
+
         for pair in self.changes:
             account = pair.first
             data = pair.second
@@ -350,17 +348,16 @@ cdef class Solver:
         positive number.
         """
         self.analyze_offers()
-
         t = CollectorTransfer
-        it = self.collector_transfers.cbegin()
-        end = self.collector_transfers.cend()
+        it = self.collector_transfers.begin()
+        end = self.collector_transfers.end()
+
         while it != end:
-            ct = &deref(it)
             yield t(
-                ct.debtor_id,
-                ct.from_creditor_id,
-                ct.to_creditor_id,
-                ct.amount,
+                deref(it).debtor_id,
+                deref(it).from_creditor_id,
+                deref(it).to_creditor_id,
+                deref(it).amount,
             )
             postincrement(it)
 
@@ -374,8 +371,8 @@ cdef class Solver:
         positive number.
         """
         self.analyze_offers()
-
         t = AccountChange
+
         for pair in self.changes:
             account = pair.first
             data = pair.second
@@ -428,6 +425,7 @@ cdef class Solver:
         account = Account(creditor_id, debtor_id)
         amount_ptr = &self.collection_amounts[account]
         amt = check_add(deref(amount_ptr), amt)
+
         amount_ptr[0] = deref(amount_ptr) + amt
         return amt
 
@@ -459,6 +457,7 @@ cdef class Solver:
         cdef unordered_multimap[CollectorAccount, i64] collector_amounts
         cdef unordered_set[i64] debtor_ids
         cdef i64 amt, giver_amount, taker_amount
+
         self.collector_transfers.clear()
 
         # Gather all "giver" and "taker" collector accounts into an
@@ -527,9 +526,11 @@ cdef class Solver:
         i64 giver_collector_id,
         i64 debtor_id
     ):
-        account = CollectorAccount(giver_collector_id, debtor_id)
-        cdef size_t count = self.collector_accounts.count(account)
+        cdef size_t count
         cdef int n
+
+        account = CollectorAccount(giver_collector_id, debtor_id)
+        count = self.collector_accounts.count(account)
 
         if count == 1:
             # There is only one matching collector account. (This
