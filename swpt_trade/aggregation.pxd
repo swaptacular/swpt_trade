@@ -134,7 +134,7 @@ cdef extern from *:
     {
       // Returns the closest integer which can be added to `n` without
       // causing an overflow. If adding `amt` to `n` does not cause an
-      // overflow, this function will return `amt` unmodified . Note that
+      // overflow, this function will return `amt` unmodified. Note that
       // when the result of the addition is -0x800000000000000, this is
       // treated as an overflow.
       if (n > 0) {
@@ -181,7 +181,7 @@ cdef extern from *:
         size_t calc_hash() noexcept
 
     cdef cppclass AccountData:
-        """Uniquely indetifies an account.
+        """Information about account's pending change.
         """
         i64 amount_change
         i64 collector_id
@@ -194,9 +194,9 @@ cdef extern from *:
         The only difference between this class and the `Account` class
         is that the `creditor_id` field will be ignored during
         comparisons between `CollectorAccount` instances. This allows
-        us to store collector accounts in an unordered miltiset, so
-        that we can quickly find all registered collector accounts for
-        a given debtor ID.
+        us to store collector accounts in unordered miltisets, so that
+        we can quickly find all registered collector accounts for a
+        given debtor ID.
         """
         const i64 creditor_id
         const i64 debtor_id
@@ -212,7 +212,7 @@ cdef extern from *:
         Transfer(i64, i64, i64, i64)
 
     cdef i64 check_add(i64, i64)
-    cdef i64 calc_amt(double, double)
+    cdef i64 calc_amt(double, float)
 
 
 cdef class Solver:

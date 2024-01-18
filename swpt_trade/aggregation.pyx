@@ -74,6 +74,8 @@ cdef class Solver:
     currencies.
 
     >>> s.register_sell_offer(1, 101, 8000, 999)
+    # 1 is seller's creditor ID, 999 is collector account's creditor ID
+
     >>> s.register_buy_offer(1, 102, 6000)
     >>> s.register_sell_offer(2, 102, 3000, 999)
     >>> s.register_buy_offer(2, 101, 5000)
@@ -106,7 +108,7 @@ cdef class Solver:
      CollectorTransfer(
         debtor_id=101, from_creditor_id=999, to_creditor_id=998, amount=5000)]
 
-    And finally, we can see all the amounts that should be given to
+    Finally, we want to see all the amounts that should be given to
     buyers. These amounts will be taken from the corresponding
     collector accounts:
 
@@ -163,8 +165,8 @@ cdef class Solver:
         The given `peg_exchange_rate` specifies the exchange rate
         between the pegged currency and the peg currency. For example,
         `2.0` would mean that pegged currency's tokens are twice as
-        valuable as peg currency's tokens. Note that 0.0, +inf, -inf,
-        and NAN are also acceptable exchange rate values.
+        valuable as peg currency's tokens. Note that 0.0, +inf, and
+        NAN are also acceptable exchange rate values.
         """
         if self.currencies_analysis_done:
             raise RuntimeError(
@@ -184,9 +186,8 @@ cdef class Solver:
     def register_collector_account(self, i64 creditor_id, i64 debtor_id):
         """Registers a collector account.
 
-        Collector accounts are used to receive traded amounts from
-        sellers, so that they can be later transferred to the
-        buyer(s).
+        Collector accounts are used to receive traded amounts from the
+        sellers, so that they can be later transferred to the buyers.
 
         Normally, at least one collector account should be registered
         for each tradable currency (each currency is uniquely
@@ -194,7 +195,7 @@ cdef class Solver:
         are registered for some or all of the traded currencies, the
         sell offers' `collector_id` parameter (see the
         `register_sell_offer` method) will determine which collector
-        account will be used for each trade.
+        account will be used for the corresponding trades.
 
         When more than one collector accounts are registered for a
         given currency, the outgoing transfers to the buyers of this
