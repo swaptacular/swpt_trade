@@ -218,6 +218,16 @@ def test_check_add():
 @cytest
 def test_calc_amt():
     assert calc_amt(1000.0, 10.0) == 100
+    assert calc_amt(1000.0, 0.0) == 0
+    assert calc_amt(1000.0, -0.0) == 0
+    assert calc_amt(-1000.0, 0.0) == 0
+    assert calc_amt(-1000.0, -0.0) == 0
+    assert calc_amt(math.inf, 0.0) == 0
+    assert calc_amt(-math.inf, 0.0) == 0
+    assert calc_amt(math.nan, 0.0) == 0
+    assert calc_amt(math.inf, -0.0) == 0
+    assert calc_amt(-math.inf, -0.0) == 0
+    assert calc_amt(math.nan, -0.0) == 0
     assert calc_amt(math.nan, 10.0) == 0
     assert calc_amt(1000.0, math.nan) == 0
     assert calc_amt(1000.0, math.inf) == 0

@@ -157,12 +157,12 @@ cdef extern from *:
     }
 
     inline i64 calc_amt(double amount, float price) {
-      double amt = amount / price;
-      if (amt > 0.0) {
-        if (amt < LLONG_MAX) {
-          return llround(amt);
+      // Return `amount / price` as i64, handling all edge cases.
+      if (price > 0.0) {
+        double amt = amount / price;
+        if (amt > 0.0) {
+          return amt < LLONG_MAX ? llround(amt) : LLONG_MAX;
         }
-        return LLONG_MAX;
       }
       return 0;
     }
