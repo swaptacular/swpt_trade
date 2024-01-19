@@ -38,7 +38,7 @@ cdef class Solver:
     The currencies are organized in a tree-like structure, each
     currency pointing to its peg currency. At the root of the tree is
     the "base currency". The base currency is identified by a ("debtor
-    info URI", "debtor ID") pair.
+    info IRI", "debtor ID") pair.
 
     Currencies that are separated from the base currency by more than
     `max_distance_to_base` pegs will be ignored, and will not be
@@ -120,7 +120,7 @@ cdef class Solver:
     """
     def __cinit__(
         self,
-        str base_debtor_info_uri,
+        str base_debtor_info_iri,
         i64 base_debtor_id,
         distance max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
         i64 min_trade_amount=DEFAULT_MIN_TRADE_AMOUNT,
@@ -128,12 +128,12 @@ cdef class Solver:
         assert base_debtor_id != 0
         assert max_distance_to_base > 0
         assert min_trade_amount > 0
-        self.base_debtor_info_uri = base_debtor_info_uri
+        self.base_debtor_info_iri = base_debtor_info_iri
         self.base_debtor_id = base_debtor_id
         self.max_distance_to_base = max_distance_to_base
         self.min_trade_amount = min_trade_amount
         self.bid_processor = BidProcessor(
-            base_debtor_info_uri,
+            base_debtor_info_iri,
             base_debtor_id,
             max_distance_to_base,
             min_trade_amount,
@@ -145,9 +145,9 @@ cdef class Solver:
     def register_currency(
         self,
         bool confirmed,
-        str debtor_info_uri,
+        str debtor_info_iri,
         i64 debtor_id,
-        str peg_debtor_info_uri='',
+        str peg_debtor_info_iri='',
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
     ):
@@ -160,7 +160,7 @@ cdef class Solver:
         confirmed as correct.
 
         Both the pegged currency and the peg currency are identified
-        by a ("debtor info URI", "debtor ID") pair.
+        by a ("debtor info IRI", "debtor ID") pair.
 
         The given `peg_exchange_rate` specifies the exchange rate
         between the pegged currency and the peg currency. For example,
@@ -175,9 +175,9 @@ cdef class Solver:
 
         self.bid_processor.register_currency(
             confirmed,
-            debtor_info_uri,
+            debtor_info_iri,
             debtor_id,
-            peg_debtor_info_uri,
+            peg_debtor_info_iri,
             peg_debtor_id,
             peg_exchange_rate,
         )
