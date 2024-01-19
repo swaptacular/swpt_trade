@@ -24,7 +24,7 @@ class Turn(db.Model):
         db.SmallInteger,
         nullable=False,
         comment=(
-            "Turn's phase: 10) gathering currencies info; 20) Gathering"
+            "Turn's phase: 10) gathering currencies info; 20) gathering"
             " buy and sell offers; 30) applying givings and takings."
             " More phases may be defined in the future."
         ),
