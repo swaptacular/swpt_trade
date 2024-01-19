@@ -70,10 +70,10 @@ class CurrencyInfo(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_uri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
-    is_confirmed = db.Column(db.BOOLEAN, nullable=False)
     peg_debtor_uri = db.Column(db.String)
     peg_debtor_id = db.Column(db.BigInteger)
     peg_exchange_rate = db.Column(db.FLOAT)
+    is_confirmed = db.Column(db.BOOLEAN, nullable=False)
     __table_args__ = (
         db.ForeignKeyConstraint(
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
