@@ -79,6 +79,7 @@ class CurrencyInfo(db.Model):
         ),
         db.Index(
             "idx_confirmed_debtor_id",
+            turn_id,
             debtor_id,
             unique=True,
             postgresql_where=is_confirmed,
