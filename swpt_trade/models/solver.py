@@ -92,8 +92,8 @@ class SellOffer(db.Model):
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["collector_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "collector_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.CheckConstraint(amount > 0),
@@ -125,8 +125,8 @@ class TraderTaking(db.Model):
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["collector_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "collector_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.CheckConstraint(amount > 0),
@@ -145,13 +145,13 @@ class CollectorGiving(db.Model):
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["from_creditor_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "from_creditor_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.ForeignKeyConstraint(
-            ["to_creditor_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "to_creditor_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.CheckConstraint(amount > 0),
@@ -170,13 +170,13 @@ class CollectorTaking(db.Model):
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["to_creditor_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "to_creditor_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.ForeignKeyConstraint(
-            ["from_creditor_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "from_creditor_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.CheckConstraint(amount > 0),
@@ -195,8 +195,8 @@ class TraderGiving(db.Model):
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["collector_id", "debtor_id"],
-            ["collector_account.creditor_id", "collector_account.debtor_id"],
+            ["debtor_id", "collector_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.CheckConstraint(amount > 0),
