@@ -5,7 +5,6 @@ from swpt_trade.extensions import db
 class CollectorAccount(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
-    creditor_hash = db.Column(db.SmallInteger, nullable=False)
     account_id = db.Column(db.String, nullable=False)
     status = db.Column(
         db.SmallInteger,
