@@ -1,5 +1,4 @@
 from __future__ import annotations
-from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -32,7 +31,7 @@ class Turn(db.Model):
     phase_deadline = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
 
 
-class CurrencyInfo(db.Model):
+class DebtorInfo(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_uri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
@@ -45,24 +44,10 @@ class CurrencyInfo(db.Model):
         db.ForeignKeyConstraint(
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
-        db.CheckConstraint(
-            or_(
-                and_(
-                    peg_debtor_uri == null(),
-                    peg_debtor_id == null(),
-                    peg_exchange_rate == null(),
-                ),
-                and_(
-                    peg_debtor_uri != null(),
-                    peg_debtor_id != null(),
-                    peg_exchange_rate != null(),
-                ),
-            )
-        ),
     )
 
 
-class ConfirmedCurrency(db.Model):
+class ConfirmedDebtor(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
 
@@ -77,6 +62,27 @@ class ConfirmedCurrency(db.Model):
     __table_args__ = (
         db.ForeignKeyConstraint(
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
+        ),
+    )
+
+
+class CurrencyInfo(db.Model):
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_uri = db.Column(db.String, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    is_confirmed = db.Column(db.BOOLEAN, nullable=False)
+    peg_debtor_uri = db.Column(db.String)
+    peg_debtor_id = db.Column(db.BigInteger)
+    peg_exchange_rate = db.Column(db.FLOAT)
+    __table_args__ = (
+        db.ForeignKeyConstraint(
+            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
+        ),
+        db.Index(
+            "idx_confirmed_debtor_id",
+            debtor_id,
+            unique=True,
+            postgresql_where=is_confirmed,
         ),
     )
 
