@@ -118,7 +118,7 @@ class BuyOffer(db.Model):
     )
 
 
-class TraderTaking(db.Model):
+class CreditorTaking(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -138,24 +138,19 @@ class TraderTaking(db.Model):
     )
 
 
-class CollectorGiving(db.Model):
+class CollectorCollecting(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    from_creditor_id = db.Column(db.BigInteger, primary_key=True)
-    to_creditor_id = db.Column(db.BigInteger, primary_key=True)
-    from_creditor_hash = db.Column(db.SmallInteger, nullable=False)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    collector_hash = db.Column(db.SmallInteger, nullable=False)
     __table_args__ = (
         db.ForeignKeyConstraint(
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["debtor_id", "from_creditor_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "to_creditor_id"],
+            ["debtor_id", "collector_id"],
             ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
@@ -163,24 +158,24 @@ class CollectorGiving(db.Model):
     )
 
 
-class CollectorTaking(db.Model):
+class CollectorSending(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    to_creditor_id = db.Column(db.BigInteger, primary_key=True)
-    from_creditor_id = db.Column(db.BigInteger, primary_key=True)
-    to_creditor_hash = db.Column(db.SmallInteger, nullable=False)
+    from_collector_id = db.Column(db.BigInteger, primary_key=True)
+    to_collector_id = db.Column(db.BigInteger, primary_key=True)
+    from_collector_hash = db.Column(db.SmallInteger, nullable=False)
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
         db.ForeignKeyConstraint(
             ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
         ),
         db.ForeignKeyConstraint(
-            ["debtor_id", "to_creditor_id"],
+            ["debtor_id", "from_collector_id"],
             ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
         db.ForeignKeyConstraint(
-            ["debtor_id", "from_creditor_id"],
+            ["debtor_id", "to_collector_id"],
             ["collector_account.debtor_id", "collector_account.creditor_id"],
             ondelete="RESTRICT",
         ),
@@ -188,7 +183,32 @@ class CollectorTaking(db.Model):
     )
 
 
-class TraderGiving(db.Model):
+class CollectorReceiving(db.Model):
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    to_collector_id = db.Column(db.BigInteger, primary_key=True)
+    from_collector_id = db.Column(db.BigInteger, primary_key=True)
+    to_collector_hash = db.Column(db.SmallInteger, nullable=False)
+    amount = db.Column(db.BigInteger, nullable=False)
+    __table_args__ = (
+        db.ForeignKeyConstraint(
+            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
+        ),
+        db.ForeignKeyConstraint(
+            ["debtor_id", "to_collector_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
+            ondelete="RESTRICT",
+        ),
+        db.ForeignKeyConstraint(
+            ["debtor_id", "from_collector_id"],
+            ["collector_account.debtor_id", "collector_account.creditor_id"],
+            ondelete="RESTRICT",
+        ),
+        db.CheckConstraint(amount > 0),
+    )
+
+
+class CreditorGiving(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
