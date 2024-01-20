@@ -1,4 +1,5 @@
 from __future__ import annotations
+from sqlalchemy.sql.expression import null, or_
 from swpt_trade.extensions import db
 
 
@@ -22,12 +23,28 @@ class Turn(db.Model):
         db.SmallInteger,
         nullable=False,
         comment=(
-            "Turn's phase: 10) gathering currencies info; 20) gathering"
-            " buy and sell offers; 30) applying givings and takings."
-            " More phases may be defined in the future."
+            "Turn's phase: 1) gathering currencies info; 2) gathering"
+            " buy and sell offers; 3) collection phase; 4) done."
         ),
     )
     phase_deadline = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    collection_deadline = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False
+    )
+    collection_started_at = db.Column(db.TIMESTAMP(timezone=True))
+    __table_args__ = (
+        db.CheckConstraint(
+            or_(
+                phase < 3,
+                collection_started_at != null(),
+            )
+        ),
+        db.Index(
+            "idx_phase",
+            phase,
+            postgresql_where=phase < 4,
+        ),
+    )
 
 
 class DebtorInfo(db.Model):
