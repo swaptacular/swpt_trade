@@ -178,7 +178,9 @@ class Configuration(metaclass=MetaEnvReader):
     MIN_CREDITOR_ID: _parse_creditor_id = None
     MAX_CREDITOR_ID: _parse_creditor_id = None
 
-    SQLALCHEMY_DATABASE_URI = ""
+    SOLVER_POSTGRES_URL = ""
+    WORKER_POSTGRES_URL = ""
+
     SQLALCHEMY_ENGINE_OPTIONS: _engine_options = _engine_options(
         '{"pool_size": 0}'
     )
@@ -240,6 +242,13 @@ def create_app(config_dict={}):
     app.config.from_object(Configuration)
     app.config.from_mapping(config_dict)
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
+    app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
+    app.config["SQLALCHEMY_BINDS"] = {
+        "solver": {
+            "url": app.config["SOLVER_POSTGRES_URL"],
+            **app.config["SQLALCHEMY_ENGINE_OPTIONS"],
+        },
+    }
     if app.config["APP_ENABLE_CORS"]:
         CORS(
             app,

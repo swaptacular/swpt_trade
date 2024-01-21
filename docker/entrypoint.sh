@@ -20,12 +20,6 @@ done
 export GUNICORN_WORKERS=${WEBSERVER_PROCESSES:-1}
 export GUNICORN_THREADS=${WEBSERVER_THREADS:-3}
 
-# The POSTGRES_URL variable should be used instead of the
-# SQLALCHEMY_DATABASE_URI variable, because we do not want to tie the
-# public interface to the "sqlalchemy" library, which we may, or may
-# not use in the future.
-export SQLALCHEMY_DATABASE_URI=${POSTGRES_URL}
-
 # This function tries to upgrade the database schema with exponential
 # backoff. This is necessary during development, because the database
 # might not be running yet when this script executes.

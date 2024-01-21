@@ -71,7 +71,9 @@ COPY tests/ tests/
 RUN python -m compileall -x '^\./(migrations|tests)/' . \
     && rm -f .env \
     && chown -R "$FLASK_APP:$FLASK_APP" .
-RUN SQLALCHEMY_DATABASE_URI=sqlite:// SQLALCHEMY_ENGINE_OPTIONS={} \
+RUN SOLVER_POSTGRES_URL=sqlite:// \
+    WORKER_POSTGRES_URL=sqlite:// \
+    SQLALCHEMY_ENGINE_OPTIONS={} \
     flask openapi write openapi.json
 
 USER $FLASK_APP

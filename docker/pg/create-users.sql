@@ -17,7 +17,8 @@ BEGIN
   --------------------------
   -- Add your users here! --
   --------------------------
-  PERFORM create_user_with_own_schema('swpt_trade');
+  PERFORM create_user_with_own_schema('swpt_solver');
+  PERFORM create_user_with_own_schema('swpt_worker');
   RETURN 'ok';
 END;
 $$ LANGUAGE plpgsql;

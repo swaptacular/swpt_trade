@@ -4,12 +4,14 @@ from swpt_trade.extensions import db
 
 
 class CollectorAccount(db.Model):
+    __bind_key__ = "solver"
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     collector_id = db.Column(db.BigInteger, primary_key=True)
     account_id = db.Column(db.String, nullable=False)
 
 
 class Turn(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     started_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     phase = db.Column(
@@ -39,6 +41,7 @@ class Turn(db.Model):
 
 
 class DebtorInfo(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_info_iri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
@@ -50,6 +53,7 @@ class DebtorInfo(db.Model):
 
 
 class ConfirmedDebtor(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
 
@@ -64,6 +68,7 @@ class ConfirmedDebtor(db.Model):
 
 
 class CurrencyInfo(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_info_iri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
@@ -83,6 +88,7 @@ class CurrencyInfo(db.Model):
 
 
 class SellOffer(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -94,6 +100,7 @@ class SellOffer(db.Model):
 
 
 class BuyOffer(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -104,6 +111,7 @@ class BuyOffer(db.Model):
 
 
 class CreditorTaking(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -116,6 +124,7 @@ class CreditorTaking(db.Model):
 
 
 class CollectorCollecting(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
@@ -128,6 +137,7 @@ class CollectorCollecting(db.Model):
 
 
 class CollectorSending(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     from_collector_id = db.Column(db.BigInteger, primary_key=True)
@@ -140,6 +150,7 @@ class CollectorSending(db.Model):
 
 
 class CollectorReceiving(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     to_collector_id = db.Column(db.BigInteger, primary_key=True)
@@ -152,6 +163,7 @@ class CollectorReceiving(db.Model):
 
 
 class CreditorGiving(db.Model):
+    __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
