@@ -55,11 +55,6 @@ class DebtorInfo(db.Model):
     peg_debtor_info_iri = db.Column(db.String)
     peg_debtor_id = db.Column(db.BigInteger)
     peg_exchange_rate = db.Column(db.FLOAT)
-    __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-    )
 
 
 class ConfirmedDebtor(db.Model):
@@ -74,11 +69,6 @@ class ConfirmedDebtor(db.Model):
     debtor_info_iri = db.Column(db.String, nullable=False)
     debtor_info_content_type = db.Column(db.String, nullable=False)
     debtor_info_sha256 = db.Column(db.LargeBinary, nullable=False)
-    __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-    )
 
 
 class CurrencyInfo(db.Model):
@@ -90,9 +80,6 @@ class CurrencyInfo(db.Model):
     peg_exchange_rate = db.Column(db.FLOAT)
     is_confirmed = db.Column(db.BOOLEAN, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
         db.Index(
             "idx_confirmed_debtor_id",
             turn_id,
@@ -110,14 +97,6 @@ class SellOffer(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     collector_id = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -128,9 +107,6 @@ class BuyOffer(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -143,14 +119,6 @@ class CreditorTaking(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     collector_id = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -163,14 +131,6 @@ class CollectorCollecting(db.Model):
     collector_id = db.Column(db.BigInteger, nullable=False)
     collector_hash = db.Column(db.SmallInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -183,19 +143,6 @@ class CollectorSending(db.Model):
     from_collector_hash = db.Column(db.SmallInteger, nullable=False)
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "from_collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "to_collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -208,19 +155,6 @@ class CollectorReceiving(db.Model):
     to_collector_hash = db.Column(db.SmallInteger, nullable=False)
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "to_collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "from_collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
 
@@ -233,13 +167,5 @@ class CreditorGiving(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     collector_id = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["turn_id"], ["turn.turn_id"], ondelete="CASCADE"
-        ),
-        db.ForeignKeyConstraint(
-            ["debtor_id", "collector_id"],
-            ["collector_account.debtor_id", "collector_account.creditor_id"],
-            ondelete="RESTRICT",
-        ),
         db.CheckConstraint(amount > 0),
     )
