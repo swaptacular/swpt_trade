@@ -5,16 +5,8 @@ from swpt_trade.extensions import db
 
 class CollectorAccount(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    collector_id = db.Column(db.BigInteger, primary_key=True)
     account_id = db.Column(db.String, nullable=False)
-    status = db.Column(
-        db.SmallInteger,
-        nullable=False,
-        default=0,
-        comment=(
-            "Collector account status: 0 means active; otherwise inactive."
-        ),
-    )
 
 
 class Turn(db.Model):
@@ -29,8 +21,8 @@ class Turn(db.Model):
         ),
     )
     phase_deadline = db.Column(db.TIMESTAMP(timezone=True))
-    collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     collection_started_at = db.Column(db.TIMESTAMP(timezone=True))
+    collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(
             and_(
