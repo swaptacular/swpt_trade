@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy.sql.expression import null, or_
+from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -19,24 +19,23 @@ class CollectorAccount(db.Model):
 
 class Turn(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    started_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     phase = db.Column(
         db.SmallInteger,
         nullable=False,
         comment=(
             "Turn's phase: 1) gathering currencies info; 2) gathering"
-            " buy and sell offers; 3) collection phase; 4) done."
+            " buy and sell offers; 3) giving and taking; 4) done."
         ),
     )
-    phase_deadline = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
-    collection_deadline = db.Column(
-        db.TIMESTAMP(timezone=True), nullable=False
-    )
+    phase_deadline = db.Column(db.TIMESTAMP(timezone=True))
+    collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     collection_started_at = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(
-            or_(
-                phase < 3,
-                collection_started_at != null(),
+            and_(
+                or_(phase < 2, collection_deadline != null()),
+                or_(phase < 3, collection_started_at != null()),
             )
         ),
         db.Index(
