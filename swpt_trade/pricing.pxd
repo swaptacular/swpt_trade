@@ -552,7 +552,7 @@ cdef class CandidateOffer:
 
 
 cdef class BidProcessor:
-    cdef readonly str base_debtor_info_iri
+    cdef readonly str base_debtor_info_locator
     cdef readonly i64 base_debtor_id
     cdef readonly distance max_distance_to_base
     cdef readonly i64 min_trade_amount

@@ -60,7 +60,7 @@ cdef class BidProcessor:
     The currencies are organized in a tree-like structure, each
     currency pointing to its peg currency. At the root of the tree is
     the "base currency". The base currency is identified by a ("debtor
-    info IRI", "debtor ID") pair.
+    info locator", "debtor ID") pair.
 
     Currencies that are separated from the base currency by no more
     than `max_distance_to_base` pegs will be considered "priceable",
@@ -99,18 +99,18 @@ cdef class BidProcessor:
     """
     def __cinit__(
         self,
-        str base_debtor_info_iri,
+        str base_debtor_info_locator,
         i64 base_debtor_id,
         distance max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
         i64 min_trade_amount=DEFAULT_MIN_TRADE_AMOUNT,
     ):
-        self.base_debtor_info_iri = base_debtor_info_iri
+        self.base_debtor_info_locator = base_debtor_info_locator
         self.base_debtor_id = base_debtor_id
         self.max_distance_to_base = max_distance_to_base
         self.min_trade_amount = min_trade_amount
         self.bid_registry_ptr = new BidRegistry(base_debtor_id)
         self.currency_registry_ptr = new CurrencyRegistry(
-            self._calc_key128(base_debtor_info_iri),
+            self._calc_key128(base_debtor_info_locator),
             base_debtor_id,
             max_distance_to_base,
         )
@@ -123,9 +123,9 @@ cdef class BidProcessor:
     def register_currency(
         self,
         bool confirmed,
-        str debtor_info_iri,
+        str debtor_info_locator,
         i64 debtor_id,
-        str peg_debtor_info_iri='',
+        str peg_debtor_info_locator='',
         i64 peg_debtor_id=0,
         float peg_exchange_rate=NAN,
     ):
@@ -138,7 +138,7 @@ cdef class BidProcessor:
         confirmed as correct.
 
         Both the pegged currency and the peg currency are identified
-        by a ("debtor info IRI", "debtor ID") pair.
+        by a ("debtor info locator", "debtor ID") pair.
 
         The given `peg_exchange_rate` specifies the exchange rate
         between the pegged currency and the peg currency. For example,
@@ -148,9 +148,9 @@ cdef class BidProcessor:
         """
         self.currency_registry_ptr.add_currency(
             confirmed,
-            self._calc_key128(debtor_info_iri),
+            self._calc_key128(debtor_info_locator),
             debtor_id,
-            self._calc_key128(peg_debtor_info_iri),
+            self._calc_key128(peg_debtor_info_locator),
             peg_debtor_id,
             peg_exchange_rate,
         )
@@ -298,9 +298,9 @@ cdef class BidProcessor:
         for debtor_id in self.to_be_confirmed:
             yield debtor_id
 
-    cdef Key128 _calc_key128(self, str iri):
+    cdef Key128 _calc_key128(self, str uri):
         m = hashlib.sha256()
-        m.update(iri.encode('utf8'))
+        m.update(uri.encode('utf8'))
         cdef i64[:] data = array.array('q', m.digest())
         return Key128(data[0], data[1])
 

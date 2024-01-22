@@ -37,17 +37,16 @@ class Turn(db.Model):
             phase,
             postgresql_where=phase < 4,
         ),
+        db.Index("idx_started_at", started_at),
     )
 
 
 class DebtorInfo(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
-    debtor_info_iri = db.Column(db.String, primary_key=True)
+    debtor_info_locator = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
-    debtor_info_content_type = db.Column(db.String, nullable=False)
-    debtor_info_sha256 = db.Column(db.LargeBinary, nullable=False)
-    peg_debtor_info_iri = db.Column(db.String)
+    peg_debtor_info_locator = db.Column(db.String)
     peg_debtor_id = db.Column(db.BigInteger)
     peg_exchange_rate = db.Column(db.FLOAT)
 
@@ -57,22 +56,21 @@ class ConfirmedDebtor(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
 
-    # NOTE: The rest of the columns are not be part of the primary
-    # key, but should be included in the primary key index to allow
-    # index-only scans. Because SQLAlchemy does not support this yet
-    # (2024-01-19), the migration file should be edited so as not to
-    # create a "normal" index, but create a "covering" index instead.
-    debtor_info_iri = db.Column(db.String, nullable=False)
-    debtor_info_content_type = db.Column(db.String, nullable=False)
-    debtor_info_sha256 = db.Column(db.LargeBinary, nullable=False)
+    # NOTE: The `debtor_info_locator` column is not be part of the
+    # primary key, but should be included in the primary key index to
+    # allow index-only scans. Because SQLAlchemy does not support this
+    # yet (2024-01-19), the migration file should be edited so as not
+    # to create a "normal" index, but create a "covering" index
+    # instead.
+    debtor_info_locator = db.Column(db.String, nullable=False)
 
 
 class CurrencyInfo(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
-    debtor_info_iri = db.Column(db.String, primary_key=True)
+    debtor_info_locator = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
-    peg_debtor_info_iri = db.Column(db.String)
+    peg_debtor_info_locator = db.Column(db.String)
     peg_debtor_id = db.Column(db.BigInteger)
     peg_exchange_rate = db.Column(db.FLOAT)
     is_confirmed = db.Column(db.BOOLEAN, nullable=False)
