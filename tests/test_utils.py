@@ -7,6 +7,7 @@ def test_parse_timedelta():
     assert parse_timedelta("3w") == timedelta(weeks=3)
     assert parse_timedelta("33d") == timedelta(days=33)
     assert parse_timedelta("123h") == timedelta(hours=123)
+    assert parse_timedelta("1234m") == timedelta(minutes=1234)
     assert parse_timedelta("1000s") == timedelta(seconds=1000)
     assert parse_timedelta("1000s ") == timedelta(seconds=1000)
     assert parse_timedelta("1000s\n") == timedelta(seconds=1000)
