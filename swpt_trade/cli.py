@@ -433,3 +433,82 @@ def flush_messages(
         ),
     )
     sys.exit(1)
+
+
+@swpt_trade.command("roll_turns")
+@with_appcontext
+@click.option(
+    "-p",
+    "--period",
+    type=str,
+    help=(
+        "Start a new turn every TEXT seconds."
+        " If not specified, the value of the TURN_PERIOD environment"
+        " variable will be used, defaulting to 1 day if empty. A unit"
+        " can also be included in the value. For example, 10m would be"
+        " equivalent to 600 seconds."
+    ),
+)
+@click.option(
+    "-o",
+    "--period-offset",
+    type=str,
+    help=(
+        "Start each turn TEXT seconds after the start of each period."
+        " If not specified, the value of the TURN_PERIOD_OFFSET environment"
+        " variable will be used, defaulting to 0 if empty. A unit can"
+        " also be included in the value. For example, if the turn period"
+        " is 1d, and the turn period offset is 1h, new turns will be"
+        " started every day at 1:00am UTC time."
+    ),
+)
+@click.option(
+    "-c",
+    "--check-interval",
+    type=str,
+    help=(
+        "The process will wake up every TEXT seconds to check whether"
+        " a new turn has to be started, or an already started turn"
+        " has to be advanced. If not specified, the value of the"
+        " TURN_CHECK_INTERVAL environment variable will be used,"
+        " defaulting to 1 minute if empty. A unit can also be included"
+        " in the value. For example, 2m would be equivalent to 120 seconds."
+    ),
+)
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def roll_turns(period, period_offset, check_interval, quit_early):
+    """Run a process that starts new turns, and advances started
+    turns.
+
+    Every turn consists of several phases. When one phase is
+    completed, the turn advances to the next phase. The durations of
+    phases 1 and 2 are controlled by the environment variables
+    TURN_PHASE1_DURATION and TURN_PHASE2_DURATION (time units can also
+    be included in their values).
+
+    """
+    from swpt_trade.utils import parse_timedelta
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started rolling turns.")
+
+    c = current_app.config
+    period = parse_timedelta(period or c["TURN_PERIOD"])
+    period_offset = parse_timedelta(period_offset or c["TURN_PERIOD_OFFSET"])
+    check_interval = parse_timedelta(
+        check_interval or c["TURN_CHECK_INTERVAL"]
+    )
+    phase1_duration = parse_timedelta(c["TURN_PHASE1_DURATION"])
+    phase2_duration = parse_timedelta(c["TURN_PHASE2_DURATION"])
+
+    # TODO: Add a real implementation.
+    print(period)
+    print(period_offset)
+    print(check_interval)
+    print(phase1_duration)
+    print(phase2_duration)

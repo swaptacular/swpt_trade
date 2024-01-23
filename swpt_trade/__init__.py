@@ -178,6 +178,12 @@ class Configuration(metaclass=MetaEnvReader):
     MIN_CREDITOR_ID: _parse_creditor_id = None
     MAX_CREDITOR_ID: _parse_creditor_id = None
 
+    TURN_PERIOD = "1d"
+    TURN_PERIOD_OFFSET = "0"
+    TURN_CHECK_INTERVAL = "1m"
+    TURN_PHASE1_DURATION = "10m"
+    TURN_PHASE2_DURATION = "1h"
+
     SOLVER_POSTGRES_URL = ""
     WORKER_POSTGRES_URL = ""
 
