@@ -21,7 +21,7 @@ def parse_timedelta(s: str) -> timedelta:
     m = RE_PERIOD.match(s)
     if m:
         n = float(m[1])
-        if n > 0:
+        if n >= 0:
             unit = m[2]
             if unit == "" or unit == "s":
                 return timedelta(seconds=n)
@@ -52,6 +52,9 @@ def can_start_new_turn(
     exact time interval (`turn_period`), and the first starting point
     is calculated to be at `DATETIME0 + turn_period_offset`.
     """
+    if not turn_period:
+        return False
+
     start_of_first_turn = DATETIME0 + turn_period_offset
     time_since_latest_turn = current_ts - latest_turn_started_at
     overdue = (current_ts - start_of_first_turn) % turn_period

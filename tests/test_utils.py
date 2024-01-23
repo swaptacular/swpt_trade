@@ -19,6 +19,7 @@ def test_parse_timedelta():
     assert parse_timedelta("1000s\n") == timedelta(seconds=1000)
     assert parse_timedelta("1000") == timedelta(seconds=1000)
     assert parse_timedelta("1000 \n") == timedelta(seconds=1000)
+    assert parse_timedelta("0") == timedelta(seconds=0)
 
     with pytest.raises(ValueError):
         parse_timedelta("1.2.3")
@@ -27,7 +28,7 @@ def test_parse_timedelta():
     with pytest.raises(ValueError):
         parse_timedelta("?s")
     with pytest.raises(ValueError):
-        parse_timedelta("0s")
+        parse_timedelta("-5s")
     with pytest.raises(ValueError):
         parse_timedelta(" 1s")
 
@@ -67,3 +68,11 @@ def test_can_start_new_turn():
     # Can not start a turn in the second half of the period.
     assert not f(36)
     assert not f(36, -1000)
+
+    # Can never start when the period is zero.
+    assert not can_start_new_turn(
+        turn_period=timedelta(seconds=0),
+        turn_period_offset=timedelta(seconds=0),
+        latest_turn_started_at=t - 1000 * h,
+        current_ts=t,
+    )
