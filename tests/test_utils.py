@@ -7,6 +7,12 @@ def test_parse_timedelta():
     assert parse_timedelta("3w") == timedelta(weeks=3)
     assert parse_timedelta("33d") == timedelta(days=33)
     assert parse_timedelta("123h") == timedelta(hours=123)
+    assert parse_timedelta("0.5h") == timedelta(minutes=30)
+    assert parse_timedelta(".5h") == timedelta(minutes=30)
+    assert parse_timedelta("30.0m") == timedelta(minutes=30)
+    assert parse_timedelta("5e-1h") == timedelta(minutes=30)
+    assert parse_timedelta("0.05e1h") == timedelta(minutes=30)
+    assert parse_timedelta("0.05e+1h") == timedelta(minutes=30)
     assert parse_timedelta("1234m") == timedelta(minutes=1234)
     assert parse_timedelta("1000s") == timedelta(seconds=1000)
     assert parse_timedelta("1000s ") == timedelta(seconds=1000)
@@ -14,6 +20,8 @@ def test_parse_timedelta():
     assert parse_timedelta("1000") == timedelta(seconds=1000)
     assert parse_timedelta("1000 \n") == timedelta(seconds=1000)
 
+    with pytest.raises(ValueError):
+        parse_timedelta("1.2.3")
     with pytest.raises(ValueError):
         parse_timedelta("3x")
     with pytest.raises(ValueError):

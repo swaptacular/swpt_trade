@@ -1,17 +1,17 @@
 import re
 from datetime import datetime, timedelta, timezone
 
-RE_PERIOD = re.compile(r"^(\d+)([smhdw]?)\s*$")
+RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
 DATETIME0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # 2024-01-01 is Monday.
 
 
 def parse_timedelta(s: str) -> timedelta:
     """Parse a string to a timedelta object.
 
-    The string must be in the format: "<int><unit>". <unit> can be `s`
-    (seconds), `m` (minutes), `h` (hours), `d` (days), or `w` (weeks).
-    If <unit> is not specified (en empty string), it defaults to
-    seconds. For example:
+    The string must be in the format: "<number><unit>". <unit> can be
+    `s` (seconds), `m` (minutes), `h` (hours), `d` (days), or `w`
+    (weeks). If <unit> is not specified (en empty string), it defaults
+    to seconds. For example:
 
     >>> parse_timedelta("20d")
     datetime.timedelta(days=20)
@@ -20,7 +20,7 @@ def parse_timedelta(s: str) -> timedelta:
     """
     m = RE_PERIOD.match(s)
     if m:
-        n = int(m[1])
+        n = float(m[1])
         if n > 0:
             unit = m[2]
             if unit == "" or unit == "s":
