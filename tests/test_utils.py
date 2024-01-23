@@ -11,9 +11,9 @@ def test_parse_timedelta():
     assert parse_timedelta("1000s") == timedelta(seconds=1000)
     assert parse_timedelta("1000s ") == timedelta(seconds=1000)
     assert parse_timedelta("1000s\n") == timedelta(seconds=1000)
+    assert parse_timedelta("1000") == timedelta(seconds=1000)
+    assert parse_timedelta("1000 \n") == timedelta(seconds=1000)
 
-    with pytest.raises(ValueError):
-        parse_timedelta("3")
     with pytest.raises(ValueError):
         parse_timedelta("3x")
     with pytest.raises(ValueError):
