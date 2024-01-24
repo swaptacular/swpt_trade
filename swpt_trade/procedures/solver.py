@@ -87,7 +87,7 @@ def advence_turn_to_phase2(
                     DebtorInfo.peg_debtor_info_locator,
                     DebtorInfo.peg_debtor_id,
                     DebtorInfo.peg_exchange_rate,
-                    (ConfirmedDebtor.turn_id != null()).label("is_confirmed"),
+                    ConfirmedDebtor.turn_id != null(),
                 )
                 .select_from(DebtorInfo)
                 .join(
