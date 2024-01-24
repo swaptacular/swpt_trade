@@ -124,3 +124,12 @@ def test_advence_turn_to_phase2(db_session):
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 2
+
+    p.advence_turn_to_phase2(
+        turn_id=turn_id,
+        phase2_duration=timedelta(hours=1),
+        max_commit_period=timedelta(days=30),
+    )
+    all_turns = Turn.query.all()
+    assert len(all_turns) == 1
+    assert all_turns[0].phase == 2
