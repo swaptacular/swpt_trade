@@ -5,7 +5,8 @@ import signal
 import sys
 import click
 import pika
-from typing import Optional, Any
+from typing import Any
+from datetime import datetime, timezone
 from flask import current_app
 from flask.cli import with_appcontext
 from flask_sqlalchemy.model import Model
@@ -15,6 +16,7 @@ from swpt_pythonlib.multiproc_utils import (
     HANDLED_SIGNALS,
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
+from swpt_trade import procedures
 
 
 @click.group("swpt_trade")
@@ -488,14 +490,13 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     Every turn consists of several phases. When one phase is
     completed, the turn advances to the next phase. The durations of
     phases 1 and 2 are controlled by the environment variables
-    TURN_PHASE1_DURATION and TURN_PHASE2_DURATION (time units can also
-    be included in their values).
+    TURN_PHASE1_DURATION and TURN_PHASE2_DURATION. The maximum
+    duration of the commit period is controlled by the
+    TURN_MAX_COMMIT_PERIOD environment variable. (Note that time units
+    can also be included in values of these variables.)
 
     """
     from swpt_trade.utils import parse_timedelta
-
-    logger = logging.getLogger(__name__)
-    logger.info("Started rolling turns.")
 
     c = current_app.config
     period = parse_timedelta(period or c["TURN_PERIOD"])
@@ -505,10 +506,35 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     )
     phase1_duration = parse_timedelta(c["TURN_PHASE1_DURATION"])
     phase2_duration = parse_timedelta(c["TURN_PHASE2_DURATION"])
+    max_commit_period = parse_timedelta(c["TURN_MAX_COMMIT_PERIOD"])
 
-    # TODO: Add a real implementation.
-    print(period)
-    print(period_offset)
-    print(check_interval)
-    print(phase1_duration)
-    print(phase2_duration)
+    logger = logging.getLogger(__name__)
+    logger.info("Started rolling turns.")
+
+    while True:
+        check_startd_at = datetime.now(tz=timezone.utc)
+        pending_turns = procedures.start_new_turn_if_possible(
+            turn_period=period,
+            turn_period_offset=period_offset,
+            phase1_duration=phase1_duration,
+        )
+        for turn in pending_turns:
+            phase = turn.phase
+            if phase == 1:
+                procedures.try_to_advence_turn_to_phase2(
+                    turn_id=turn.turn_id,
+                    phase2_duration=phase2_duration,
+                    max_commit_period=max_commit_period,
+                )
+            elif phase == 2:
+                # TODO: Implement and call the implementation.
+                pass
+            else:
+                assert phase == 3
+                procedures.try_to_advence_turn_to_phase4(turn.turn_id)
+
+        if quit_early:
+            break
+
+        elapsed_time = datetime.now(tz=timezone.utc) - check_startd_at
+        time.sleep(max(0.0, (check_interval - elapsed_time).total_seconds()))

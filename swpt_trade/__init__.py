@@ -183,6 +183,7 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_CHECK_INTERVAL = "1m"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
+    TURN_MAX_COMMIT_PERIOD = "14d"
 
     SOLVER_POSTGRES_URL = ""
     WORKER_POSTGRES_URL = ""
