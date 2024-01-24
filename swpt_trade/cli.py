@@ -512,13 +512,14 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     logger.info("Started rolling turns.")
 
     while True:
-        check_startd_at = datetime.now(tz=timezone.utc)
-        pending_turns = procedures.start_new_turn_if_possible(
+        logger.info("Trying to start a new turn and advance started turns.")
+        check_began_at = datetime.now(tz=timezone.utc)
+        started_turns = procedures.start_new_turn_if_possible(
             turn_period=period,
             turn_period_offset=period_offset,
             phase1_duration=phase1_duration,
         )
-        for turn in pending_turns:
+        for turn in started_turns:
             phase = turn.phase
             if phase == 1:
                 procedures.try_to_advence_turn_to_phase2(
@@ -536,5 +537,5 @@ def roll_turns(period, period_offset, check_interval, quit_early):
         if quit_early:
             break
 
-        elapsed_time = datetime.now(tz=timezone.utc) - check_startd_at
+        elapsed_time = datetime.now(tz=timezone.utc) - check_began_at
         time.sleep(max(0.0, (check_interval - elapsed_time).total_seconds()))
