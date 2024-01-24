@@ -1,7 +1,13 @@
 import pytest
 from datetime import timedelta, datetime, timezone
 from swpt_trade import procedures as p
-from swpt_trade.models import Turn, TS0
+from swpt_trade.models import (
+    Turn,
+    DebtorInfo,
+    ConfirmedDebtor,
+    CurrencyInfo,
+    TS0,
+)
 
 
 @pytest.fixture(params=[True, False])
@@ -50,3 +56,71 @@ def test_start_new_turn_if_possible(turn_may_exist):
     assert len(all_turns) == 2 if turn_may_exist else 1
     all_turns.sort(key=lambda t: t.phase)
     assert all_turns[0].phase == 1
+
+
+def test_advence_turn_to_phase2(db_session):
+    turn = Turn(phase_deadline=TS0)
+    db_session.add(turn)
+    db_session.flush()
+    db_session.commit()
+    turn_id = turn.turn_id
+
+    db_session.add(
+        DebtorInfo(
+            turn_id=turn_id,
+            debtor_info_locator='http://example.com/101',
+            debtor_id=101,
+            peg_debtor_info_locator=None,
+            peg_debtor_id=None,
+            peg_exchange_rate=None,
+        )
+    )
+    db_session.add(
+        DebtorInfo(
+            turn_id=turn_id,
+            debtor_info_locator='http://example.com/102',
+            debtor_id=102,
+            peg_debtor_info_locator='http://example.com/101',
+            peg_debtor_id=101,
+            peg_exchange_rate=2.0,
+        )
+    )
+    db_session.add(
+        ConfirmedDebtor(
+            turn_id=turn_id,
+            debtor_id=102,
+            debtor_info_locator='http://example.com/102',
+        )
+    )
+    db_session.commit()
+    assert len(db_session.query(CurrencyInfo).all()) == 0
+
+    p.advence_turn_to_phase2(
+        turn_id=turn_id,
+        phase2_duration=timedelta(hours=1),
+        max_commit_period=timedelta(days=30),
+    )
+
+    currencies = db_session.query(CurrencyInfo).all()
+    assert len(currencies) == 2
+    currencies.sort(key=lambda c: c.debtor_id)
+
+    assert currencies[0].turn_id == turn_id
+    assert currencies[0].debtor_info_locator == 'http://example.com/101'
+    assert currencies[0].debtor_id == 101
+    assert currencies[0].peg_debtor_info_locator is None
+    assert currencies[0].peg_debtor_id is None
+    assert currencies[0].peg_exchange_rate is None
+    assert currencies[0].is_confirmed is False
+
+    assert currencies[1].turn_id == turn_id
+    assert currencies[1].debtor_info_locator == 'http://example.com/102'
+    assert currencies[1].debtor_id == 102
+    assert currencies[1].peg_debtor_info_locator == 'http://example.com/101'
+    assert currencies[1].peg_debtor_id == 101
+    assert currencies[1].peg_exchange_rate == 2.0
+    assert currencies[1].is_confirmed is True
+
+    all_turns = Turn.query.all()
+    assert len(all_turns) == 1
+    assert all_turns[0].phase == 2

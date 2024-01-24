@@ -32,6 +32,7 @@ class Turn(db.Model):
     collection_started_at = db.Column(db.TIMESTAMP(timezone=True))
     collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
+        db.CheckConstraint(and_(phase > 0, phase <= 4)),
         db.CheckConstraint(
             and_(
                 or_(phase < 2, collection_deadline != null()),

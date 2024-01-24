@@ -1,9 +1,16 @@
 from typing import TypeVar, Callable, List
 from datetime import datetime, timezone, timedelta
-import sqlalchemy
+from sqlalchemy import select, insert, text
+from sqlalchemy.sql.expression import null, and_
 from swpt_trade.utils import can_start_new_turn
 from swpt_trade.extensions import db
-from swpt_trade.models import Turn, TS0
+from swpt_trade.models import (
+    Turn,
+    DebtorInfo,
+    ConfirmedDebtor,
+    CurrencyInfo,
+    TS0,
+)
 
 
 T = TypeVar("T")
@@ -18,7 +25,7 @@ def start_new_turn_if_possible(
         phase1_duration: timedelta,
 ) -> List[Turn]:
     db.session.execute(
-        sqlalchemy.text("LOCK TABLE turn IN SHARE ROW EXCLUSIVE MODE"),
+        text("LOCK TABLE turn IN SHARE ROW EXCLUSIVE MODE"),
         bind_arguments={"bind": db.engines["solver"]},
     )
     unfinished_turns = Turn.query.filter(Turn.phase < 4).all()
@@ -46,3 +53,56 @@ def start_new_turn_if_possible(
             return [new_turn]
 
     return unfinished_turns
+
+
+@atomic
+def advence_turn_to_phase2(
+        *,
+        turn_id: int,
+        phase2_duration: timedelta,
+        max_commit_period: timedelta,
+) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    turn = (
+        Turn.query.filter_by(turn_id=turn_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if turn and turn.phase == 1:
+        db.session.execute(
+            insert(CurrencyInfo).from_select(
+                [
+                    "turn_id",
+                    "debtor_info_locator",
+                    "debtor_id",
+                    "peg_debtor_info_locator",
+                    "peg_debtor_id",
+                    "peg_exchange_rate",
+                    "is_confirmed",
+                ],
+                select(
+                    DebtorInfo.turn_id,
+                    DebtorInfo.debtor_info_locator,
+                    DebtorInfo.debtor_id,
+                    DebtorInfo.peg_debtor_info_locator,
+                    DebtorInfo.peg_debtor_id,
+                    DebtorInfo.peg_exchange_rate,
+                    (ConfirmedDebtor.turn_id != null()).label("is_confirmed"),
+                )
+                .select_from(DebtorInfo)
+                .join(
+                    ConfirmedDebtor,
+                    and_(
+                        ConfirmedDebtor.turn_id == DebtorInfo.turn_id,
+                        ConfirmedDebtor.debtor_id == DebtorInfo.debtor_id,
+                        ConfirmedDebtor.debtor_info_locator
+                        == DebtorInfo.debtor_info_locator,
+                    ),
+                    isouter=True,
+                )
+                .where(DebtorInfo.turn_id == turn_id),
+            )
+        )
+        turn.phase = 2
+        turn.phase_deadline = current_ts + phase2_duration
+        turn.collection_deadline = current_ts + max_commit_period
