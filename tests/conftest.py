@@ -40,6 +40,24 @@ def db_session(app):
         "TRUNCATE TABLE finalize_transfer_signal",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
+
+    for cmd in [
+        "TRUNCATE TABLE collector_account",
+        "TRUNCATE TABLE turn",
+        "TRUNCATE TABLE confirmed_debtor",
+        "TRUNCATE TABLE currency_info",
+        "TRUNCATE TABLE sell_offer",
+        "TRUNCATE TABLE creditor_taking",
+        "TRUNCATE TABLE collector_collecting",
+        "TRUNCATE TABLE collector_sending",
+        "TRUNCATE TABLE collector_receiving",
+        "TRUNCATE TABLE creditor_giving",
+    ]:
+        db.session.execute(
+            sqlalchemy.text(cmd),
+            bind_arguments={"bind": db.engines["solver"]},
+        )
+
     db.session.commit()
 
 

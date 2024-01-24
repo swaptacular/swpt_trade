@@ -17,6 +17,7 @@ class Turn(db.Model):
     phase = db.Column(
         db.SmallInteger,
         nullable=False,
+        default=1,
         comment=(
             "Turn's phase: 1) gathering currencies info; 2) gathering"
             " buy and sell offers; 3) giving and taking; 4) done."
