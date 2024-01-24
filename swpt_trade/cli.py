@@ -382,7 +382,7 @@ def flush_messages(
 
     def _flush(
         models_to_flush: list[type[Model]],
-        wait: Optional[float],
+        wait: float,
     ) -> None:  # pragma: no cover
         from swpt_trade import create_app
 
