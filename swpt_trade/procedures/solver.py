@@ -29,13 +29,13 @@ def start_new_turn_if_possible(
         turn_period_offset: timedelta,
         phase1_duration: timedelta,
 ) -> List[Turn]:
+    current_ts = datetime.now(tz=timezone.utc)
     db.session.execute(
         text("LOCK TABLE turn IN SHARE ROW EXCLUSIVE MODE"),
         bind_arguments={"bind": db.engines["solver"]},
     )
     unfinished_turns = Turn.query.filter(Turn.phase < 4).all()
     if not unfinished_turns:
-        current_ts = datetime.now(tz=timezone.utc)
         latest_turn = (
             Turn.query
             .order_by(Turn.started_at.desc())
