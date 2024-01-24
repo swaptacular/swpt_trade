@@ -100,6 +100,7 @@ def test_try_to_advence_turn_to_phase2(db_session):
     db_session.commit()
     assert len(db_session.query(CurrencyInfo).all()) == 0
 
+    # Successful advance.
     p.try_to_advence_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
@@ -131,6 +132,7 @@ def test_try_to_advence_turn_to_phase2(db_session):
     assert all_turns[0].phase == 2
     assert all_turns[0].phase_deadline is not None
 
+    # Wrong turn_id or phase.
     p.try_to_advence_turn_to_phase2(
         turn_id=-1,
         phase2_duration=timedelta(hours=1),
@@ -169,6 +171,7 @@ def test_try_to_advence_turn_to_phase4(db_session):
     )
     db_session.commit()
 
+    # Can not advance with pending rows.
     p.try_to_advence_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
@@ -176,12 +179,15 @@ def test_try_to_advence_turn_to_phase4(db_session):
 
     CollectorSending.query.delete()
 
+    # Can advance without pending rows.
     p.try_to_advence_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4
     assert all_turns[0].phase_deadline is None
 
+    # Wrong turn_id or phase.
+    p.try_to_advence_turn_to_phase4(-1)
     p.try_to_advence_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
