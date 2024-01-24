@@ -38,11 +38,11 @@ def start_new_turn_if_possible(
                 ),
                 current_ts=current_ts,
         ):
-            db.session.add(
-                Turn(
-                    started_at=current_ts,
-                    phase_deadline=current_ts + phase1_duration,
-                )
+            new_turn = Turn(
+                started_at=current_ts,
+                phase_deadline=current_ts + phase1_duration,
             )
+            db.session.add(new_turn)
+            return [new_turn]
 
     return unfinished_turns

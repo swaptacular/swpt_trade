@@ -1,6 +1,7 @@
 from __future__ import annotations
 from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
+from .common import get_now_utc
 
 
 class CollectorAccount(db.Model):
@@ -13,7 +14,11 @@ class CollectorAccount(db.Model):
 class Turn(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    started_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    started_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_now_utc,
+    )
     phase = db.Column(
         db.SmallInteger,
         nullable=False,
