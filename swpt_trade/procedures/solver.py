@@ -9,6 +9,11 @@ from swpt_trade.models import (
     DebtorInfo,
     ConfirmedDebtor,
     CurrencyInfo,
+    CreditorGiving,
+    CollectorReceiving,
+    CollectorSending,
+    CollectorCollecting,
+    CreditorTaking,
     TS0,
 )
 
@@ -56,7 +61,7 @@ def start_new_turn_if_possible(
 
 
 @atomic
-def advence_turn_to_phase2(
+def try_to_advence_turn_to_phase2(
         *,
         turn_id: int,
         phase2_duration: timedelta,
@@ -106,3 +111,34 @@ def advence_turn_to_phase2(
         turn.phase = 2
         turn.phase_deadline = current_ts + phase2_duration
         turn.collection_deadline = current_ts + max_commit_period
+
+
+@atomic
+def try_to_advence_turn_to_phase4(turn_id: int) -> None:
+    turn = (
+        Turn.query.filter_by(turn_id=turn_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if turn and turn.phase == 3:
+        for table in [
+                CreditorGiving,
+                CollectorReceiving,
+                CollectorSending,
+                CollectorCollecting,
+                CreditorTaking,
+        ]:
+            has_pending_rows = bool(
+                db.session.execute(
+                    select(1)
+                    .select_from(table)
+                    .filter_by(turn_id=turn_id)
+                    .limit(1)
+                ).one_or_none()
+            )
+            if has_pending_rows:
+                break
+        else:
+            # There are no pending rows.
+            turn.phase = 4
+            turn.phase_deadline = None

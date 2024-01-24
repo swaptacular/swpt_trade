@@ -6,6 +6,7 @@ from swpt_trade.models import (
     DebtorInfo,
     ConfirmedDebtor,
     CurrencyInfo,
+    CollectorSending,
     TS0,
 )
 
@@ -39,10 +40,12 @@ def test_start_new_turn_if_possible(turn_may_exist):
     )
     assert len(turns) == 1
     assert turns[0].phase == 1
+    assert turns[0].phase_deadline is not None
     all_turns = Turn.query.all()
     assert len(all_turns) == 2 if turn_may_exist else 1
     all_turns.sort(key=lambda t: t.phase)
     assert all_turns[0].phase == 1
+    assert all_turns[0].phase_deadline is not None
 
     # Does not start a new turn.
     turns = p.start_new_turn_if_possible(
@@ -52,14 +55,16 @@ def test_start_new_turn_if_possible(turn_may_exist):
     )
     assert len(turns) == 1
     assert turns[0].phase == 1
+    assert turns[0].phase_deadline is not None
     all_turns = Turn.query.all()
     assert len(all_turns) == 2 if turn_may_exist else 1
     all_turns.sort(key=lambda t: t.phase)
     assert all_turns[0].phase == 1
+    assert all_turns[0].phase_deadline is not None
 
 
-def test_advence_turn_to_phase2(db_session):
-    turn = Turn(phase_deadline=TS0)
+def test_try_to_advence_turn_to_phase2(db_session):
+    turn = Turn()
     db_session.add(turn)
     db_session.flush()
     db_session.commit()
@@ -95,7 +100,7 @@ def test_advence_turn_to_phase2(db_session):
     db_session.commit()
     assert len(db_session.query(CurrencyInfo).all()) == 0
 
-    p.advence_turn_to_phase2(
+    p.try_to_advence_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
@@ -124,13 +129,14 @@ def test_advence_turn_to_phase2(db_session):
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 2
+    assert all_turns[0].phase_deadline is not None
 
-    p.advence_turn_to_phase2(
+    p.try_to_advence_turn_to_phase2(
         turn_id=-1,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
     )
-    p.advence_turn_to_phase2(
+    p.try_to_advence_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
@@ -138,3 +144,46 @@ def test_advence_turn_to_phase2(db_session):
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 2
+    assert all_turns[0].phase_deadline is not None
+
+
+def test_try_to_advence_turn_to_phase4(db_session):
+    turn = Turn(
+        phase=3,
+        phase_deadline=TS0,
+        collection_started_at=TS0,
+        collection_deadline=TS0,
+    )
+    db_session.add(turn)
+    db_session.flush()
+    turn_id = turn.turn_id
+    db_session.add(
+        CollectorSending(
+            turn_id=turn_id,
+            debtor_id=102,
+            from_collector_id=1,
+            to_collector_id=2,
+            from_collector_hash=123,
+            amount=100000,
+        )
+    )
+    db_session.commit()
+
+    p.try_to_advence_turn_to_phase4(turn_id)
+    all_turns = Turn.query.all()
+    assert len(all_turns) == 1
+    assert all_turns[0].phase == 3
+
+    CollectorSending.query.delete()
+
+    p.try_to_advence_turn_to_phase4(turn_id)
+    all_turns = Turn.query.all()
+    assert len(all_turns) == 1
+    assert all_turns[0].phase == 4
+    assert all_turns[0].phase_deadline is None
+
+    p.try_to_advence_turn_to_phase4(turn_id)
+    all_turns = Turn.query.all()
+    assert len(all_turns) == 1
+    assert all_turns[0].phase == 4
+    assert all_turns[0].phase_deadline is None
