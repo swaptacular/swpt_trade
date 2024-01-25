@@ -496,6 +496,9 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     TURN_MAX_COMMIT_PERIOD environment variable. (Note that time units
     can also be included in values of these variables.)
 
+    Another important environment variables which control the way
+    trading turns work are: BASE_DEBTOR_INFO_LOCATOR, BASE_DEBTOR_ID,
+    MAX_DISTANCE_TO_BASE, MIN_TRADE_AMOUNT.
     """
     from swpt_trade.utils import parse_timedelta
 
@@ -519,6 +522,10 @@ def roll_turns(period, period_offset, check_interval, quit_early):
             turn_period=period,
             turn_period_offset=period_offset,
             phase1_duration=phase1_duration,
+            base_debtor_info_locator=c["BASE_DEBTOR_INFO_LOCATOR"],
+            base_debtor_id=c["BASE_DEBTOR_ID"],
+            max_distance_to_base=c["MAX_DISTANCE_TO_BASE"],
+            min_trade_amount=c["MIN_TRADE_AMOUNT"],
         )
         for turn in started_turns:
             phase = turn.phase

@@ -29,6 +29,10 @@ def start_new_turn_if_possible(
         turn_period: timedelta,
         turn_period_offset: timedelta,
         phase1_duration: timedelta,
+        base_debtor_info_locator: str,
+        base_debtor_id: int,
+        max_distance_to_base: int,
+        min_trade_amount: int,
 ) -> List[Turn]:
     current_ts = datetime.now(tz=timezone.utc)
     db.session.execute(
@@ -53,6 +57,10 @@ def start_new_turn_if_possible(
         ):
             new_turn = Turn(
                 started_at=current_ts,
+                base_debtor_info_locator=base_debtor_info_locator,
+                base_debtor_id=base_debtor_id,
+                max_distance_to_base=max_distance_to_base,
+                min_trade_amount=min_trade_amount,
                 phase_deadline=current_ts + phase1_duration,
             )
             db.session.add(new_turn)

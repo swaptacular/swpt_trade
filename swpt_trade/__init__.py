@@ -24,14 +24,21 @@ def _engine_options(s: str) -> dict:
 
 
 def _parse_creditor_id(s: str) -> int:
-    n = literal_eval(s.strip())
-    if (
-        not isinstance(n, int) or n < (-1 << 63) or n >= (1 << 64)
-    ):  # pragma: no cover
-        raise ValueError(f"Invalid creditor ID: {s}")
+    try:
+        n = literal_eval(s.strip())
+        if (
+            not isinstance(n, int) or n < (-1 << 63) or n >= (1 << 64)
+        ):  # pragma: no cover
+            raise ValueError
+    except Exception:  # pragma: no cover
+        raise ValueError(f"Invalid creditor/debtor ID: {s}")
+
     if n < 0:  # pragma: no cover
         return n
     return u64_to_i64(n)
+
+
+_parse_debtor_id = _parse_creditor_id
 
 
 def _excepthook(exc_type, exc_value, traceback):  # pragma: nocover
@@ -184,6 +191,11 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
     TURN_MAX_COMMIT_PERIOD = "14d"
+
+    BASE_DEBTOR_INFO_LOCATOR = ""
+    BASE_DEBTOR_ID: _parse_debtor_id = None
+    MAX_DISTANCE_TO_BASE = 10
+    MIN_TRADE_AMOUNT = 1000
 
     SOLVER_POSTGRES_URL = ""
     WORKER_POSTGRES_URL = ""

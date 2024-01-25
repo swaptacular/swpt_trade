@@ -19,6 +19,10 @@ class Turn(db.Model):
         nullable=False,
         default=get_now_utc,
     )
+    base_debtor_info_locator = db.Column(db.String, nullable=False)
+    base_debtor_id = db.Column(db.BigInteger, nullable=False)
+    max_distance_to_base = db.Column(db.SmallInteger, nullable=False)
+    min_trade_amount = db.Column(db.BigInteger, nullable=False)
     phase = db.Column(
         db.SmallInteger,
         nullable=False,
@@ -32,6 +36,9 @@ class Turn(db.Model):
     collection_started_at = db.Column(db.TIMESTAMP(timezone=True))
     collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
+        db.CheckConstraint(base_debtor_id != 0),
+        db.CheckConstraint(max_distance_to_base > 0),
+        db.CheckConstraint(min_trade_amount > 0),
         db.CheckConstraint(and_(phase > 0, phase <= 4)),
         db.CheckConstraint(or_(phase > 2, phase_deadline != null())),
         db.CheckConstraint(

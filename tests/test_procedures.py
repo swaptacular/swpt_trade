@@ -17,6 +17,10 @@ def turn_may_exist(request, db_session):
         db_session.add(
             Turn(
                 started_at=TS0,
+                base_debtor_info_locator="https://example.com/101",
+                base_debtor_id=101,
+                max_distance_to_base=5,
+                min_trade_amount=5000,
                 phase=4,
                 phase_deadline=TS0,
                 collection_started_at=TS0,
@@ -37,8 +41,16 @@ def test_start_new_turn_if_possible(turn_may_exist):
         turn_period=timedelta(days=1),
         turn_period_offset=current_ts - midnight,
         phase1_duration=timedelta(hours=1),
+        base_debtor_info_locator="https://example.com/101",
+        base_debtor_id=101,
+        max_distance_to_base=5,
+        min_trade_amount=5000,
     )
     assert len(turns) == 1
+    assert turns[0].base_debtor_info_locator == "https://example.com/101"
+    assert turns[0].base_debtor_id == 101
+    assert turns[0].max_distance_to_base == 5
+    assert turns[0].min_trade_amount == 5000
     assert turns[0].phase == 1
     assert turns[0].phase_deadline is not None
     all_turns = Turn.query.all()
@@ -52,8 +64,16 @@ def test_start_new_turn_if_possible(turn_may_exist):
         turn_period=timedelta(days=1),
         turn_period_offset=current_ts - midnight,
         phase1_duration=timedelta(hours=1),
+        base_debtor_info_locator="https://example.com/101",
+        base_debtor_id=101,
+        max_distance_to_base=5,
+        min_trade_amount=5000,
     )
     assert len(turns) == 1
+    assert turns[0].base_debtor_info_locator == "https://example.com/101"
+    assert turns[0].base_debtor_id == 101
+    assert turns[0].max_distance_to_base == 5
+    assert turns[0].min_trade_amount == 5000
     assert turns[0].phase == 1
     assert turns[0].phase_deadline is not None
     all_turns = Turn.query.all()
@@ -64,7 +84,13 @@ def test_start_new_turn_if_possible(turn_may_exist):
 
 
 def test_try_to_advance_turn_to_phase2(db_session):
-    turn = Turn(phase_deadline=TS0)
+    turn = Turn(
+        phase_deadline=TS0,
+        base_debtor_info_locator="https://example.com/101",
+        base_debtor_id=101,
+        max_distance_to_base=5,
+        min_trade_amount=5000,
+    )
     db_session.add(turn)
     db_session.flush()
     db_session.commit()
@@ -157,6 +183,10 @@ def test_try_to_advance_turn_to_phase4(db_session):
         phase_deadline=TS0,
         collection_started_at=TS0,
         collection_deadline=TS0,
+        base_debtor_info_locator="https://example.com/101",
+        base_debtor_id=101,
+        max_distance_to_base=5,
+        min_trade_amount=5000,
     )
     db_session.add(turn)
     db_session.flush()

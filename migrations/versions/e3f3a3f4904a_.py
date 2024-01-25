@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 6f7ac686b16d
+Revision ID: e3f3a3f4904a
 Revises: 
-Create Date: 2024-01-25 16:31:26.511492
+Create Date: 2024-01-25 17:33:49.882236
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '6f7ac686b16d'
+revision = 'e3f3a3f4904a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -191,11 +191,18 @@ def upgrade_solver():
     op.create_table('turn',
     sa.Column('turn_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('started_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('base_debtor_info_locator', sa.String(), nullable=False),
+    sa.Column('base_debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('max_distance_to_base', sa.SmallInteger(), nullable=False),
+    sa.Column('min_trade_amount', sa.BigInteger(), nullable=False),
     sa.Column('phase', sa.SmallInteger(), nullable=False, comment="Turn's phase: 1) gathering currencies info; 2) gathering buy and sell offers; 3) giving and taking; 4) done."),
     sa.Column('phase_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_started_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.CheckConstraint('(phase < 2 OR collection_deadline IS NOT NULL) AND (phase < 3 OR collection_started_at IS NOT NULL)'),
+    sa.CheckConstraint('base_debtor_id != 0'),
+    sa.CheckConstraint('max_distance_to_base > 0'),
+    sa.CheckConstraint('min_trade_amount > 0'),
     sa.CheckConstraint('phase > 0 AND phase <= 4'),
     sa.CheckConstraint('phase > 2 OR phase_deadline IS NOT NULL'),
     sa.PrimaryKeyConstraint('turn_id')
