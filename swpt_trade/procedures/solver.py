@@ -13,6 +13,7 @@ from swpt_trade.models import (
     CollectorReceiving,
     CollectorSending,
     CollectorCollecting,
+    CreditorCollecting,
     CreditorTaking,
     TS0,
 )
@@ -61,7 +62,7 @@ def start_new_turn_if_possible(
 
 
 @atomic
-def try_to_advence_turn_to_phase2(
+def try_to_advance_turn_to_phase2(
         *,
         turn_id: int,
         phase2_duration: timedelta,
@@ -114,7 +115,7 @@ def try_to_advence_turn_to_phase2(
 
 
 @atomic
-def try_to_advence_turn_to_phase4(turn_id: int) -> None:
+def try_to_advance_turn_to_phase4(turn_id: int) -> None:
     turn = (
         Turn.query.filter_by(turn_id=turn_id)
         .with_for_update()
@@ -126,6 +127,7 @@ def try_to_advence_turn_to_phase4(turn_id: int) -> None:
                 CollectorReceiving,
                 CollectorSending,
                 CollectorCollecting,
+                CreditorCollecting,
                 CreditorTaking,
         ]:
             has_pending_rows = bool(

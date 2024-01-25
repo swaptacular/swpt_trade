@@ -33,6 +33,7 @@ class Turn(db.Model):
     collection_deadline = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(and_(phase > 0, phase <= 4)),
+        db.CheckConstraint(or_(phase > 2, phase_deadline != null())),
         db.CheckConstraint(
             and_(
                 or_(phase < 2, collection_deadline != null()),
@@ -116,6 +117,19 @@ class BuyOffer(db.Model):
 
 
 class CreditorTaking(db.Model):
+    __bind_key__ = "solver"
+    turn_id = db.Column(db.Integer, primary_key=True)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_hash = db.Column(db.SmallInteger, nullable=False)
+    amount = db.Column(db.BigInteger, nullable=False)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint(amount > 0),
+    )
+
+
+class CreditorCollecting(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)

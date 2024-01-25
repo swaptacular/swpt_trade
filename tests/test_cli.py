@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import Mock
 from swpt_trade.extensions import db
 from swpt_trade import models as m
@@ -57,3 +58,51 @@ def test_flush_messages(mocker, app, db_session):
     assert result.exit_code == 1
     assert send_signalbus_message.called_once()
     assert len(m.FinalizeTransferSignal.query.all()) == 0
+
+
+def test_roll_turns(app, db_session):
+    current_ts = datetime.now(tz=timezone.utc)
+    midnight = current_ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    offset_seconds = (current_ts - midnight).total_seconds()
+    runner = app.test_cli_runner()
+
+    def invoke():
+        return runner.invoke(
+            args=[
+                "swpt_trade",
+                "roll_turns",
+                "--period=24h",
+                f"--period-offset={offset_seconds}",
+                "--quit-early",
+            ]
+        )
+
+    result = invoke()
+    assert result.exit_code == 0
+    turns = m.Turn.query.all()
+    assert len(turns) == 1
+    assert turns[0].phase == 1
+
+    result = invoke()
+    assert result.exit_code == 0
+    turns = m.Turn.query.all()
+    assert len(turns) == 1
+    assert turns[0].phase == 2
+
+    result = invoke()
+    assert result.exit_code == 0
+    turns = m.Turn.query.all()
+    assert len(turns) == 1
+    assert turns[0].phase == 3
+
+    result = invoke()
+    assert result.exit_code == 0
+    turns = m.Turn.query.all()
+    assert len(turns) == 1
+    assert turns[0].phase == 4
+
+    result = invoke()
+    assert result.exit_code == 0
+    turns = m.Turn.query.all()
+    assert len(turns) == 1
+    assert turns[0].phase == 4

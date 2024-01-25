@@ -63,8 +63,8 @@ def test_start_new_turn_if_possible(turn_may_exist):
     assert all_turns[0].phase_deadline is not None
 
 
-def test_try_to_advence_turn_to_phase2(db_session):
-    turn = Turn()
+def test_try_to_advance_turn_to_phase2(db_session):
+    turn = Turn(phase_deadline=TS0)
     db_session.add(turn)
     db_session.flush()
     db_session.commit()
@@ -101,7 +101,7 @@ def test_try_to_advence_turn_to_phase2(db_session):
     assert len(db_session.query(CurrencyInfo).all()) == 0
 
     # Successful advance.
-    p.try_to_advence_turn_to_phase2(
+    p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
@@ -131,14 +131,15 @@ def test_try_to_advence_turn_to_phase2(db_session):
     assert len(all_turns) == 1
     assert all_turns[0].phase == 2
     assert all_turns[0].phase_deadline is not None
+    assert all_turns[0].phase_deadline != TS0
 
     # Wrong turn_id or phase.
-    p.try_to_advence_turn_to_phase2(
+    p.try_to_advance_turn_to_phase2(
         turn_id=-1,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
     )
-    p.try_to_advence_turn_to_phase2(
+    p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
         max_commit_period=timedelta(days=30),
@@ -147,9 +148,10 @@ def test_try_to_advence_turn_to_phase2(db_session):
     assert len(all_turns) == 1
     assert all_turns[0].phase == 2
     assert all_turns[0].phase_deadline is not None
+    assert all_turns[0].phase_deadline != TS0
 
 
-def test_try_to_advence_turn_to_phase4(db_session):
+def test_try_to_advance_turn_to_phase4(db_session):
     turn = Turn(
         phase=3,
         phase_deadline=TS0,
@@ -172,7 +174,7 @@ def test_try_to_advence_turn_to_phase4(db_session):
     db_session.commit()
 
     # Can not advance with pending rows.
-    p.try_to_advence_turn_to_phase4(turn_id)
+    p.try_to_advance_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 3
@@ -180,15 +182,15 @@ def test_try_to_advence_turn_to_phase4(db_session):
     CollectorSending.query.delete()
 
     # Can advance without pending rows.
-    p.try_to_advence_turn_to_phase4(turn_id)
+    p.try_to_advance_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4
     assert all_turns[0].phase_deadline is None
 
     # Wrong turn_id or phase.
-    p.try_to_advence_turn_to_phase4(-1)
-    p.try_to_advence_turn_to_phase4(turn_id)
+    p.try_to_advance_turn_to_phase4(-1)
+    p.try_to_advance_turn_to_phase4(turn_id)
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4

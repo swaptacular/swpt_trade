@@ -17,6 +17,7 @@ from swpt_pythonlib.multiproc_utils import (
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
 from swpt_trade import procedures
+from swpt_trade.roll_turns import try_to_advance_turn_to_phase3
 
 
 @click.group("swpt_trade")
@@ -521,21 +522,21 @@ def roll_turns(period, period_offset, check_interval, quit_early):
         )
         for turn in started_turns:
             phase = turn.phase
-            if phase == 1:
-                procedures.try_to_advence_turn_to_phase2(
+            if phase == 1 and turn.phase_deadline < check_began_at:
+                procedures.try_to_advance_turn_to_phase2(
                     turn_id=turn.turn_id,
                     phase2_duration=phase2_duration,
                     max_commit_period=max_commit_period,
                 )
-            elif phase == 2:
-                # TODO: Implement and call the implementation.
-                pass
-            else:
-                assert phase == 3
-                procedures.try_to_advence_turn_to_phase4(turn.turn_id)
+            elif phase == 2 and turn.phase_deadline < check_began_at:
+                try_to_advance_turn_to_phase3(turn.turn_id)
+            elif phase == 3:
+                procedures.try_to_advance_turn_to_phase4(turn.turn_id)
+
+        elapsed_time = datetime.now(tz=timezone.utc) - check_began_at
+        wait_seconds = (check_interval - elapsed_time).total_seconds()
 
         if quit_early:
             break
-
-        elapsed_time = datetime.now(tz=timezone.utc) - check_began_at
-        time.sleep(max(0.0, (check_interval - elapsed_time).total_seconds()))
+        if wait_seconds > 0.0:  # pragma: no cover
+            time.sleep(wait_seconds)

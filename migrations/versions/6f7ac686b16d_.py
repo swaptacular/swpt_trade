@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: ce51179f3945
+Revision ID: 6f7ac686b16d
 Revises: 
-Create Date: 2024-01-24 19:54:28.189150
+Create Date: 2024-01-25 16:31:26.511492
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'ce51179f3945'
+revision = '6f7ac686b16d'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -127,6 +127,16 @@ def upgrade_solver():
     sa.Column('debtor_info_locator', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id')
     )
+    op.create_table('creditor_collecting',
+    sa.Column('turn_id', sa.Integer(), nullable=False),
+    sa.Column('creditor_id', sa.BigInteger(), nullable=False),
+    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('creditor_hash', sa.SmallInteger(), nullable=False),
+    sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('collector_id', sa.BigInteger(), nullable=False),
+    sa.CheckConstraint('amount > 0'),
+    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
+    )
     op.create_table('creditor_giving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
@@ -187,6 +197,7 @@ def upgrade_solver():
     sa.Column('collection_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.CheckConstraint('(phase < 2 OR collection_deadline IS NOT NULL) AND (phase < 3 OR collection_started_at IS NOT NULL)'),
     sa.CheckConstraint('phase > 0 AND phase <= 4'),
+    sa.CheckConstraint('phase > 2 OR phase_deadline IS NOT NULL'),
     sa.PrimaryKeyConstraint('turn_id')
     )
     with op.batch_alter_table('turn', schema=None) as batch_op:
@@ -211,6 +222,7 @@ def downgrade_solver():
     op.drop_table('currency_info')
     op.drop_table('creditor_taking')
     op.drop_table('creditor_giving')
+    op.drop_table('creditor_collecting')
     op.drop_table('confirmed_debtor')
     op.drop_table('collector_sending')
     op.drop_table('collector_receiving')
