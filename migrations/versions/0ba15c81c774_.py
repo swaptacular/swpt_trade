@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: e3f3a3f4904a
+Revision ID: 0ba15c81c774
 Revises: 
-Create Date: 2024-01-25 17:33:49.882236
+Create Date: 2024-01-25 18:48:10.578806
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e3f3a3f4904a'
+revision = '0ba15c81c774'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -199,10 +199,11 @@ def upgrade_solver():
     sa.Column('phase_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_started_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
-    sa.CheckConstraint('(phase < 2 OR collection_deadline IS NOT NULL) AND (phase < 3 OR collection_started_at IS NOT NULL)'),
     sa.CheckConstraint('base_debtor_id != 0'),
     sa.CheckConstraint('max_distance_to_base > 0'),
     sa.CheckConstraint('min_trade_amount > 0'),
+    sa.CheckConstraint('phase < 2 OR collection_deadline IS NOT NULL'),
+    sa.CheckConstraint('phase < 3 OR collection_started_at IS NOT NULL'),
     sa.CheckConstraint('phase > 0 AND phase <= 4'),
     sa.CheckConstraint('phase > 2 OR phase_deadline IS NOT NULL'),
     sa.PrimaryKeyConstraint('turn_id')

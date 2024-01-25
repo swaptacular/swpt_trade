@@ -41,12 +41,8 @@ class Turn(db.Model):
         db.CheckConstraint(min_trade_amount > 0),
         db.CheckConstraint(and_(phase > 0, phase <= 4)),
         db.CheckConstraint(or_(phase > 2, phase_deadline != null())),
-        db.CheckConstraint(
-            and_(
-                or_(phase < 2, collection_deadline != null()),
-                or_(phase < 3, collection_started_at != null()),
-            )
-        ),
+        db.CheckConstraint(or_(phase < 2, collection_deadline != null())),
+        db.CheckConstraint(or_(phase < 3, collection_started_at != null())),
         db.Index(
             "idx_phase",
             phase,
