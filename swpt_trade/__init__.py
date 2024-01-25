@@ -192,7 +192,7 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_PHASE2_DURATION = "1h"
     TURN_MAX_COMMIT_PERIOD = "14d"
 
-    BASE_DEBTOR_INFO_LOCATOR = ""
+    BASE_DEBTOR_INFO_LOCATOR: str = None
     BASE_DEBTOR_ID: _parse_debtor_id = None
     MAX_DISTANCE_TO_BASE = 10
     MIN_TRADE_AMOUNT = 1000
