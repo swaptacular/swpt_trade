@@ -46,6 +46,7 @@ def db_session(app):
     for cmd in [
         "TRUNCATE TABLE collector_account",
         "TRUNCATE TABLE turn",
+        "TRUNCATE TABLE debtor_info",
         "TRUNCATE TABLE confirmed_debtor",
         "TRUNCATE TABLE currency_info",
         "TRUNCATE TABLE sell_offer",

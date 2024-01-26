@@ -124,6 +124,8 @@ def test_try_to_advance_turn_to_phase2(db_session):
         )
     )
     db_session.commit()
+    assert len(DebtorInfo.query.all()) != 0
+    assert len(ConfirmedDebtor.query.all()) != 0
     assert len(db_session.query(CurrencyInfo).all()) == 0
 
     # Successful advance.
@@ -158,6 +160,9 @@ def test_try_to_advance_turn_to_phase2(db_session):
     assert all_turns[0].phase == 2
     assert all_turns[0].phase_deadline is not None
     assert all_turns[0].phase_deadline != TS0
+
+    assert len(DebtorInfo.query.all()) == 0
+    assert len(ConfirmedDebtor.query.all()) == 0
 
     # Wrong turn_id or phase.
     p.try_to_advance_turn_to_phase2(
