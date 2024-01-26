@@ -212,7 +212,7 @@ cdef class Solver:
             CollectorAccount(creditor_id, debtor_id)
         )
 
-    cdef void analyze_currencies(self):
+    cpdef void analyze_currencies(self):
         """Analyze registered currencies.
 
         This may take some time when there are lots and lots of
@@ -289,7 +289,7 @@ cdef class Solver:
         if price > 0.0:
             self.graph.add_demand(amount * price, debtor_id, buyer_creditor_id)
 
-    cdef void analyze_offers(self):
+    cpdef void analyze_offers(self):
         """Analyze registered offers.
 
         This may take a significant amount of time when there are lots
