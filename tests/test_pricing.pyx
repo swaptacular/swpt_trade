@@ -4,7 +4,7 @@ import pytest
 import math
 from datetime import date
 from . import cytest
-from swpt_trade.pricing cimport (
+from swpt_trade.solver.pricing cimport (
     compare_prices,
     Key128,
     Currency,
@@ -14,7 +14,7 @@ from swpt_trade.pricing cimport (
     BidRegistry,
     BidProcessor,
 )
-from swpt_trade.pricing import CandidateOfferAuxData
+from swpt_trade.solver import CandidateOfferAuxData
 
 
 @cytest

@@ -3,7 +3,7 @@
 import pytest
 import math
 from . import cytest
-from swpt_trade.aggregation cimport (
+from swpt_trade.solver.aggregation cimport (
     check_add,
     calc_amt,
     Account,

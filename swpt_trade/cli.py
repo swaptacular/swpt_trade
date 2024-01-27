@@ -17,7 +17,7 @@ from swpt_pythonlib.multiproc_utils import (
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
 from swpt_trade import procedures
-from swpt_trade.roll_turns import try_to_advance_turn_to_phase3
+from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
 
 @click.group("swpt_trade")

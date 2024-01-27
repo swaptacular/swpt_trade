@@ -7,12 +7,12 @@ from libcpp.unordered_map cimport unordered_multimap
 from libc.stdlib cimport rand
 from libc.math cimport NAN
 from libcpp cimport bool
-from swpt_trade.pricing cimport distance, BidProcessor
-from swpt_trade.pricing import (
+from .pricing cimport distance, BidProcessor
+from .pricing import (
     DEFAULT_MAX_DISTANCE_TO_BASE,
     DEFAULT_MIN_TRADE_AMOUNT,
 )
-from swpt_trade.matching cimport Digraph
+from .matching cimport Digraph
 from collections import namedtuple
 
 

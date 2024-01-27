@@ -15,7 +15,7 @@ from swpt_trade.models import (
     CreditorCollecting,
     CreditorTaking,
 )
-from swpt_trade.aggregation import Solver
+from swpt_trade.solver import Solver
 from swpt_trade.utils import batched, calc_hash
 
 INSERT_BATCH_SIZE = 50000
@@ -47,7 +47,7 @@ def try_to_advance_turn_to_phase3(turn_id: int) -> None:
         _register_buy_offers(solver, turn_id)
         solver.analyze_offers()
 
-        _try_to_write_solver_results(solver, turn_id)
+        _try_to_commit_solver_results(solver, turn_id)
 
 
 def _register_currencies(solver: Solver, turn_id: int) -> None:
@@ -112,7 +112,7 @@ def _register_buy_offers(solver: Solver, turn_id: int) -> None:
 
 
 @atomic
-def _try_to_write_solver_results(solver: Solver, turn_id: int) -> None:
+def _try_to_commit_solver_results(solver: Solver, turn_id: int) -> None:
     turn = (
         Turn.query.filter_by(turn_id=turn_id)
         .with_for_update()

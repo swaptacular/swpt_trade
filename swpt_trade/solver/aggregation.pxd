@@ -4,8 +4,8 @@ from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_set cimport unordered_multiset
 from libcpp.unordered_map cimport unordered_map
 from libcpp.vector cimport vector
-from swpt_trade.pricing cimport distance, BidProcessor
-from swpt_trade.matching cimport Digraph
+from .pricing cimport distance, BidProcessor
+from .matching cimport Digraph
 
 
 cdef extern from *:

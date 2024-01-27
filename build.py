@@ -21,7 +21,7 @@ def build():
         "libraries": LIBRARIES,
     }
     extensions = [
-        Extension("*", ["swpt_trade/*.pyx"], **kwargs),
+        Extension("*", ["swpt_trade/solver/*.pyx"], **kwargs),
         Extension("*", ["tests/*.pyx"], **kwargs),
     ]
     ext_modules = cythonize(

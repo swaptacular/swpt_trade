@@ -64,6 +64,8 @@ def can_start_new_turn(
 
 
 def batched(iterable, n):
+    """Batch data from the iterable into tuples of length n.
+    """
     if n < 1:
         raise ValueError('n must be at least one')
     it = iter(iterable)
@@ -72,6 +74,9 @@ def batched(iterable, n):
 
 
 def calc_hash(n: int) -> int:
+    """Calculate the MD5 hash of `n`, and return the highest 16 bits
+    as a signed 16-bits integer.
+    """
     m = md5()
     m.update(n.to_bytes(8, byteorder="big", signed=True))
     return int.from_bytes(m.digest()[:2], byteorder="big", signed=True)
