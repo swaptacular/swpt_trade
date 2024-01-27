@@ -26,28 +26,23 @@ T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
 
-def try_to_advance_turn_to_phase3(turn_id: int) -> None:
-    turn = (
-        Turn.query.filter_by(turn_id=turn_id)
-        .with_for_update()
-        .one_or_none()
+def try_to_advance_turn_to_phase3(turn: Turn) -> None:
+    turn_id = turn.turn_id
+    solver = Solver(
+        turn.base_debtor_info_locator,
+        turn.base_debtor_id,
+        turn.max_distance_to_base,
+        turn.min_trade_amount,
     )
-    if turn and turn.phase == 2:
-        solver = Solver(
-            turn.base_debtor_info_locator,
-            turn.base_debtor_id,
-            turn.max_distance_to_base,
-            turn.min_trade_amount,
-        )
-        _register_currencies(solver, turn_id)
-        _register_collector_accounts(solver, turn_id)
-        solver.analyze_currencies()
+    _register_currencies(solver, turn_id)
+    _register_collector_accounts(solver, turn_id)
+    solver.analyze_currencies()
 
-        _register_sell_offers(solver, turn_id)
-        _register_buy_offers(solver, turn_id)
-        solver.analyze_offers()
+    _register_sell_offers(solver, turn_id)
+    _register_buy_offers(solver, turn_id)
+    solver.analyze_offers()
 
-        _try_to_commit_solver_results(solver, turn_id)
+    _try_to_commit_solver_results(solver, turn_id)
 
 
 def _register_currencies(solver: Solver, turn_id: int) -> None:

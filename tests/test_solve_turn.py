@@ -109,4 +109,4 @@ def test_try_to_advance_turn_to_phase3(db_session):
     )
     db_session.commit()
 
-    try_to_advance_turn_to_phase3(turn_id)
+    try_to_advance_turn_to_phase3(turn)

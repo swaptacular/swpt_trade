@@ -536,7 +536,7 @@ def roll_turns(period, period_offset, check_interval, quit_early):
                     max_commit_period=max_commit_period,
                 )
             elif phase == 2 and turn.phase_deadline < check_began_at:
-                try_to_advance_turn_to_phase3(turn.turn_id)
+                try_to_advance_turn_to_phase3(turn)
             elif phase == 3:
                 procedures.try_to_advance_turn_to_phase4(turn.turn_id)
 
