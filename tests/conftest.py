@@ -54,7 +54,7 @@ def db_session(app):
         "TRUNCATE TABLE collector_collecting",
         "TRUNCATE TABLE collector_sending",
         "TRUNCATE TABLE collector_receiving",
-        "TRUNCATE TABLE creditor_giving",
+        "TRUNCATE TABLE collector_giving",
     ]:
         db.session.execute(
             sqlalchemy.text(cmd),

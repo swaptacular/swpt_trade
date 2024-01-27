@@ -1,5 +1,7 @@
 import re
+from hashlib import md5
 from datetime import datetime, timedelta, timezone
+from itertools import islice
 
 RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
 DATETIME0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # 2024-01-01 is Monday.
@@ -59,3 +61,37 @@ def can_start_new_turn(
     time_since_latest_turn = current_ts - latest_turn_started_at
     overdue = (current_ts - start_of_first_turn) % turn_period
     return overdue < 0.5 * turn_period < time_since_latest_turn
+
+
+def batched(iterable, n):
+    if n < 1:
+        raise ValueError('n must be at least one')
+    it = iter(iterable)
+    while batch := tuple(islice(it, n)):
+        yield batch
+
+
+def calc_hash(n: int) -> int:
+    m = md5()
+    m.update(n.to_bytes(8, byteorder="big", signed=True))
+    return int.from_bytes(m.digest()[:2], byteorder="big", signed=True)
+
+
+def i16_to_u16(value: int) -> int:
+    """Convert a signed 16-bit integer to unsigned 16-bit integer.
+    """
+    if value > 0x7fff or value < -0x8000:
+        raise ValueError()
+    if value >= 0:
+        return value
+    return value + 0x10000
+
+
+def u16_to_i16(value: int) -> int:
+    """Convert an unsigned 16-bit integer to a signed 16-bit integer.
+    """
+    if value > 0xffff or value < 0:
+        raise ValueError()
+    if value <= 0x7fff:
+        return value
+    return value - 0x10000

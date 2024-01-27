@@ -1,6 +1,13 @@
 import pytest
 from datetime import timedelta, datetime, timezone
-from swpt_trade.utils import parse_timedelta, can_start_new_turn
+from swpt_trade.utils import (
+    parse_timedelta,
+    can_start_new_turn,
+    batched,
+    calc_hash,
+    i16_to_u16,
+    u16_to_i16,
+)
 
 
 def test_parse_timedelta():
@@ -76,3 +83,43 @@ def test_can_start_new_turn():
         latest_turn_started_at=t - 1000 * h,
         current_ts=t,
     )
+
+
+def test_batched():
+    assert list(batched('ABCDEFG', 3)) == [
+        tuple("ABC"),
+        tuple("DEF"),
+        tuple("G"),
+    ]
+    with pytest.raises(ValueError):
+        list(batched('ABCDEFG', 0))
+
+
+def test_calc_hash():
+    assert calc_hash(123) == u16_to_i16(0b1111110000010000)
+
+
+def test_i16_to_u16():
+    assert i16_to_u16(-0x8000) == 0x8000
+    assert i16_to_u16(-0x7fff) == 0x8001
+    assert i16_to_u16(-1) == 0xffff
+    assert i16_to_u16(1) == 0x0001
+    assert i16_to_u16(0x7fff) == 0x7fff
+
+    with pytest.raises(ValueError):
+        i16_to_u16(0x8000)
+    with pytest.raises(ValueError):
+        i16_to_u16(-0x8001)
+
+
+def test_u16_to_i16():
+    assert u16_to_i16(0x8000) == -0x8000
+    assert u16_to_i16(0x8001) == -0x7fff
+    assert u16_to_i16(0xffff) == -1
+    assert u16_to_i16(0x0001) == 1
+    assert u16_to_i16(0x7fff) == 0x7fff
+
+    with pytest.raises(ValueError):
+        u16_to_i16(-1)
+    with pytest.raises(ValueError):
+        u16_to_i16(0x10000)

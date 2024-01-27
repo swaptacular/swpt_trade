@@ -275,6 +275,9 @@ def test_try_to_advance_turn_to_phase3(db_session):
         )
     )
     db_session.add(
+        CollectorAccount(debtor_id=101, collector_id=997, account_id="997")
+    )
+    db_session.add(
         CollectorAccount(debtor_id=101, collector_id=998, account_id="998")
     )
     db_session.add(
@@ -285,14 +288,23 @@ def test_try_to_advance_turn_to_phase3(db_session):
             turn_id=turn_id,
             creditor_id=1,
             debtor_id=101,
-            amount=15000,
-            collector_id=998,
+            amount=5000,
+            collector_id=997,
         )
     )
     db_session.add(
         SellOffer(
             turn_id=turn_id,
             creditor_id=2,
+            debtor_id=101,
+            amount=6000,
+            collector_id=998,
+        )
+    )
+    db_session.add(
+        SellOffer(
+            turn_id=turn_id,
+            creditor_id=3,
             debtor_id=102,
             amount=10000,
             collector_id=999,
@@ -310,6 +322,14 @@ def test_try_to_advance_turn_to_phase3(db_session):
         BuyOffer(
             turn_id=turn_id,
             creditor_id=2,
+            debtor_id=102,
+            amount=20000,
+        )
+    )
+    db_session.add(
+        BuyOffer(
+            turn_id=turn_id,
+            creditor_id=3,
             debtor_id=101,
             amount=30000,
         )

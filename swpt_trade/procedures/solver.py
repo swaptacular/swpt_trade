@@ -9,7 +9,7 @@ from swpt_trade.models import (
     DebtorInfo,
     ConfirmedDebtor,
     CurrencyInfo,
-    CreditorGiving,
+    CollectorGiving,
     CollectorReceiving,
     CollectorSending,
     CollectorCollecting,
@@ -134,7 +134,7 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
     )
     if turn and turn.phase == 3:
         for table in [
-                CreditorGiving,
+                CollectorGiving,
                 CollectorReceiving,
                 CollectorSending,
                 CollectorCollecting,

@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 0ba15c81c774
+Revision ID: 53102e539bf1
 Revises: 
-Create Date: 2024-01-25 18:48:10.578806
+Create Date: 2024-01-27 18:21:11.728011
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '0ba15c81c774'
+revision = '53102e539bf1'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -101,6 +101,16 @@ def upgrade_solver():
     sa.CheckConstraint('amount > 0'),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
     )
+    op.create_table('collector_giving',
+    sa.Column('turn_id', sa.Integer(), nullable=False),
+    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('creditor_id', sa.BigInteger(), nullable=False),
+    sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('collector_id', sa.BigInteger(), nullable=False),
+    sa.Column('collector_hash', sa.SmallInteger(), nullable=False),
+    sa.CheckConstraint('amount > 0'),
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
+    )
     op.create_table('collector_receiving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
@@ -128,16 +138,6 @@ def upgrade_solver():
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id')
     )
     op.create_table('creditor_collecting',
-    sa.Column('turn_id', sa.Integer(), nullable=False),
-    sa.Column('creditor_id', sa.BigInteger(), nullable=False),
-    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
-    sa.Column('creditor_hash', sa.SmallInteger(), nullable=False),
-    sa.Column('amount', sa.BigInteger(), nullable=False),
-    sa.Column('collector_id', sa.BigInteger(), nullable=False),
-    sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
-    )
-    op.create_table('creditor_giving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
@@ -229,11 +229,11 @@ def downgrade_solver():
 
     op.drop_table('currency_info')
     op.drop_table('creditor_taking')
-    op.drop_table('creditor_giving')
     op.drop_table('creditor_collecting')
     op.drop_table('confirmed_debtor')
     op.drop_table('collector_sending')
     op.drop_table('collector_receiving')
+    op.drop_table('collector_giving')
     op.drop_table('collector_collecting')
     op.drop_table('collector_account')
     op.drop_table('buy_offer')

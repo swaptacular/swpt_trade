@@ -1,5 +1,6 @@
 from typing import TypeVar, Callable
-from sqlalchemy import select
+from datetime import datetime, timezone
+from sqlalchemy import select, insert
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     CollectorAccount,
@@ -7,9 +8,18 @@ from swpt_trade.models import (
     CurrencyInfo,
     SellOffer,
     BuyOffer,
-    TS0,
+    CollectorGiving,
+    CollectorReceiving,
+    CollectorSending,
+    CollectorCollecting,
+    CreditorCollecting,
+    CreditorTaking,
 )
 from swpt_trade.aggregation import Solver
+from swpt_trade.utils import batched, calc_hash
+
+INSERT_BATCH_SIZE = 50000
+SELECT_BATCH_SIZE = 50000
 
 
 T = TypeVar("T")
@@ -42,7 +52,7 @@ def try_to_advance_turn_to_phase3(turn_id: int) -> None:
 
 def _register_currencies(solver: Solver, turn_id: int) -> None:
     with db.engines['solver'].connect() as conn:
-        with conn.execution_options(yield_per=50_000).execute(
+        with conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
                     CurrencyInfo.is_confirmed,
                     CurrencyInfo.debtor_info_locator,
@@ -62,7 +72,7 @@ def _register_currencies(solver: Solver, turn_id: int) -> None:
 
 def _register_collector_accounts(solver: Solver, turn_id: int) -> None:
     with db.engines['solver'].connect() as conn:
-        with conn.execution_options(yield_per=50_000).execute(
+        with conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
                     CollectorAccount.collector_id,
                     CollectorAccount.debtor_id,
@@ -74,7 +84,7 @@ def _register_collector_accounts(solver: Solver, turn_id: int) -> None:
 
 def _register_sell_offers(solver: Solver, turn_id: int) -> None:
     with db.engines['solver'].connect() as conn:
-        with conn.execution_options(yield_per=50_000).execute(
+        with conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
                     SellOffer.creditor_id,
                     SellOffer.debtor_id,
@@ -89,7 +99,7 @@ def _register_sell_offers(solver: Solver, turn_id: int) -> None:
 
 def _register_buy_offers(solver: Solver, turn_id: int) -> None:
     with db.engines['solver'].connect() as conn:
-        with conn.execution_options(yield_per=50_000).execute(
+        with conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
                     BuyOffer.creditor_id,
                     BuyOffer.debtor_id,
@@ -109,13 +119,9 @@ def _try_to_write_solver_results(solver: Solver, turn_id: int) -> None:
         .one_or_none()
     )
     if turn and turn.phase == 2:
-        # for solver.takings_iter():
-        #     db.session.execute(
-        #         insert()
-        #     )
-        # _write_takings(solver, turn_id)
-        # _write_collector_transfers(solver, turn_id)
-        # _write_givings(solver, turn_id)
+        _write_takings(solver, turn_id)
+        _write_collector_transfers(solver, turn_id)
+        _write_givings(solver, turn_id)
 
         CurrencyInfo.query.filter_by(turn_id=turn_id).delete()
         SellOffer.query.filter_by(turn_id=turn_id).delete()
@@ -123,4 +129,108 @@ def _try_to_write_solver_results(solver: Solver, turn_id: int) -> None:
 
         turn.phase = 3
         turn.phase_deadline = None
-        turn.collection_started_at = TS0
+        turn.collection_started_at = datetime.now(tz=timezone.utc)
+
+
+def _write_takings(solver: Solver, turn_id: int) -> None:
+    for account_changes in batched(solver.takings_iter(), INSERT_BATCH_SIZE):
+        db.session.execute(
+            insert(CreditorTaking).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": ac.creditor_id,
+                    "debtor_id": ac.debtor_id,
+                    "creditor_hash": calc_hash(ac.creditor_id),
+                    "amount": -ac.amount,
+                    "collector_id": ac.collector_id,
+                } for ac in account_changes
+            ],
+        )
+        db.session.execute(
+            insert(CollectorCollecting).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "debtor_id": ac.debtor_id,
+                    "creditor_id": ac.creditor_id,
+                    "amount": -ac.amount,
+                    "collector_id": ac.collector_id,
+                    "collector_hash": calc_hash(ac.collector_id),
+                } for ac in account_changes
+            ],
+        )
+
+
+def _write_collector_transfers(solver: Solver, turn_id: int) -> None:
+    for collector_transfers in batched(
+            solver.collector_transfers_iter(), INSERT_BATCH_SIZE
+    ):
+        db.session.execute(
+            insert(CollectorSending).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "debtor_id": ct.debtor_id,
+                    "from_collector_id": ct.from_creditor_id,
+                    "to_collector_id": ct.to_creditor_id,
+                    "from_collector_hash": calc_hash(ct.from_creditor_id),
+                    "amount": ct.amount,
+                } for ct in collector_transfers
+            ],
+        )
+        db.session.execute(
+            insert(CollectorReceiving).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "debtor_id": ct.debtor_id,
+                    "to_collector_id": ct.to_creditor_id,
+                    "from_collector_id": ct.from_creditor_id,
+                    "to_collector_hash": calc_hash(ct.to_creditor_id),
+                    "amount": ct.amount,
+                } for ct in collector_transfers
+            ],
+        )
+
+
+def _write_givings(solver: Solver, turn_id: int) -> None:
+    for account_changes in batched(solver.givings_iter(), INSERT_BATCH_SIZE):
+        db.session.execute(
+            insert(CollectorGiving).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "debtor_id": ac.debtor_id,
+                    "creditor_id": ac.creditor_id,
+                    "amount": ac.amount,
+                    "collector_id": ac.collector_id,
+                    "collector_hash": calc_hash(ac.collector_id),
+                } for ac in account_changes
+            ],
+        )
+        db.session.execute(
+            insert(CreditorCollecting).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": ac.creditor_id,
+                    "debtor_id": ac.debtor_id,
+                    "creditor_hash": calc_hash(ac.creditor_id),
+                    "amount": ac.amount,
+                    "collector_id": ac.collector_id,
+                } for ac in account_changes
+            ],
+        )
