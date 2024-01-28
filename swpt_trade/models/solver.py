@@ -132,19 +132,6 @@ class CreditorTaking(db.Model):
     )
 
 
-class CreditorCollecting(db.Model):
-    __bind_key__ = "solver"
-    turn_id = db.Column(db.Integer, primary_key=True)
-    creditor_id = db.Column(db.BigInteger, primary_key=True)
-    debtor_id = db.Column(db.BigInteger, primary_key=True)
-    creditor_hash = db.Column(db.SmallInteger, nullable=False)
-    amount = db.Column(db.BigInteger, nullable=False)
-    collector_id = db.Column(db.BigInteger, nullable=False)
-    __table_args__ = (
-        db.CheckConstraint(amount > 0),
-    )
-
-
 class CollectorCollecting(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
@@ -184,7 +171,7 @@ class CollectorReceiving(db.Model):
     )
 
 
-class CollectorGiving(db.Model):
+class CollectorDispatching(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -192,6 +179,19 @@ class CollectorGiving(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     collector_id = db.Column(db.BigInteger, nullable=False)
     collector_hash = db.Column(db.SmallInteger, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint(amount > 0),
+    )
+
+
+class CreditorGiving(db.Model):
+    __bind_key__ = "solver"
+    turn_id = db.Column(db.Integer, primary_key=True)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_hash = db.Column(db.SmallInteger, nullable=False)
+    amount = db.Column(db.BigInteger, nullable=False)
+    collector_id = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
     )

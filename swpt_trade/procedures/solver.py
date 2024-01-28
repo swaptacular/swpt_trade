@@ -9,11 +9,11 @@ from swpt_trade.models import (
     DebtorInfo,
     ConfirmedDebtor,
     CurrencyInfo,
-    CollectorGiving,
+    CollectorDispatching,
     CollectorReceiving,
     CollectorSending,
     CollectorCollecting,
-    CreditorCollecting,
+    CreditorGiving,
     CreditorTaking,
     TS0,
 )
@@ -134,11 +134,11 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
     )
     if turn and turn.phase == 3:
         for table in [
-                CollectorGiving,
+                CollectorDispatching,
                 CollectorReceiving,
                 CollectorSending,
                 CollectorCollecting,
-                CreditorCollecting,
+                CreditorGiving,
                 CreditorTaking,
         ]:
             has_pending_rows = bool(

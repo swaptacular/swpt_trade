@@ -8,11 +8,11 @@ from swpt_trade.models import (
     CurrencyInfo,
     SellOffer,
     BuyOffer,
-    CollectorGiving,
+    CollectorDispatching,
     CollectorReceiving,
     CollectorSending,
     CollectorCollecting,
-    CreditorCollecting,
+    CreditorGiving,
     CreditorTaking,
 )
 from swpt_trade.solver import Solver
@@ -211,7 +211,7 @@ def _write_collector_transfers(solver: Solver, turn_id: int) -> None:
 def _write_givings(solver: Solver, turn_id: int) -> None:
     for account_changes in batched(solver.givings_iter(), INSERT_BATCH_SIZE):
         db.session.execute(
-            insert(CollectorGiving).execution_options(
+            insert(CollectorDispatching).execution_options(
                 insertmanyvalues_page_size=INSERT_BATCH_SIZE
             ),
             [
@@ -226,7 +226,7 @@ def _write_givings(solver: Solver, turn_id: int) -> None:
             ],
         )
         db.session.execute(
-            insert(CreditorCollecting).execution_options(
+            insert(CreditorGiving).execution_options(
                 insertmanyvalues_page_size=INSERT_BATCH_SIZE
             ),
             [

@@ -53,7 +53,7 @@ WORKDIR /usr/src/app
 
 COPY --from=oathkeeper-image /usr/bin/oathkeeper /usr/bin/oathkeeper
 COPY --from=venv-image /opt/venv /opt/venv
-COPY --from=venv-image /usr/src/app/swpt_trade/*.so swpt_trade/
+COPY --from=venv-image /usr/src/app/swpt_trade/solver/*.so swpt_trade/solver/
 COPY --from=venv-image /usr/src/app/tests/*.so tests/
 
 COPY docker/entrypoint.sh \

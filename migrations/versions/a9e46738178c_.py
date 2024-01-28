@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 53102e539bf1
+Revision ID: a9e46738178c
 Revises: 
-Create Date: 2024-01-27 18:21:11.728011
+Create Date: 2024-01-28 16:09:15.457099
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '53102e539bf1'
+revision = 'a9e46738178c'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -101,7 +101,7 @@ def upgrade_solver():
     sa.CheckConstraint('amount > 0'),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
     )
-    op.create_table('collector_giving',
+    op.create_table('collector_dispatching',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
@@ -137,7 +137,7 @@ def upgrade_solver():
     sa.Column('debtor_info_locator', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id')
     )
-    op.create_table('creditor_collecting',
+    op.create_table('creditor_giving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
@@ -229,11 +229,11 @@ def downgrade_solver():
 
     op.drop_table('currency_info')
     op.drop_table('creditor_taking')
-    op.drop_table('creditor_collecting')
+    op.drop_table('creditor_giving')
     op.drop_table('confirmed_debtor')
     op.drop_table('collector_sending')
     op.drop_table('collector_receiving')
-    op.drop_table('collector_giving')
+    op.drop_table('collector_dispatching')
     op.drop_table('collector_collecting')
     op.drop_table('collector_account')
     op.drop_table('buy_offer')
