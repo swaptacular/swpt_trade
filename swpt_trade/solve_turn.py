@@ -26,13 +26,15 @@ T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
 # TODO: When changing to phase 3, the `try_to_advance_turn_to_phase3`
-# function deletes all records for the given turn from the
+# function will delete all records for the given turn from the
 # `CurrencyInfo`, `SellOffer`, and `BuyOffer` tables. This however,
 # does not guarantee that a worker process will not continue to insert
-# rows for the given turn in these tables. In order to ensure that
-# such obsolete records will be deleted eventually, a
+# new rows for the given turn in these tables. Therefore, in order to
+# ensure that such obsolete records will be deleted eventually, a
 # garbage-collecting process should be implemented, which continuously
-# scans those tables for obsolete records and deletes them.
+# scans those tables for obsolete records and deletes them. In fact,
+# this process should scan and garbage-collect the `DebtorInfo` and
+# `ConfirmedDebtor` tables as well.
 
 
 def try_to_advance_turn_to_phase3(turn: Turn) -> None:
