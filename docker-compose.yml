@@ -19,6 +19,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: app-image
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     env_file: .env
     environment:
       - 'SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@tests-pg:5432/${POSTGRES_DB}'
@@ -34,6 +36,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: app-image
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     env_file: .env
     environment:
       - 'WEBSERVER_PORT=8080'
