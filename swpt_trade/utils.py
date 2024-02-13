@@ -73,6 +73,24 @@ def batched(iterable, n):
         yield batch
 
 
+def calc_iri_routing_key(iri: str) -> str:
+    """Calculate a binary RabbitMQ routing key from an IRI string.
+
+    The binary routing key is calculated by taking the highest 24
+    bits, separated with dots, of the MD5 digest of the UTF-8
+    serialization of the passed IRI string. For example::
+
+      >>> calc_iri_routing_key(123)
+      '0.1.0.0.0.0.1.1.1.1.0.1.0.1.0.0.1.1.0.0.0.1.0.1'
+    """
+    m = md5()
+    m.update(iri.encode("utf8"))
+    md5_hash = m.digest()
+    s = "".join([format(byte, "08b") for byte in md5_hash[:3]])
+    assert len(s) == 24
+    return ".".join(s)
+
+
 def calc_hash(n: int) -> int:
     """Calculate the MD5 hash of `n`, and return the highest 16 bits
     as a signed 16-bits integer.

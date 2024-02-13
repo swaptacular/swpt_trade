@@ -1,10 +1,12 @@
 from __future__ import annotations
 from flask import current_app
 from marshmallow import Schema, fields
-from swpt_pythonlib.utils import i64_to_hex_routing_key
+from swpt_pythonlib.utils import i64_to_hex_routing_key, calc_bin_routing_key
+from swpt_trade.utils import calc_iri_routing_key
 from swpt_trade.extensions import (
     db,
     CREDITORS_OUT_EXCHANGE,
+    TO_TRADE_EXCHANGE,
 )
 from .common import Signal, CT_AGENT
 
@@ -126,3 +128,98 @@ class FinalizeTransferSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_FLUSH_FINALIZE_TRANSFERS_BURST_COUNT"]
+
+
+class FetchDebtorInfoSignal(Signal):
+    """Requests a debtor info document to be fetched from Internet.
+
+    The `iri` field specifies the Internationalized Resource
+    Identifier (IRI) from which the debtor info document should be
+    fetched. When `is_confirmation` is `True`, this request is being
+    made as a step in the debtor-confirmation process.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("FetchDebtorInfo")
+        iri = fields.String()
+        debtor_id = fields.Integer()
+        is_confirmation = fields.Boolean()
+        distance_to_leaf = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    iri = db.Column(db.String, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    is_confirmation = db.Column(db.BOOLEAN, nullable=False)
+    distance_to_leaf = db.Column(db.SmallInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_iri_routing_key(self.iri)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_FETCH_DEBTOR_INFO_BURST_COUNT"]
+
+
+class StartDebtorConfirmationSignal(Signal):
+    """Starts the debtor-confirmation process for a given debtor.
+
+    The `iri` field specifies an Internationalized Resource Identifier
+    (IRI), from which a debtor info document for the given debtor can
+    be fetched. Note that normally the given IRI will be not be the
+    same as the debtor's official debtor info locator.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("StartDebtorConfirmation")
+        debtor_id = fields.Integer()
+        iri = fields.String()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    iri = db.Column(db.String, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.debtor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config[
+            "APP_FLUSH_START_DEBTOR_CONFIRMATION_BURST_COUNT"
+        ]
+
+
+class ConfirmDebtorSignal(Signal):
+    """Informs that the given confirmed debtor has specified the given
+    debtor info locator.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("ConfirmDebtor")
+        debtor_id = fields.Integer()
+        debtor_info_locator = fields.String()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    debtor_info_locator = db.Column(db.String, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.debtor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_CONFIRM_DEBTOR_BURST_COUNT"]

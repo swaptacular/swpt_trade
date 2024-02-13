@@ -41,7 +41,7 @@ class DebtorConfirmation(db.Model):
 class DebtorInfoFetch(db.Model):
     iri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    is_peg_location = db.Column(db.BOOLEAN, nullable=False, default=False)
+    is_locator = db.Column(db.BOOLEAN, nullable=False, default=False)
     is_confirmation = db.Column(db.BOOLEAN, nullable=False, default=False)
     distance_to_leaf = db.Column(db.SmallInteger, nullable=False, default=0)
     inserted_at = db.Column(

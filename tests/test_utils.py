@@ -7,6 +7,7 @@ from swpt_trade.utils import (
     calc_hash,
     i16_to_u16,
     u16_to_i16,
+    calc_iri_routing_key,
 )
 
 
@@ -38,6 +39,13 @@ def test_parse_timedelta():
         parse_timedelta("-5s")
     with pytest.raises(ValueError):
         parse_timedelta(" 1s")
+
+
+def test_calc_iri_routing_key():
+    h1 = calc_iri_routing_key("https://example.com/iri")
+    h2 = calc_iri_routing_key("https://example.com/iri2")
+    assert h1 == '0.1.0.0.0.0.1.1.1.1.0.1.0.1.0.0.1.1.0.0.0.1.0.1'
+    assert h2 == '0.0.0.1.0.1.0.1.0.0.0.1.1.1.1.1.0.0.1.1.1.0.1.0'
 
 
 def test_can_start_new_turn():
