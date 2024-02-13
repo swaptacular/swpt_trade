@@ -10,7 +10,10 @@ class DebtorInfoDocument(db.Model):
     peg_debtor_info_locator = db.Column(db.String)
     peg_debtor_id = db.Column(db.BigInteger)
     peg_exchange_rate = db.Column(db.FLOAT)
-    update_at = db.Column(db.TIMESTAMP(timezone=True))
+    will_not_change_until = db.Column(db.TIMESTAMP(timezone=True))
+    fetched_at = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+    )
     __table_args__ = (
         db.CheckConstraint(
             or_(
@@ -22,19 +25,27 @@ class DebtorInfoDocument(db.Model):
                 ),
             )
         ),
-        db.Index(
-            "idx_debtor_info_document_update_at",
-            update_at,
-            postgresql_where=update_at != null(),
-        ),
     )
 
 
-class DebtorConfirmation(db.Model):
+class AnchorDebtor(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True, autoincrement=False)
     debtor_info_locator = db.Column(db.String)  # NOTE: nulls are allowed!
-    latest_update_at = db.Column(
-        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+    locator_claimed_at = db.Column(db.TIMESTAMP(timezone=True))
+    latest_debtor_info_fetch_at = db.Column(db.TIMESTAMP(timezone=True))
+    __table_args__ = (
+        db.CheckConstraint(
+            or_(
+                debtor_info_locator == null(),
+                and_(
+                    locator_claimed_at != null(),
+                    latest_debtor_info_fetch_at != null(),
+                ),
+            )
+        ),
+        db.Index(
+            "idx_anchor_debtor_fetch_at", latest_debtor_info_fetch_at
+        ),
     )
 
 
@@ -43,7 +54,7 @@ class DebtorInfoFetch(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     is_locator = db.Column(db.BOOLEAN, nullable=False, default=False)
     is_confirmation = db.Column(db.BOOLEAN, nullable=False, default=False)
-    distance_to_leaf = db.Column(db.SmallInteger, nullable=False, default=0)
+    distance_to_anchor = db.Column(db.SmallInteger, nullable=False, default=0)
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
@@ -54,7 +65,7 @@ class DebtorInfoFetch(db.Model):
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
     __table_args__ = (
-        db.CheckConstraint(distance_to_leaf >= 0),
+        db.CheckConstraint(distance_to_anchor >= 0),
         db.CheckConstraint(attempts_count >= 0),
         db.CheckConstraint(
             or_(attempts_count == 0, latest_attempt_at != null())
