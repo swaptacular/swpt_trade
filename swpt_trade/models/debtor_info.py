@@ -31,20 +31,21 @@ class DebtorInfoDocument(db.Model):
 class AnchorDebtor(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True, autoincrement=False)
     debtor_info_locator = db.Column(db.String)  # NOTE: nulls are allowed!
-    locator_claimed_at = db.Column(db.TIMESTAMP(timezone=True))
+    latest_confirmation_attempt_at = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+    )
     latest_debtor_info_fetch_at = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(
             or_(
                 debtor_info_locator == null(),
-                and_(
-                    locator_claimed_at != null(),
-                    latest_debtor_info_fetch_at != null(),
-                ),
+                latest_debtor_info_fetch_at != null(),
             )
         ),
         db.Index(
-            "idx_anchor_debtor_fetch_at", latest_debtor_info_fetch_at
+            "idx_anchor_debtor_fetch_at",
+            latest_debtor_info_fetch_at,
+            postgresql_where=debtor_info_locator != null(),
         ),
     )
 

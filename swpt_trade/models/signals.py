@@ -135,8 +135,8 @@ class FetchDebtorInfoSignal(Signal):
 
     The `iri` field specifies the Internationalized Resource
     Identifier (IRI) from which the debtor info document should be
-    fetched. When `is_confirmation` is `True`, this request is being
-    made as a step in the debtor-confirmation process.
+    fetched. When `is_confirmation` is `True`, this signal is being
+    sent as a step in the debtor-confirmation process.
     """
     exchange_name = TO_TRADE_EXCHANGE
 
@@ -165,18 +165,18 @@ class FetchDebtorInfoSignal(Signal):
         return current_app.config["APP_FLUSH_FETCH_DEBTOR_INFO_BURST_COUNT"]
 
 
-class LocateDebtorSignal(Signal):
+class DiscoverDebtorSignal(Signal):
     """Starts the debtor-confirmation process for a given debtor.
 
     The `iri` field specifies an Internationalized Resource Identifier
     (IRI), from which a debtor info document for the given debtor can
-    be fetched. Note that normally the given IRI will be not be the
-    same as the debtor's official debtor info locator.
+    be fetched. Note that normally the given IRI will not be the same
+    as the debtor's official debtor info locator.
     """
     exchange_name = TO_TRADE_EXCHANGE
 
     class __marshmallow__(Schema):
-        type = fields.Constant("LocateDebtor")
+        type = fields.Constant("DiscoverDebtor")
         debtor_id = fields.Integer()
         iri = fields.String()
         inserted_at = fields.DateTime(data_key="ts")
@@ -193,12 +193,14 @@ class LocateDebtorSignal(Signal):
 
     @classproperty
     def signalbus_burst_count(self):
-        return current_app.config["APP_FLUSH_LOCATE_DEBTOR_BURST_COUNT"]
+        return current_app.config["APP_FLUSH_DISCOVER_DEBTOR_BURST_COUNT"]
 
 
 class ConfirmDebtorSignal(Signal):
-    """Informs that the given debtor successfully claimed the given
-    debtor info locator.
+    """Finalizes the debtor-confirmation process for a given debtor.
+
+    This signal informs that the given debtor successfully claimed the
+    given debtor info locator.
     """
     exchange_name = TO_TRADE_EXCHANGE
 
