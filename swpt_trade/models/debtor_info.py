@@ -15,37 +15,48 @@ class DebtorInfoDocument(db.Model):
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
     __table_args__ = (
+        db.CheckConstraint(peg_exchange_rate >= 0.0),
         db.CheckConstraint(
             or_(
-                peg_debtor_info_locator == null(),
                 and_(
+                    peg_debtor_info_locator == null(),
+                    peg_debtor_id == null(),
+                    peg_exchange_rate == null(),
+                ),
+                and_(
+                    peg_debtor_info_locator != null(),
                     peg_debtor_id != null(),
                     peg_exchange_rate != null(),
-                    peg_exchange_rate >= 0.0,
                 ),
             )
         ),
     )
 
 
-class AnchorDebtor(db.Model):
+class DebtorLocatorClaim(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True, autoincrement=False)
-    debtor_info_locator = db.Column(db.String)  # NOTE: nulls are allowed!
-    latest_confirmation_attempt_at = db.Column(
+    debtor_info_locator = db.Column(db.String)
+    latest_locator_fetch_at = db.Column(db.TIMESTAMP(timezone=True))
+    latest_discovery_fetch_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
-    latest_debtor_info_fetch_at = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(
             or_(
-                debtor_info_locator == null(),
-                latest_debtor_info_fetch_at != null(),
+                and_(
+                    debtor_info_locator == null(),
+                    latest_locator_fetch_at == null(),
+                ),
+                and_(
+                    debtor_info_locator != null(),
+                    latest_locator_fetch_at != null(),
+                ),
             )
         ),
         db.Index(
-            "idx_anchor_debtor_fetch_at",
-            latest_debtor_info_fetch_at,
-            postgresql_where=debtor_info_locator != null(),
+            "idx_debtor_locator_claim_latest_locator_fetch_at",
+            latest_locator_fetch_at,
+            postgresql_where=latest_locator_fetch_at != null(),
         ),
     )
 
@@ -53,9 +64,9 @@ class AnchorDebtor(db.Model):
 class DebtorInfoFetch(db.Model):
     iri = db.Column(db.String, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    is_locator = db.Column(db.BOOLEAN, nullable=False, default=False)
-    is_confirmation = db.Column(db.BOOLEAN, nullable=False, default=False)
-    distance_to_anchor = db.Column(db.SmallInteger, nullable=False, default=0)
+    is_locator_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
+    is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
+    recursion_level = db.Column(db.SmallInteger, nullable=False, default=0)
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
@@ -66,10 +77,19 @@ class DebtorInfoFetch(db.Model):
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
     __table_args__ = (
-        db.CheckConstraint(distance_to_anchor >= 0),
-        db.CheckConstraint(attempts_count >= 0),
+        db.CheckConstraint(recursion_level >= 0),
         db.CheckConstraint(
-            or_(attempts_count == 0, latest_attempt_at != null())
+            or_(
+                and_(
+                    attempts_count == 0,
+                    latest_attempt_at == null(),
+                    latest_attempt_errorcode == null(),
+                ),
+                and_(
+                    attempts_count > 0,
+                    latest_attempt_at != null(),
+                ),
+            )
         ),
         db.Index("idx_debtor_info_fetch_next_attempt_at", next_attempt_at),
     )

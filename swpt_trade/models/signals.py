@@ -132,11 +132,6 @@ class FinalizeTransferSignal(Signal):
 
 class FetchDebtorInfoSignal(Signal):
     """Requests a debtor info document to be fetched from Internet.
-
-    The `iri` field specifies the Internationalized Resource
-    Identifier (IRI) from which the debtor info document should be
-    fetched. When `is_confirmation` is `True`, this signal is being
-    sent as a step in the debtor-confirmation process.
     """
     exchange_name = TO_TRADE_EXCHANGE
 
@@ -144,8 +139,9 @@ class FetchDebtorInfoSignal(Signal):
         type = fields.Constant("FetchDebtorInfo")
         iri = fields.String()
         debtor_id = fields.Integer()
-        is_confirmation = fields.Boolean()
-        distance_to_anchor = fields.Integer()
+        is_locator_fetch = fields.Boolean()
+        is_discovery_fetch = fields.Boolean()
+        recursion_level = fields.Integer()
         inserted_at = fields.DateTime(data_key="ts")
 
     __marshmallow_schema__ = __marshmallow__()
@@ -153,8 +149,9 @@ class FetchDebtorInfoSignal(Signal):
     signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     iri = db.Column(db.String, nullable=False)
     debtor_id = db.Column(db.BigInteger, nullable=False)
-    is_confirmation = db.Column(db.BOOLEAN, nullable=False)
-    distance_to_anchor = db.Column(db.SmallInteger, nullable=False)
+    is_locator_fetch = db.Column(db.BOOLEAN, nullable=False)
+    is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False)
+    recursion_level = db.Column(db.SmallInteger, nullable=False)
 
     @property
     def routing_key(self):  # pragma: no cover
@@ -171,7 +168,7 @@ class DiscoverDebtorSignal(Signal):
     The `iri` field specifies an Internationalized Resource Identifier
     (IRI), from which a debtor info document for the given debtor can
     be fetched. Note that normally the given IRI will not be the same
-    as the debtor's official debtor info locator.
+    as the debtor's "debtor info locator".
     """
     exchange_name = TO_TRADE_EXCHANGE
 
