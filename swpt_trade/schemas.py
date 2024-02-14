@@ -85,7 +85,7 @@ class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     update_id = fields.Integer(
-        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+        required=True, validate=validate.Range(min=1, max=MAX_INT64)
     )
     account_id = fields.String(
         required=True, validate=validate.Length(max=ACCOUNT_ID_MAX_BYTES)
@@ -114,7 +114,7 @@ class UpdatedPolicyMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     update_id = fields.Integer(
-        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+        required=True, validate=validate.Range(min=1, max=MAX_INT64)
     )
     policy_name = fields.String(load_default=None)
     min_principal = fields.Integer(
@@ -164,7 +164,7 @@ class UpdatedFlagsMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     update_id = fields.Integer(
-        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+        required=True, validate=validate.Range(min=1, max=MAX_INT64)
     )
     config_flags = fields.Integer(
         required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
