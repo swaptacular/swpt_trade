@@ -3,24 +3,76 @@ from marshmallow import (
     fields,
     validate,
     validates,
+    validates_schema,
     ValidationError,
     EXCLUDE,
 )
 from swpt_trade.models import (
+    MAX_INT16,
+    MIN_INT32,
+    MAX_INT32,
     MIN_INT64,
     MAX_INT64,
+    ACCOUNT_ID_MAX_BYTES,
 )
 
 
 class ValidateTypeMixin:
     @validates("type")
     def validate_type(self, value):
-        if f"{value}Schema" != type(self).__name__:
+        if f"{value}MessageSchema" != type(self).__name__:
             raise ValidationError("Invalid type.")
 
 
-class DoDoSomethingMessageSchema(ValidateTypeMixin, Schema):
-    """``DoDoSomething`` message schema."""
+class FetchDebtorInfoMessageSchema(ValidateTypeMixin, Schema):
+    """``FetchDebtorInfo`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    iri = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    is_locator_fetch = fields.Boolean(required=True)
+    is_discovery_fetch = fields.Boolean(required=True)
+    recursion_level = fields.Integer(
+        required=True, validate=validate.Range(min=0, max=MAX_INT16)
+    )
+    ts = fields.DateTime(required=True)
+
+
+class DiscoverDebtorMessageSchema(ValidateTypeMixin, Schema):
+    """``DiscoverDebtor`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    iri = fields.String(required=True)
+    ts = fields.DateTime(required=True)
+
+
+class ConfirmDebtorMessageSchema(ValidateTypeMixin, Schema):
+    """``ConfirmDebtor`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    debtor_info_locator = fields.String(required=True)
+    ts = fields.DateTime(required=True)
+
+
+class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):
+    """``UpdatedLedger`` message schema."""
 
     class Meta:
         unknown = EXCLUDE
@@ -32,3 +84,89 @@ class DoDoSomethingMessageSchema(ValidateTypeMixin, Schema):
     creditor_id = fields.Integer(
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
+    update_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    account_id = fields.String(
+        required=True, validate=validate.Length(max=ACCOUNT_ID_MAX_BYTES)
+    )
+    creation_date = fields.Date(required=True)
+    principal = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    last_transfer_number = fields.Integer(
+        required=True, validate=validate.Range(min=0, max=MAX_INT64)
+    )
+    ts = fields.DateTime(required=True)
+
+
+class UpdatedPolicyMessageSchema(ValidateTypeMixin, Schema):
+    """``UpdatedPolicy`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    update_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    policy_name = fields.String(load_default=None)
+    min_principal = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    max_principal = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    peg_exchange_rate = fields.Float(
+        load_default=None, validate=validate.Range(min=0.0)
+    )
+    peg_debtor_id = fields.Integer(
+        load_default=None,
+        validate=validate.Range(min=MIN_INT64, max=MAX_INT64),
+    )
+    ts = fields.DateTime(required=True)
+
+    @validates_schema
+    def validate_max_principal(self, data, **kwargs):
+        if data["min_principal"] > data["max_principal"]:
+            raise ValidationError(
+                "max_principal must be equal or greater than min_principal."
+            )
+
+    @validates_schema
+    def validate_peg(self, data, **kwargs):
+        a = data["peg_exchange_rate"]
+        b = data["peg_debtor_id"]
+        if (a is None and b is not None) or (a is not None and b is None):
+            raise ValidationError(
+                "peg_exchange_rate and peg_debtor_id fields must both be"
+                " missing, or must both be present."
+            )
+
+
+class UpdatedFlagsMessageSchema(ValidateTypeMixin, Schema):
+    """``UpdatedFlags`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    update_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    config_flags = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    ts = fields.DateTime(required=True)
