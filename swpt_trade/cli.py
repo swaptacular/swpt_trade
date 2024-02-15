@@ -45,7 +45,6 @@ def subscribe():  # pragma: no cover
         TO_TRADE_EXCHANGE,
     )
 
-    CA_TRADE_EXCHANGE = "ca.trade"
     logger = logging.getLogger(__name__)
     queue_name = current_app.config["PROTOCOL_BROKER_QUEUE"]
     routing_key = current_app.config["PROTOCOL_BROKER_QUEUE_ROUTING_KEY"]
@@ -64,23 +63,10 @@ def subscribe():  # pragma: no cover
     channel.exchange_declare(
         TO_TRADE_EXCHANGE, exchange_type="topic", durable=True
     )
-    channel.exchange_declare(
-        CA_TRADE_EXCHANGE, exchange_type="x-random", durable=True
-    )
 
-    # declare exchange bindings
-    channel.exchange_bind(
-        source=TO_TRADE_EXCHANGE,
-        destination=CA_TRADE_EXCHANGE,
-    )
-    logger.info(
-        'Created a binding from "%s" to the "%s" exchange.',
-        TO_TRADE_EXCHANGE,
-        CA_TRADE_EXCHANGE,
-    )
     channel.exchange_bind(
         source=CREDITORS_IN_EXCHANGE,
-        destination=CA_TRADE_EXCHANGE,
+        destination=TO_TRADE_EXCHANGE,
         arguments={
             "x-match": "all",
             "ca-trade": True,
@@ -89,7 +75,7 @@ def subscribe():  # pragma: no cover
     logger.info(
         'Created a binding from "%s" to the "%s" exchange.',
         CREDITORS_IN_EXCHANGE,
-        CA_TRADE_EXCHANGE,
+        TO_TRADE_EXCHANGE,
     )
 
     # declare a corresponding dead-letter queue
@@ -109,13 +95,13 @@ def subscribe():  # pragma: no cover
 
     # bind the queue
     channel.queue_bind(
-        exchange=CA_TRADE_EXCHANGE,
+        exchange=TO_TRADE_EXCHANGE,
         queue=queue_name,
         routing_key=routing_key,
     )
     logger.info(
         'Created a binding from "%s" to "%s" with routing key "%s".',
-        CA_TRADE_EXCHANGE,
+        TO_TRADE_EXCHANGE,
         queue_name,
         routing_key,
     )
