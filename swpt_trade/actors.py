@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Optional
 from datetime import datetime, date, timedelta
 from base64 import b16decode
 from marshmallow import ValidationError
@@ -237,6 +238,52 @@ def _on_finalized_agent_transfer_signal(
     )
 
 
+def _on_updated_ledger_signal(
+    debtor_id: int,
+    creditor_id: int,
+    update_id: int,
+    account_id: str,
+    creation_date: date,
+    principal: int,
+    last_transfer_number: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
+def _on_updated_policy_signal(
+    debtor_id: int,
+    creditor_id: int,
+    update_id: int,
+    policy_name: Optional[str],
+    min_principal: int,
+    max_principal: int,
+    peg_exchange_rate: Optional[float],
+    peg_debtor_id: Optional[int],
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
+def _on_updated_flags_signal(
+    debtor_id: int,
+    creditor_id: int,
+    update_id: int,
+    config_flags: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
 def _on_fetch_debtor_info_signal(
     iri: str,
     debtor_id: int,
@@ -315,6 +362,18 @@ _MESSAGE_TYPES = {
         schemas.ConfirmDebtorMessageSchema(),
         _on_confirm_debtor_signal,
     ),
+    "UpdatedLedger": (
+        schemas.UpdatedLedgerMessageSchema(),
+        _on_updated_ledger_signal,
+    ),
+    "UpdatedPolicy": (
+        schemas.UpdatedPolicyMessageSchema(),
+        _on_updated_policy_signal,
+    ),
+    "UpdatedFlags": (
+        schemas.UpdatedFlagsMessageSchema(),
+        _on_updated_flags_signal,
+    ),
 }
 
 _LOGGER = logging.getLogger(__name__)
@@ -353,9 +412,8 @@ class SmpConsumer(rabbitmq.Consumer):
             _LOGGER.error("Message validation error: %s", str(e))
             return False
 
-        is_smp_message = "creditor_id" in message_content
         if (
-            is_smp_message
+            "creditor_id" in message_content
             and not is_valid_creditor_id(message_content["creditor_id"])
         ):
             raise RuntimeError(
