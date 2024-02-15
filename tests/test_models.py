@@ -5,6 +5,7 @@ from swpt_pythonlib.utils import (
     i64_to_hex_routing_key,
 )
 from swpt_trade import models as m
+from swpt_trade import schemas
 
 
 def test_sibnalbus_burst_count(app):
@@ -35,6 +36,8 @@ def test_non_smp_signals(db_session):
     assert message.properties.app_id == "swpt_trade"
     assert b'https://example.com' in message.body
     assert b'creditor_id' not in message.body
+    data = schemas.FetchDebtorInfoMessageSchema().loads(message.body)
+    assert data['iri'] == "https://example.com"
     assert message.exchange == 'to_trade'
     assert message.routing_key == calc_iri_routing_key("https://example.com")
 
@@ -53,6 +56,8 @@ def test_non_smp_signals(db_session):
     assert message.properties.app_id == "swpt_trade"
     assert b'https://example.com' in message.body
     assert b'creditor_id' not in message.body
+    data = schemas.DiscoverDebtorMessageSchema().loads(message.body)
+    assert data['iri'] == "https://example.com"
     assert message.exchange == 'to_trade'
     assert message.routing_key == calc_bin_routing_key(1)
 
@@ -71,6 +76,8 @@ def test_non_smp_signals(db_session):
     assert message.properties.app_id == "swpt_trade"
     assert b'https://example.com' in message.body
     assert b'creditor_id' not in message.body
+    data = schemas.ConfirmDebtorMessageSchema().loads(message.body)
+    assert data['debtor_info_locator'] == "https://example.com"
     assert message.exchange == 'to_trade'
     assert message.routing_key == calc_bin_routing_key(1)
 
