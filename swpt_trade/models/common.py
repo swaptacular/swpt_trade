@@ -50,22 +50,21 @@ class Signal(db.Model):
     def _create_message(self):  # pragma: no cover
         data = self.__marshmallow_schema__.dump(self)
         message_type = data["type"]
-        creditor_id = data["creditor_id"]
-        debtor_id = data["debtor_id"]
+        headers = {"message-type": message_type}
+        is_smp_message = "creditor_id" in data
 
-        if not is_valid_creditor_id(creditor_id):
-            raise RuntimeError(
-                "The agent is not responsible for this creditor."
-            )
+        if is_smp_message:
+            creditor_id = data["creditor_id"]
+            if not is_valid_creditor_id(creditor_id):
+                raise RuntimeError(
+                    "The agent is not responsible for this creditor."
+                )
+            headers["creditor-id"] = creditor_id
+            headers["debtor-id"] = data["debtor_id"]
 
-        headers = {
-            "message-type": message_type,
-            "debtor-id": debtor_id,
-            "creditor-id": creditor_id,
-        }
-        if "coordinator_id" in data:
-            headers["coordinator-id"] = data["coordinator_id"]
-            headers["coordinator-type"] = data["coordinator_type"]
+            if "coordinator_id" in data:
+                headers["coordinator-id"] = data["coordinator_id"]
+                headers["coordinator-type"] = data["coordinator_type"]
 
         properties = rabbitmq.MessageProperties(
             delivery_mode=2,
@@ -87,7 +86,7 @@ class Signal(db.Model):
             routing_key=self.routing_key,
             body=body,
             properties=properties,
-            mandatory=message_type == "FinalizeTransfer",
+            mandatory=message_type == "FinalizeTransfer" or not is_smp_message,
         )
 
     inserted_at = db.Column(
