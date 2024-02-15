@@ -1,8 +1,11 @@
 from __future__ import annotations
 from flask import current_app
 from marshmallow import Schema, fields
-from swpt_pythonlib.utils import i64_to_hex_routing_key, calc_bin_routing_key
-from swpt_trade.utils import calc_iri_routing_key
+from swpt_pythonlib.utils import (
+    i64_to_hex_routing_key,
+    calc_bin_routing_key,
+    calc_iri_routing_key,
+)
 from swpt_trade.extensions import (
     db,
     CREDITORS_OUT_EXCHANGE,
