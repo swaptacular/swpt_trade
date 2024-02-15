@@ -6,7 +6,7 @@ from marshmallow import ValidationError
 from flask import current_app
 import swpt_pythonlib.protocol_schemas as ps
 from swpt_pythonlib import rabbitmq
-from swpt_trade import procedures
+from swpt_trade import procedures, schemas
 from swpt_trade.models import CT_AGENT, is_valid_creditor_id
 
 
@@ -237,6 +237,43 @@ def _on_finalized_agent_transfer_signal(
     )
 
 
+def _on_fetch_debtor_info_signal(
+    iri: str,
+    debtor_id: int,
+    transfer_id: int,
+    is_locator_fetch: bool,
+    is_discovery_fetch: bool,
+    recursion_level: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
+def _on_discover_debtor_signal(
+    debtor_id: int,
+    iri: str,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
+def _on_confirm_debtor_signal(
+    debtor_id: int,
+    debtor_info_locator: str,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement
+    raise NotImplementedError
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -246,7 +283,10 @@ _MESSAGE_TYPES = {
         ps.AccountUpdateMessageSchema(),
         _on_account_update_signal,
     ),
-    "AccountPurge": (ps.AccountPurgeMessageSchema(), _on_account_purge_signal),
+    "AccountPurge": (
+        ps.AccountPurgeMessageSchema(),
+        _on_account_purge_signal,
+    ),
     "AccountTransfer": (
         ps.AccountTransferMessageSchema(),
         _on_account_transfer_signal,
@@ -262,6 +302,18 @@ _MESSAGE_TYPES = {
     "FinalizedTransfer": (
         ps.FinalizedTransferMessageSchema(),
         _on_finalized_agent_transfer_signal,
+    ),
+    "FetchDebtorInfo": (
+        schemas.FetchDebtorInfoMessageSchema(),
+        _on_fetch_debtor_info_signal,
+    ),
+    "DiscoverDebtor": (
+        schemas.DiscoverDebtorMessageSchema(),
+        _on_discover_debtor_signal,
+    ),
+    "ConfirmDebtor": (
+        schemas.ConfirmDebtorMessageSchema(),
+        _on_confirm_debtor_signal,
     ),
 }
 
@@ -301,7 +353,11 @@ class SmpConsumer(rabbitmq.Consumer):
             _LOGGER.error("Message validation error: %s", str(e))
             return False
 
-        if not is_valid_creditor_id(message_content["creditor_id"]):
+        is_smp_message = "creditor_id" in message_content
+        if (
+            is_smp_message
+            and not is_valid_creditor_id(message_content["creditor_id"])
+        ):
             raise RuntimeError(
                 "The agent is not responsible for this creditor."
             )
