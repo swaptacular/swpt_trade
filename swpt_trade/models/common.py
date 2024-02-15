@@ -47,7 +47,7 @@ class Signal(db.Model):
     def send_signalbus_message(self):  # pragma: no cover
         self.send_signalbus_messages([self])
 
-    def _create_message(self):  # pragma: no cover
+    def _create_message(self):
         data = self.__marshmallow_schema__.dump(self)
         message_type = data["type"]
         headers = {"message-type": message_type}

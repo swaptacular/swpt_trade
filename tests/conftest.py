@@ -40,6 +40,9 @@ def db_session(app):
         "TRUNCATE TABLE configure_account_signal",
         "TRUNCATE TABLE prepare_transfer_signal",
         "TRUNCATE TABLE finalize_transfer_signal",
+        "TRUNCATE TABLE fetch_debtor_info_signal",
+        "TRUNCATE TABLE discover_debtor_signal",
+        "TRUNCATE TABLE confirm_debtor_signal",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
 
