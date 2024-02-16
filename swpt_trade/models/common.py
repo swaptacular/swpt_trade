@@ -101,8 +101,9 @@ class Signal(db.Model):
         if is_smp_message:
             # For SMP messages, we verify that the server which sends
             # the message has been explicitly configured to be
-            # responsible for the given shard. The goal is to prevent
-            # misconfiguration disasters.
+            # responsible for the given creditor. The goal is to
+            # prevent misconfiguration disasters. For other message
+            # types, misconfigurations are not particularly dangerous.
             if not message_belongs_to_this_shard(data):
                 if (
                     current_app.config["DELETE_PARENT_SHARD_RECORDS"]
@@ -113,7 +114,7 @@ class Signal(db.Model):
                     # shards. Therefore we should just ignore it.
                     return None
                 raise RuntimeError(
-                    "The server is not responsible for this shard."
+                    "The server is not responsible for this creditor."
                 )
 
             headers["creditor-id"] = data["creditor_id"]
