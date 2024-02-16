@@ -8,7 +8,7 @@ from flask import current_app
 import swpt_pythonlib.protocol_schemas as ps
 from swpt_pythonlib import rabbitmq
 from swpt_trade import procedures, schemas
-from swpt_trade.models import CT_AGENT, is_valid_creditor_id
+from swpt_trade.models import CT_AGENT, belongs_to_this_shard
 
 
 def _on_rejected_config_signal(
@@ -412,13 +412,8 @@ class SmpConsumer(rabbitmq.Consumer):
             _LOGGER.error("Message validation error: %s", str(e))
             return False
 
-        if (
-            "creditor_id" in message_content
-            and not is_valid_creditor_id(message_content["creditor_id"])
-        ):
-            raise RuntimeError(
-                "The agent is not responsible for this creditor."
-            )
+        if not belongs_to_this_shard(message_content):
+            raise RuntimeError("The server is not responsible for this shard.")
 
         actor(**message_content)
         return True

@@ -9,7 +9,7 @@ from json import dumps
 from typing import List
 from flask_cors import CORS
 from ast import literal_eval
-from swpt_pythonlib.utils import u64_to_i64
+from swpt_pythonlib.utils import u64_to_i64, ShardingRealm
 
 
 def _engine_options(s: str) -> dict:
@@ -224,6 +224,8 @@ class Configuration(metaclass=MetaEnvReader):
     FLUSH_PROCESSES = 1
     FLUSH_PERIOD = 2.0
 
+    DELETE_PARENT_SHARD_RECORDS = False
+
     API_TITLE = "Trade API"
     API_VERSION = "v1"
     OPENAPI_VERSION = "3.0.2"
@@ -271,6 +273,9 @@ def create_app(config_dict={}):
             **app.config["SQLALCHEMY_ENGINE_OPTIONS"],
         },
     }
+    app.config["SHARDING_REALM"] = ShardingRealm(
+        Configuration.PROTOCOL_BROKER_QUEUE_ROUTING_KEY
+    )
     if app.config["APP_ENABLE_CORS"]:
         CORS(
             app,

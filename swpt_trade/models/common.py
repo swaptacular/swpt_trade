@@ -24,15 +24,57 @@ ACCOUNT_ID_MAX_BYTES = 100
 
 CT_AGENT = "agent"
 
+SMP_MESSAGE_TYPES = set([
+    "ConfigureAccount",
+    "RejectedConfig",
+    "AccountUpdate",
+    "PrepareTransfer",
+    "RejectedTransfer",
+    "PreparedTransfer",
+    "FinalizeTransfer",
+    "FinalizedTransfer",
+    "AccountPurge",
+])
+CREDITOR_ID_SHARDED_MESSAGE_TYPES = SMP_MESSAGE_TYPES | set([
+    "UpdatedLedger",
+    "UpdatedPolicy",
+    "UpdatedFlags",
+])
+DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
+    "DiscoverDebtor",
+    "ConfirmDebtor",
+])
+IRI_SHARDED_MESSAGE_TYPES = set([
+    "FetchDebtorInfo",
+])
+
 
 def get_now_utc():
     return datetime.now(tz=timezone.utc)
 
 
-def is_valid_creditor_id(creditor_id: int, match_parent=False) -> bool:
-    min_creditor_id = current_app.config["MIN_CREDITOR_ID"]
-    max_creditor_id = current_app.config["MAX_CREDITOR_ID"]
-    return min_creditor_id <= creditor_id <= max_creditor_id
+def belongs_to_this_shard(data: dict, match_parent: bool = False) -> bool:
+    sharding_realm = current_app.config["SHARDING_REALM"]
+    message_type = data["type"]
+
+    if message_type in CREDITOR_ID_SHARDED_MESSAGE_TYPES:
+        creditor_id = data["creditor_id"]
+        min_creditor_id = current_app.config["MIN_CREDITOR_ID"]
+        max_creditor_id = current_app.config["MAX_CREDITOR_ID"]
+        return (
+            min_creditor_id <= creditor_id <= max_creditor_id
+            and sharding_realm.match(creditor_id, match_parent=match_parent)
+        )
+    elif message_type in DEBTOR_ID_SHARDED_MESSAGE_TYPES:
+        return sharding_realm.match(
+            data["debtor_id"], match_parent=match_parent
+        )
+    elif message_type in IRI_SHARDED_MESSAGE_TYPES:
+        return sharding_realm.match_str(
+            data["iri"], match_parent=match_parent
+        )
+    else:  # pragma: no cover
+        raise RuntimeError("Unknown message type.")
 
 
 class Signal(db.Model):
@@ -49,17 +91,23 @@ class Signal(db.Model):
 
     def _create_message(self):
         data = self.__marshmallow_schema__.dump(self)
+        if not belongs_to_this_shard(data):
+            if (
+                current_app.config["DELETE_PARENT_SHARD_RECORDS"]
+                and belongs_to_this_shard(data, match_parent=True)
+            ):
+                # This message most probably is a left-over from the
+                # previous splitting of the parent shard into children
+                # shards. Therefore we should just ignore it.
+                return None  # pragma: no cover
+            raise RuntimeError("The server is not responsible for this shard.")
+
         message_type = data["type"]
+        is_smp_message = message_type in SMP_MESSAGE_TYPES
         headers = {"message-type": message_type}
-        is_smp_message = "creditor_id" in data
 
         if is_smp_message:
-            creditor_id = data["creditor_id"]
-            if not is_valid_creditor_id(creditor_id):
-                raise RuntimeError(
-                    "The agent is not responsible for this creditor."
-                )
-            headers["creditor-id"] = creditor_id
+            headers["creditor-id"] = data["creditor_id"]
             headers["debtor-id"] = data["debtor_id"]
 
             if "coordinator_id" in data:
