@@ -53,7 +53,10 @@ def get_now_utc():
     return datetime.now(tz=timezone.utc)
 
 
-def belongs_to_this_shard(data: dict, match_parent: bool = False) -> bool:
+def message_belongs_to_this_shard(
+        data: dict,
+        match_parent: bool = False,
+) -> bool:
     sharding_realm = current_app.config["SHARDING_REALM"]
     message_type = data["type"]
 
@@ -91,10 +94,10 @@ class Signal(db.Model):
 
     def _create_message(self):
         data = self.__marshmallow_schema__.dump(self)
-        if not belongs_to_this_shard(data):
+        if not message_belongs_to_this_shard(data):
             if (
                 current_app.config["DELETE_PARENT_SHARD_RECORDS"]
-                and belongs_to_this_shard(data, match_parent=True)
+                and message_belongs_to_this_shard(data, match_parent=True)
             ):
                 # This message most probably is a left-over from the
                 # previous splitting of the parent shard into children

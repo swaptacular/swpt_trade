@@ -8,7 +8,7 @@ from flask import current_app
 import swpt_pythonlib.protocol_schemas as ps
 from swpt_pythonlib import rabbitmq
 from swpt_trade import procedures, schemas
-from swpt_trade.models import CT_AGENT, belongs_to_this_shard
+from swpt_trade.models import CT_AGENT, message_belongs_to_this_shard
 
 
 def _on_rejected_config_signal(
@@ -412,7 +412,7 @@ class SmpConsumer(rabbitmq.Consumer):
             _LOGGER.error("Message validation error: %s", str(e))
             return False
 
-        if not belongs_to_this_shard(message_content):
+        if not message_belongs_to_this_shard(message_content):
             raise RuntimeError("The server is not responsible for this shard.")
 
         actor(**message_content)
