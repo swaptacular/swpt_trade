@@ -27,17 +27,64 @@ def restore_sharding_realm(app):
     app.config["SHARDING_REALM"] = orig_sharding_realm
 
 
-def test_sharding_realm(app, restore_sharding_realm, db_session):
+def test_sharding_realm(app, restore_sharding_realm, db_session, current_ts):
     app.config["SHARDING_REALM"] = ShardingRealm("1.#")
     app.config["DELETE_PARENT_SHARD_RECORDS"] = False
 
-    signal1 = m.ConfirmDebtorSignal(
+    # Sharded by debtor ID
+    assert m.message_belongs_to_this_shard({
+        "type": "DiscoverDebtor",
+        "signal_id": 123,
+        "debtor_id": 1,
+        "iri": "https://example.com",
+        "ts": "2024-01-01T10:00:00Z",
+    })
+    assert not m.message_belongs_to_this_shard({
+        "type": "DiscoverDebtor",
+        "signal_id": 123,
+        "debtor_id": 3,
+        "iri": "https://example.com",
+        "ts": "2024-01-01T10:00:00Z",
+    })
+
+    # Sharded by IRI
+    assert m.message_belongs_to_this_shard({
+        "type": "FetchDebtorInfo",
+        "iri": "https://example.com/test",
+        "debtor_id": 2,
+        "is_locator_fetch": True,
+        "is_discovery_fetch": False,
+        "recursion_level": 5,
+        "ts": "2022-01-01T00:00:00Z",
+    })
+    assert not m.message_belongs_to_this_shard({
+        "type": "FetchDebtorInfo",
+        "iri": "https://example.com/test-other",
+        "debtor_id": 2,
+        "is_locator_fetch": True,
+        "is_discovery_fetch": False,
+        "recursion_level": 5,
+        "ts": "2022-01-01T00:00:00Z",
+    })
+
+    # Sharded by creditor ID
+    signal1 = m.ConfigureAccountSignal(
         debtor_id=1,
-        debtor_info_locator="https://example.com",
+        creditor_id=4294967299,
+        ts=current_ts,
+        seqnum=100,
+        negligible_amount=3.14,
+        config_data="test_config",
+        config_flags=123,
     )  # correct realm
-    signal2 = m.ConfirmDebtorSignal(
-        debtor_id=3,
-        debtor_info_locator="https://example.com",
+    signal2 = m.ConfigureAccountSignal(
+        debtor_id=1,
+        creditor_id=4294967298,
+        ts=current_ts,
+        seqnum=100,
+        negligible_amount=3.14,
+        config_data="test_config",
+        config_flags=123,
     )  # incorrect realm
 
     db_session.add(signal1)

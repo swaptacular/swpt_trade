@@ -94,22 +94,28 @@ class Signal(db.Model):
 
     def _create_message(self):
         data = self.__marshmallow_schema__.dump(self)
-        if not message_belongs_to_this_shard(data):
-            if (
-                current_app.config["DELETE_PARENT_SHARD_RECORDS"]
-                and message_belongs_to_this_shard(data, match_parent=True)
-            ):
-                # This message most probably is a left-over from the
-                # previous splitting of the parent shard into children
-                # shards. Therefore we should just ignore it.
-                return None
-            raise RuntimeError("The server is not responsible for this shard.")
-
         message_type = data["type"]
-        is_smp_message = message_type in SMP_MESSAGE_TYPES
         headers = {"message-type": message_type}
+        is_smp_message = message_type in SMP_MESSAGE_TYPES
 
         if is_smp_message:
+            # For SMP messages, we verify that the server which sends
+            # the message has been explicitly configured to be
+            # responsible for the given shard. The goal is to prevent
+            # misconfiguration disasters.
+            if not message_belongs_to_this_shard(data):
+                if (
+                    current_app.config["DELETE_PARENT_SHARD_RECORDS"]
+                    and message_belongs_to_this_shard(data, match_parent=True)
+                ):
+                    # This message most probably is a left-over from the
+                    # previous splitting of the parent shard into children
+                    # shards. Therefore we should just ignore it.
+                    return None
+                raise RuntimeError(
+                    "The server is not responsible for this shard."
+                )
+
             headers["creditor-id"] = data["creditor_id"]
             headers["debtor-id"] = data["debtor_id"]
 
