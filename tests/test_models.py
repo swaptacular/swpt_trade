@@ -4,6 +4,7 @@ from swpt_pythonlib.utils import (
     calc_bin_routing_key,
     i64_to_hex_routing_key,
 )
+from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade import models as m
 from swpt_trade import schemas
 
@@ -15,6 +16,41 @@ def test_sibnalbus_burst_count(app):
     assert isinstance(m.FetchDebtorInfoSignal.signalbus_burst_count, int)
     assert isinstance(m.DiscoverDebtorSignal.signalbus_burst_count, int)
     assert isinstance(m.ConfirmDebtorSignal.signalbus_burst_count, int)
+
+
+@pytest.fixture()
+def restore_sharding_realm(app):
+    orig_sharding_realm = app.config["SHARDING_REALM"]
+    orig_delete_parent_recs = app.config["DELETE_PARENT_SHARD_RECORDS"]
+    yield
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = orig_delete_parent_recs
+    app.config["SHARDING_REALM"] = orig_sharding_realm
+
+
+def test_sharding_realm(app, restore_sharding_realm, db_session):
+    app.config["SHARDING_REALM"] = ShardingRealm("1.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = False
+
+    signal1 = m.ConfirmDebtorSignal(
+        debtor_id=1,
+        debtor_info_locator="https://example.com",
+    )  # correct realm
+    signal2 = m.ConfirmDebtorSignal(
+        debtor_id=3,
+        debtor_info_locator="https://example.com",
+    )  # incorrect realm
+
+    db_session.add(signal1)
+    db_session.add(signal2)
+    db_session.flush()
+
+    assert signal1._create_message() is not None
+
+    with pytest.raises(RuntimeError):
+        signal2._create_message()
+
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+    assert signal2._create_message() is None
 
 
 def test_non_smp_signals(db_session):

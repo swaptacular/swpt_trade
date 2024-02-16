@@ -102,7 +102,7 @@ class Signal(db.Model):
                 # This message most probably is a left-over from the
                 # previous splitting of the parent shard into children
                 # shards. Therefore we should just ignore it.
-                return None  # pragma: no cover
+                return None
             raise RuntimeError("The server is not responsible for this shard.")
 
         message_type = data["type"]
