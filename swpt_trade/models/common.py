@@ -99,11 +99,6 @@ class Signal(db.Model):
         is_smp_message = message_type in SMP_MESSAGE_TYPES
 
         if is_smp_message:
-            # For SMP messages, we verify that the server which sends
-            # the message has been explicitly configured to be
-            # responsible for the given creditor. The goal is to
-            # prevent misconfiguration disasters. For other message
-            # types, misconfigurations are not particularly dangerous.
             if not message_belongs_to_this_shard(data):
                 if (
                     current_app.config["DELETE_PARENT_SHARD_RECORDS"]
