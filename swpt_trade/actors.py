@@ -287,7 +287,6 @@ def _on_updated_flags_signal(
 def _on_fetch_debtor_info_signal(
     iri: str,
     debtor_id: int,
-    transfer_id: int,
     is_locator_fetch: bool,
     is_discovery_fetch: bool,
     recursion_level: int,
