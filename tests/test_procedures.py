@@ -1,5 +1,5 @@
 import pytest
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from swpt_trade import procedures as p
 from swpt_trade.models import (
     Turn,
@@ -7,6 +7,8 @@ from swpt_trade.models import (
     ConfirmedDebtor,
     CurrencyInfo,
     CollectorSending,
+    DebtorLocatorClaim,
+    FetchDebtorInfoSignal,
     TS0,
 )
 
@@ -32,8 +34,7 @@ def turn_may_exist(request, db_session):
     return request.param
 
 
-def test_start_new_turn_if_possible(turn_may_exist):
-    current_ts = datetime.now(tz=timezone.utc)
+def test_start_new_turn_if_possible(current_ts, turn_may_exist):
     midnight = current_ts.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Successfully starts a new turn.
@@ -230,3 +231,87 @@ def test_try_to_advance_turn_to_phase4(db_session):
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4
     assert all_turns[0].phase_deadline is None
+
+
+def test_discover_debtor(db_session, current_ts):
+    assert len(DebtorLocatorClaim.query.all()) == 0
+    assert len(FetchDebtorInfoSignal.query.all()) == 0
+
+    # Processing a very old message.
+    p.discover_debtor(
+        debtor_id=666,
+        iri="https:/example.com/666",
+        ts=current_ts - timedelta(days=21),
+        locator_claim_expiration_period=timedelta(days=30),
+        max_message_delay=timedelta(days=20),
+    )
+    assert len(DebtorLocatorClaim.query.all()) == 0
+    assert len(FetchDebtorInfoSignal.query.all()) == 0
+
+    # Processing a valid message.
+    p.discover_debtor(
+        debtor_id=666,
+        iri="https:/example.com/666",
+        ts=current_ts,
+        locator_claim_expiration_period=timedelta(days=30),
+        max_message_delay=timedelta(days=20),
+    )
+
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+    assert claims[0].debtor_info_locator is None
+    assert claims[0].latest_locator_fetch_at is None
+    assert claims[0].latest_discovery_fetch_at >= current_ts
+
+    fetch_signals = FetchDebtorInfoSignal.query.all()
+    assert len(fetch_signals) == 1
+    assert fetch_signals[0].iri == "https:/example.com/666"
+    assert fetch_signals[0].debtor_id == 666
+    assert fetch_signals[0].is_locator_fetch is False
+    assert fetch_signals[0].is_discovery_fetch is True
+    assert fetch_signals[0].recursion_level == 0
+
+    # Processing the same valid message again (does nothing).
+    p.discover_debtor(
+        debtor_id=666,
+        iri="https:/example.com/666",
+        ts=current_ts,
+        locator_claim_expiration_period=timedelta(days=30),
+        max_message_delay=timedelta(days=20),
+    )
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert len(FetchDebtorInfoSignal.query.all()) == 1
+
+    # Processing the same valid message again, but this time with
+    # expired debtor locator claim.
+    claims[0].latest_discovery_fetch_at = current_ts - timedelta(days=40)
+    claims[0].debtor_info_locator = "https:/example.com/locator"
+    claims[0].latest_locator_fetch_at = current_ts - timedelta(days=39)
+    db_session.commit()
+
+    p.discover_debtor(
+        debtor_id=666,
+        iri="https:/example.com/777",
+        ts=current_ts,
+        locator_claim_expiration_period=timedelta(days=30),
+        max_message_delay=timedelta(days=20),
+    )
+
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+    assert claims[0].debtor_info_locator == "https:/example.com/locator"
+    assert claims[0].latest_locator_fetch_at == current_ts - timedelta(days=39)
+    assert claims[0].latest_discovery_fetch_at >= current_ts
+
+    fetch_signals = FetchDebtorInfoSignal.query.all()
+    assert len(fetch_signals) == 2
+    fetch_signals.sort(key=lambda signal: signal.iri)
+    assert fetch_signals[0].iri == "https:/example.com/666"
+    assert fetch_signals[1].iri == "https:/example.com/777"
+    assert fetch_signals[1].debtor_id == 666
+    assert fetch_signals[1].is_locator_fetch is False
+    assert fetch_signals[1].is_discovery_fetch is True
+    assert fetch_signals[1].recursion_level == 0

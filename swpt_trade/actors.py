@@ -305,8 +305,17 @@ def _on_discover_debtor_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.discover_debtor(
+        debtor_id=debtor_id,
+        iri=iri,
+        ts=ts,
+        locator_claim_expiration_period=timedelta(
+            days=current_app.config["APP_LOCATOR_CLAIM_EXPIRATION_DAYS"]
+        ),
+        max_message_delay=timedelta(
+            days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
+        ),
+    )
 
 
 def _on_confirm_debtor_signal(
