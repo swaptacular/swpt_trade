@@ -294,8 +294,14 @@ def _on_fetch_debtor_info_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.schedule_debtor_info_fetch(
+        iri=iri,
+        debtor_id=debtor_id,
+        is_locator_fetch=is_locator_fetch,
+        is_discovery_fetch=is_discovery_fetch,
+        recursion_level=recursion_level,
+        ts=ts,
+    )
 
 
 def _on_discover_debtor_signal(

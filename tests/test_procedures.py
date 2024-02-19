@@ -9,6 +9,7 @@ from swpt_trade.models import (
     CollectorSending,
     DebtorLocatorClaim,
     FetchDebtorInfoSignal,
+    DebtorInfoFetch,
     TS0,
 )
 
@@ -231,6 +232,45 @@ def test_try_to_advance_turn_to_phase4(db_session):
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4
     assert all_turns[0].phase_deadline is None
+
+
+def test_schedule_debtor_info_fetch(db_session, current_ts):
+    assert len(DebtorInfoFetch.query.all()) == 0
+
+    p.schedule_debtor_info_fetch(
+        iri="https://example.com/666",
+        debtor_id=666,
+        is_locator_fetch=True,
+        is_discovery_fetch=False,
+        recursion_level=4,
+        ts=current_ts,
+    )
+    fetches = DebtorInfoFetch.query.all()
+    assert len(fetches) == 1
+    assert fetches[0].iri == "https://example.com/666"
+    assert fetches[0].debtor_id == 666
+    assert fetches[0].is_locator_fetch is True
+    assert fetches[0].is_discovery_fetch is False
+    assert fetches[0].recursion_level == 4
+    assert fetches[0].attempts_count == 0
+
+    # Schedule a fetch for the same IRI and debtor ID.
+    p.schedule_debtor_info_fetch(
+        iri="https://example.com/666",
+        debtor_id=666,
+        is_locator_fetch=False,
+        is_discovery_fetch=True,
+        recursion_level=2,
+        ts=current_ts,
+    )
+    fetches = DebtorInfoFetch.query.all()
+    assert len(fetches) == 1
+    assert fetches[0].iri == "https://example.com/666"
+    assert fetches[0].debtor_id == 666
+    assert fetches[0].is_locator_fetch is True
+    assert fetches[0].is_discovery_fetch is True
+    assert fetches[0].recursion_level == 2
+    assert fetches[0].attempts_count == 0
 
 
 def test_discover_and_confirm_debtor(db_session, current_ts):

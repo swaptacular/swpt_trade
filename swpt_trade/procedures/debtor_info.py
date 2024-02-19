@@ -4,10 +4,46 @@ from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorLocatorClaim,
     FetchDebtorInfoSignal,
+    DebtorInfoFetch,
 )
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
+
+
+@atomic
+def schedule_debtor_info_fetch(
+        *,
+        iri: str,
+        debtor_id: int,
+        is_locator_fetch: bool,
+        is_discovery_fetch: bool,
+        recursion_level: int,
+        ts: datetime,
+) -> None:
+    debtor_info_fetch = (
+        DebtorInfoFetch.query
+        .filter_by(iri=iri, debtor_id=debtor_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if debtor_info_fetch:
+        debtor_info_fetch.is_locator_fetch |= is_locator_fetch
+        debtor_info_fetch.is_discovery_fetch |= is_discovery_fetch
+        debtor_info_fetch.recursion_level = min(
+            recursion_level, debtor_info_fetch.recursion_level
+        )
+    else:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                DebtorInfoFetch(
+                    iri=iri,
+                    debtor_id=debtor_id,
+                    is_locator_fetch=is_locator_fetch,
+                    is_discovery_fetch=is_discovery_fetch,
+                    recursion_level=recursion_level,
+                )
+            )
 
 
 @atomic
