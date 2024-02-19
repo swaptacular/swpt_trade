@@ -17,15 +17,8 @@ def discover_debtor(
         iri: str,
         ts: datetime,
         locator_claim_expiration_period: timedelta,
-        max_message_delay: timedelta,
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
-    message_delay = current_ts - ts
-
-    if message_delay > max_message_delay:
-        # We should ignore this message because it is too old.
-        return
-
     locator_claim = (
         DebtorLocatorClaim.query
         .filter_by(debtor_id=debtor_id)

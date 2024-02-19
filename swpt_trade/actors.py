@@ -312,9 +312,6 @@ def _on_discover_debtor_signal(
         locator_claim_expiration_period=timedelta(
             days=current_app.config["APP_LOCATOR_CLAIM_EXPIRATION_DAYS"]
         ),
-        max_message_delay=timedelta(
-            days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
-        ),
     )
 
 

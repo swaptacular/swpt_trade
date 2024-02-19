@@ -237,24 +237,12 @@ def test_discover_debtor(db_session, current_ts):
     assert len(DebtorLocatorClaim.query.all()) == 0
     assert len(FetchDebtorInfoSignal.query.all()) == 0
 
-    # Processing a very old message.
-    p.discover_debtor(
-        debtor_id=666,
-        iri="https:/example.com/666",
-        ts=current_ts - timedelta(days=21),
-        locator_claim_expiration_period=timedelta(days=30),
-        max_message_delay=timedelta(days=20),
-    )
-    assert len(DebtorLocatorClaim.query.all()) == 0
-    assert len(FetchDebtorInfoSignal.query.all()) == 0
-
-    # Processing a valid message.
+    # Processing a message.
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
         locator_claim_expiration_period=timedelta(days=30),
-        max_message_delay=timedelta(days=20),
     )
 
     claims = DebtorLocatorClaim.query.all()
@@ -272,20 +260,19 @@ def test_discover_debtor(db_session, current_ts):
     assert fetch_signals[0].is_discovery_fetch is True
     assert fetch_signals[0].recursion_level == 0
 
-    # Processing the same valid message again (does nothing).
+    # Processing the same message again (does nothing).
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
         locator_claim_expiration_period=timedelta(days=30),
-        max_message_delay=timedelta(days=20),
     )
     claims = DebtorLocatorClaim.query.all()
     assert len(claims) == 1
     assert len(FetchDebtorInfoSignal.query.all()) == 1
 
-    # Processing the same valid message again, but this time with
-    # expired debtor locator claim.
+    # Processing the same message again, but this time with expired
+    # debtor locator claim.
     claims[0].latest_discovery_fetch_at = current_ts - timedelta(days=40)
     claims[0].debtor_info_locator = "https:/example.com/locator"
     claims[0].latest_locator_fetch_at = current_ts - timedelta(days=39)
@@ -296,7 +283,6 @@ def test_discover_debtor(db_session, current_ts):
         iri="https:/example.com/777",
         ts=current_ts,
         locator_claim_expiration_period=timedelta(days=30),
-        max_message_delay=timedelta(days=20),
     )
 
     claims = DebtorLocatorClaim.query.all()
