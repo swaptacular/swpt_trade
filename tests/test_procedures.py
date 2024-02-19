@@ -233,11 +233,11 @@ def test_try_to_advance_turn_to_phase4(db_session):
     assert all_turns[0].phase_deadline is None
 
 
-def test_discover_debtor(db_session, current_ts):
+def test_discover_and_confirm_debtor(db_session, current_ts):
     assert len(DebtorLocatorClaim.query.all()) == 0
     assert len(FetchDebtorInfoSignal.query.all()) == 0
 
-    # Processing a message.
+    # Process a discover message.
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
@@ -260,7 +260,7 @@ def test_discover_debtor(db_session, current_ts):
     assert fetch_signals[0].is_discovery_fetch is True
     assert fetch_signals[0].recursion_level == 0
 
-    # Processing the same message again (does nothing).
+    # Process the same discover message again (does nothing).
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
@@ -271,8 +271,53 @@ def test_discover_debtor(db_session, current_ts):
     assert len(claims) == 1
     assert len(FetchDebtorInfoSignal.query.all()) == 1
 
-    # Processing the same message again, but this time with expired
-    # debtor locator claim.
+    # Process a confirm message.
+    p.confirm_debtor(
+        debtor_id=666,
+        debtor_info_locator="https:/example.com/old-locator",
+        ts=current_ts + timedelta(seconds=10),
+        max_message_delay=timedelta(days=14),
+    )
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+    assert claims[0].debtor_info_locator == "https:/example.com/old-locator"
+    assert (
+        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=10)
+    )
+
+    # Process another confirm message for this debtor.
+    p.confirm_debtor(
+        debtor_id=666,
+        debtor_info_locator="https:/example.com/locator",
+        ts=current_ts + timedelta(seconds=30),
+        max_message_delay=timedelta(days=14),
+    )
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+    assert claims[0].debtor_info_locator == "https:/example.com/locator"
+    assert (
+        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=30)
+    )
+
+    # Process a very old confirm message (does nothing).
+    p.confirm_debtor(
+        debtor_id=666,
+        debtor_info_locator="https:/example.com/very-old-locator",
+        ts=current_ts - timedelta(days=15),
+        max_message_delay=timedelta(days=14),
+    )
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+    assert claims[0].debtor_info_locator == "https:/example.com/locator"
+    assert (
+        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=30)
+    )
+
+    # Process the same discover message again, but this time with
+    # expired debtor locator claim.
     claims[0].latest_discovery_fetch_at = current_ts - timedelta(days=40)
     claims[0].debtor_info_locator = "https:/example.com/locator"
     claims[0].latest_locator_fetch_at = current_ts - timedelta(days=39)
@@ -301,3 +346,17 @@ def test_discover_debtor(db_session, current_ts):
     assert fetch_signals[1].is_locator_fetch is False
     assert fetch_signals[1].is_discovery_fetch is True
     assert fetch_signals[1].recursion_level == 0
+
+    # Process a confirm message for another debtor.
+    p.confirm_debtor(
+        debtor_id=1234,
+        debtor_info_locator="https:/example.com/locator1234",
+        ts=current_ts,
+        max_message_delay=timedelta(days=14),
+    )
+    claims = DebtorLocatorClaim.query.all()
+    assert len(claims) == 2
+    claims.sort(key=lambda claim: claim.debtor_id)
+    assert claims[1].debtor_id == 1234
+    assert claims[1].debtor_info_locator == "https:/example.com/locator1234"
+    assert claims[1].latest_locator_fetch_at == current_ts

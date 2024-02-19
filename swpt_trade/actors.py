@@ -322,8 +322,14 @@ def _on_confirm_debtor_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.confirm_debtor(
+        debtor_id=debtor_id,
+        debtor_info_locator=debtor_info_locator,
+        ts=ts,
+        max_message_delay=timedelta(
+            days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
+        ),
+    )
 
 
 _MESSAGE_TYPES = {
