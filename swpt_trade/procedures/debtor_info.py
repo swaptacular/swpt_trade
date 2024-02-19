@@ -22,13 +22,12 @@ def discover_debtor(
     locator_claim = (
         DebtorLocatorClaim.query
         .filter_by(debtor_id=debtor_id)
-        .with_for_update()
         .one_or_none()
     )
     if locator_claim:
         age = current_ts - locator_claim.latest_discovery_fetch_at
         if age < locator_claim_expiration_period:
-            # We should ignore this message, because the existing
+            # We should ignore this message because the existing
             # locator claim is still valid.
             return
         locator_claim.latest_discovery_fetch_at = current_ts
