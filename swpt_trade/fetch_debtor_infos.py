@@ -78,18 +78,22 @@ def _perform_debtor_info_fetches(
                 )
 
             if fetch.is_locator_fetch and fetch.iri == debtor_info_locator:
+                peg_debtor_info_locator = document.peg_debtor_info_locator
+                peg_debtor_id = document.peg_debtor_id
+                recursion_level = fetch.recursion_level
+
                 if (
-                    document.peg_debtor_info_locator is not None
-                    and document.peg_debtor_id is not None
-                    and fetch.recursion_level < max_distance_to_base
+                    peg_debtor_info_locator is not None
+                    and peg_debtor_id is not None
+                    and recursion_level < max_distance_to_base
                 ):
                     db.session.add(
                         FetchDebtorInfoSignal(
-                            iri=document.peg_debtor_info_locator,
-                            debtor_id=document.peg_debtor_id,
+                            iri=peg_debtor_info_locator,
+                            debtor_id=peg_debtor_id,
                             is_locator_fetch=True,
                             is_discovery_fetch=False,
-                            recursion_level=fetch.recursion_level + 1,
+                            recursion_level=recursion_level + 1,
                         )
                     )
                 documents.append(document)
