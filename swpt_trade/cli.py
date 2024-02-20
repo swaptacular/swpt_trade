@@ -17,6 +17,7 @@ from swpt_pythonlib.multiproc_utils import (
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
 from swpt_trade import procedures
+from swpt_trade.fetch_debtor_infos import perform_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
 
@@ -327,7 +328,7 @@ def consume_chore_messages(
     "--processes",
     type=int,
     help=(
-        "Then umber of worker processes."
+        "The number of worker processes."
         " If not specified, the value of the FLUSH_PROCESSES environment"
         " variable will be used, defaulting to 1 if empty."
     ),
@@ -419,6 +420,134 @@ def flush_messages(
         models_to_flush=models_to_flush,
         wait=(
             wait if wait is not None else current_app.config["FLUSH_PERIOD"]
+        ),
+    )
+    sys.exit(1)
+
+
+@swpt_trade.command("fetch_debtor_infos")
+@with_appcontext
+@click.option(
+    "-p",
+    "--processes",
+    type=int,
+    help=(
+        "The number of worker processes."
+        " If not specified, the value of the FETCH_PROCESSES environment"
+        " variable will be used, defaulting to 1 if empty."
+    ),
+)
+@click.option(
+    "-c",
+    "--connections",
+    type=int,
+    help=(
+        "The maximum number of HTTP connections that each worker process"
+        " will initiate simultaneously. If not specified, the value of"
+        " the FETCH_CONNECTIONS environment variable will be used,"
+        " defaulting to 100 if empty."
+    ),
+)
+@click.option(
+    "-t",
+    "--timeout",
+    type=float,
+    help=(
+        "The number of seconds to wait for a response, before the HTTP"
+        " request is cancelled. If not specified, the value of the "
+        " FETCH_TIMEOUT environment variable will be used, defaulting"
+        " to 10 seconds if empty."
+    ),
+)
+@click.option(
+    "-w",
+    "--wait",
+    type=float,
+    help=(
+        "Poll the database for scheduled requests every FLOAT seconds."
+        " If not specified, the value of the FETCH_PERIOD environment"
+        " variable will be used, defaulting to 2 seconds if empty."
+    ),
+)
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def fetch_debtor_infos(
+    processes: int,
+    connections: int,
+    timeout: float,
+    wait: float,
+    quit_early: bool,
+) -> None:
+    """Perform scheduled HTTP requests to fetch debtor info documents.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Started fetching debtor info documents.")
+
+    def _fetch(
+            connections: int,
+            timeout: float,
+            wait: float,
+    ) -> None:  # pragma: no cover
+        from swpt_trade import create_app
+
+        app = create_app()
+        stopped = False
+
+        def stop(signum: Any = None, frame: Any = None) -> None:
+            nonlocal stopped
+            stopped = True
+
+        for sig in HANDLED_SIGNALS:
+            signal.signal(sig, stop)
+        try_unblock_signals()
+
+        with app.app_context():
+            while not stopped:
+                started_at = time.time()
+                try:
+                    count = perform_debtor_info_fetches(connections, timeout)
+                except Exception:
+                    logger.exception(
+                        "Caught error while fetching debtor info documents."
+                    )
+                    sys.exit(1)
+
+                if count > 0:
+                    logger.info(
+                        "%i debtor info documents have been fetched.", count
+                    )
+                else:
+                    logger.debug("0 debtor info documents have been fetched.")
+
+                if quit_early:
+                    break
+                time.sleep(max(0.0, wait + started_at - time.time()))
+
+    spawn_worker_processes(
+        processes=(
+            processes
+            if processes is not None
+            else current_app.config["FETCH_PROCESSES"]
+        ),
+        target=_fetch,
+        connections=(
+            connections
+            if connections is not None
+            else current_app.config["FETCH_CONNECTIONS"]
+        ),
+        timeout=(
+            timeout
+            if timeout is not None
+            else current_app.config["FETCH_TIMEOUT"]
+        ),
+        wait=(
+            wait
+            if wait is not None
+            else current_app.config["FETCH_PERIOD"]
         ),
     )
     sys.exit(1)

@@ -124,10 +124,7 @@ case $1 in
         generate_oathkeeper_configuration
         exec supervisord -c "$APP_ROOT_DIR/supervisord-webserver.conf"
         ;;
-    consume_messages)
-        exec flask swpt_trade "$@"
-        ;;
-    consume_chore_messages)
+    consume_messages | consume_chore_messages | roll_turns | fetch_debtor_infos)
         exec flask swpt_trade "$@"
         ;;
     flush_configure_accounts | flush_prepare_transfers | flush_finalize_transfers \
