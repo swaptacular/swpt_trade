@@ -113,7 +113,8 @@ def _perform_debtor_info_fetches(
 
 def _query_debtor_info_fetches(max_count: int) -> List[DebtorInfoFetch]:
     # TODO: Join DebtorInfoFetch with DebtorInfoDocument and eliminate
-    #       unnecessary fetches.
+    #       unnecessary fetches (including left-over fetches from the
+    #       parent shard).
     current_ts = datetime.now(tz=timezone.utc)
     return (
         DebtorInfoFetch.query
