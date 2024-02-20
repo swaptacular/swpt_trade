@@ -26,12 +26,16 @@ class FetchResult:
 def perform_debtor_info_fetches(connections: int, timeout: float) -> int:
     count = 0
     burst_count = current_app.config["APP_DEBTOR_INFO_FETCH_BURST_COUNT"]
+    max_distance_to_base = current_app.config["MAX_DISTANCE_TO_BASE"]
     assert burst_count > 0
     assert connections > 0
     assert timeout > 0.0
+    assert max_distance_to_base > 1
 
     while True:
-        n = _perform_debtor_info_fetches(burst_count, connections, timeout)
+        n = _perform_debtor_info_fetches(
+            burst_count, connections, timeout, max_distance_to_base
+        )
         count += n
         if n < burst_count:
             break
@@ -44,8 +48,8 @@ def _perform_debtor_info_fetches(
         burst_count: int,
         connections: int,
         timeout: float,
+        max_distance_to_base: int,
 ) -> int:
-    max_distance_to_base = current_app.config["MAX_DISTANCE_TO_BASE"]
     fetches = _query_debtor_info_fetches(burst_count)
     fetch_results = _perform_fetches(fetches)
     documents: List[DebtorInfoDocument] = []
