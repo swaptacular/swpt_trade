@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timedelta
 from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 from .common import get_now_utc
@@ -31,6 +32,18 @@ class DebtorInfoDocument(db.Model):
             )
         ),
     )
+
+    def has_expired(
+            self,
+            current_ts: datetime,
+            expiration_period: timedelta,
+    ) -> bool:
+        frozen_until = self.will_not_change_until
+        is_frozen = frozen_until is not None and frozen_until > current_ts
+        return (
+            not is_frozen
+            and current_ts - self.fetched_at < expiration_period
+        )
 
 
 class DebtorLocatorClaim(db.Model):
