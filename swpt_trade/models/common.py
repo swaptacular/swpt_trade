@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from flask import current_app
 from swpt_trade.extensions import db, publisher
 from swpt_pythonlib import rabbitmq
+from swpt_pythonlib.utils import ShardingRealm
 
 MIN_INT16 = -1 << 15
 MAX_INT16 = (1 << 15) - 1
@@ -51,7 +52,7 @@ DEBTOR_INFO_LOCATOR_SHARDED_MESSAGE_TYPES = set([
 ])
 
 
-def get_now_utc():
+def get_now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
@@ -59,7 +60,7 @@ def message_belongs_to_this_shard(
         data: dict,
         match_parent: bool = False,
 ) -> bool:
-    sharding_realm = current_app.config["SHARDING_REALM"]
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     message_type = data["type"]
 
     if message_type in CREDITOR_ID_SHARDED_MESSAGE_TYPES:

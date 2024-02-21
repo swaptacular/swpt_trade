@@ -1,7 +1,8 @@
 from typing import TypeVar, Callable, Tuple, List, Optional
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import current_app
+from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorInfoFetch,
@@ -29,15 +30,10 @@ class FetchResult:
 def perform_debtor_info_fetches(connections: int, timeout: float) -> int:
     count = 0
     burst_count = current_app.config["APP_DEBTOR_INFO_FETCH_BURST_COUNT"]
-    max_distance_to_base = current_app.config["MAX_DISTANCE_TO_BASE"]
-    assert burst_count > 0
-    assert max_distance_to_base > 1
-    assert connections > 0
-    assert timeout > 0.0
 
     while True:
         n = _perform_debtor_info_fetches_burst(
-            burst_count, max_distance_to_base, connections, timeout
+            burst_count, connections, timeout
         )
         count += n
         if n < burst_count:
@@ -49,10 +45,15 @@ def perform_debtor_info_fetches(connections: int, timeout: float) -> int:
 @atomic
 def _perform_debtor_info_fetches_burst(
         burst_count: int,
-        max_distance_to_base: int,
         connections: int,
         timeout: float,
 ) -> int:
+    max_distance_to_base = current_app.config["MAX_DISTANCE_TO_BASE"]
+    assert max_distance_to_base > 1
+    assert burst_count > 0
+    assert connections > 0
+    assert timeout > 0.0
+
     fetch_results = _resolve_debtor_info_fetches(burst_count)
 
     for r in fetch_results:
@@ -153,9 +154,10 @@ def _resolve_debtor_info_fetches(max_count: int) -> List[FetchResult]:
 
 def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
     current_ts = datetime.now(tz=timezone.utc)
-    sharding_realm = current_app.config["SHARDING_REALM"]
-    exp_period = current_app.config["APP_DEBTOR_INFO_EXPIRATION_DAYS"]
-
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    exp_period = timedelta(
+        days=current_app.config["APP_DEBTOR_INFO_EXPIRATION_DAYS"]
+    )
     wrong_shard: List[FetchTuple] = []
     cached: List[FetchTuple] = []
     new: List[FetchTuple] = []
