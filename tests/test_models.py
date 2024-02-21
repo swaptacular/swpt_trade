@@ -16,6 +16,7 @@ def test_sibnalbus_burst_count(app):
     assert isinstance(m.FetchDebtorInfoSignal.signalbus_burst_count, int)
     assert isinstance(m.DiscoverDebtorSignal.signalbus_burst_count, int)
     assert isinstance(m.ConfirmDebtorSignal.signalbus_burst_count, int)
+    assert isinstance(m.StoreDocumentSignal.signalbus_burst_count, int)
 
 
 @pytest.fixture()
@@ -45,6 +46,20 @@ def test_sharding_realm(app, restore_sharding_realm, db_session, current_ts):
         "debtor_id": 3,
         "iri": "https://example.com",
         "ts": "2024-01-01T10:00:00Z",
+    })
+
+    # Sharded by debtor_info_locator
+    assert m.message_belongs_to_this_shard({
+        "type": "StoreDocument",
+        "debtor_info_locator": "https://example.com/test",
+        "debtor_id": 2,
+        "ts": "2022-01-01T00:00:00Z",
+    })
+    assert not m.message_belongs_to_this_shard({
+        "type": "StoreDocument",
+        "debtor_info_locator": "https://example.com/test-other",
+        "debtor_id": 2,
+        "ts": "2022-01-01T00:00:00Z",
     })
 
     # Sharded by IRI

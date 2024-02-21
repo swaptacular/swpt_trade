@@ -128,13 +128,14 @@ case $1 in
         exec flask swpt_trade "$@"
         ;;
     flush_configure_accounts | flush_prepare_transfers | flush_finalize_transfers \
-        | flush_fetch_debtor_infos | flush_discover_debtors | flush_confirm_debtors \
-        | flush_all)
+        | flush_fetch_debtor_infos | flush_store_documents | flush_discover_debtors \
+        | flush_confirm_debtors | flush_all)
 
         flush_configure_accounts=ConfigureAccountSignal
         flush_prepare_transfers=PrepareTransferSignal
         flush_finalize_transfers=FinalizeTransferSignal
         flush_fetch_debtor_infos=FetchDebtorInfoSignal
+        flush_store_documents=StoreDocumentSignal
         flush_discover_debtors=DiscoverDebtorSignal
         flush_confirm_debtors=ConfirmDebtorSignal
         flush_all=

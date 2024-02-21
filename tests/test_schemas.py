@@ -273,6 +273,77 @@ def test_fetch_debtor_info_message():
                    for m in e.messages.values())
 
 
+def test_store_document_message():
+    s = schemas.StoreDocumentMessageSchema()
+
+    data = s.loads("""{
+    "type": "StoreDocument",
+    "debtor_info_locator": "https://example.com/test",
+    "debtor_id": 2,
+    "peg_debtor_info_locator": "https://example.com/test2",
+    "peg_debtor_id": 22,
+    "peg_exchange_rate": 3.14,
+    "will_not_change_until": "2032-01-01T00:00:00Z",
+    "ts": "2022-01-01T00:00:00Z",
+    "unknown": "ignored"
+    }""")
+
+    assert data['type'] == 'StoreDocument'
+    assert data['debtor_info_locator'] == 'https://example.com/test'
+    assert data['debtor_id'] == 2
+    assert type(data['debtor_id']) is int
+    assert data['peg_debtor_info_locator'] == 'https://example.com/test2'
+    assert data['peg_debtor_id'] == 22
+    assert type(data['peg_debtor_id']) is int
+    assert data['peg_exchange_rate'] == 3.14
+    assert data['will_not_change_until'] == datetime.fromisoformat(
+        '2032-01-01T00:00:00+00:00'
+    )
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+    assert "unknown" not in data
+
+    data = s.loads("""{
+    "type": "StoreDocument",
+    "debtor_info_locator": "https://example.com/test",
+    "debtor_id": 2,
+    "ts": "2022-01-01T00:00:00Z"
+    }""")
+
+    assert data['type'] == 'StoreDocument'
+    assert data['debtor_info_locator'] == 'https://example.com/test'
+    assert data['debtor_id'] == 2
+    assert type(data['debtor_id']) is int
+    assert data['peg_debtor_info_locator'] is None
+    assert data['peg_debtor_id'] is None
+    assert data['peg_exchange_rate'] is None
+    assert data['will_not_change_until'] is None
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+
+    with pytest.raises(ValidationError, match='or must all be present'):
+        s.loads("""{
+        "type": "StoreDocument",
+        "debtor_info_locator": "https://example.com/test",
+        "debtor_id": 2,
+        "peg_debtor_info_locator": "https://example.com/test2",
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Invalid type.'):
+        s.loads("""{
+        "type": "WrongType",
+        "debtor_info_locator": "https://example.com/test",
+        "debtor_id": 2,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == len(data) - 4
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+
 def test_discover_debtor_message():
     s = schemas.DiscoverDebtorMessageSchema()
 

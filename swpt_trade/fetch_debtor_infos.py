@@ -2,13 +2,13 @@ from typing import TypeVar, Callable, List, Iterable, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from flask import current_app
-from sqlalchemy import select, insert
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorInfoFetch,
     DebtorInfoDocument,
     ConfirmDebtorSignal,
     FetchDebtorInfoSignal,
+    StoreDocumentSignal,
 )
 
 T = TypeVar("T")
@@ -52,7 +52,6 @@ def _perform_debtor_info_fetches(
 ) -> int:
     fetches = _query_debtor_info_fetches(burst_count)
     fetch_results = _perform_fetches(fetches)
-    documents: List[DebtorInfoDocument] = []
 
     for r in fetch_results:
         fetch = r.fetch
@@ -61,8 +60,8 @@ def _perform_debtor_info_fetches(
 
         if document:
             assert not retry
-            debtor_id = document.debtor_id
             debtor_info_locator = document.debtor_info_locator
+            debtor_id = document.debtor_id
 
             if fetch.is_discovery_fetch and fetch.debtor_id == debtor_id:
                 db.session.add(
@@ -84,11 +83,13 @@ def _perform_debtor_info_fetches(
             if fetch.is_locator_fetch and fetch.iri == debtor_info_locator:
                 peg_debtor_info_locator = document.peg_debtor_info_locator
                 peg_debtor_id = document.peg_debtor_id
+                peg_exchange_rate = document.peg_exchange_rate
                 recursion_level = fetch.recursion_level
 
                 if (
                     peg_debtor_info_locator is not None
                     and peg_debtor_id is not None
+                    and peg_exchange_rate is not None
                     and recursion_level < max_distance_to_base
                 ):
                     db.session.add(
@@ -100,14 +101,22 @@ def _perform_debtor_info_fetches(
                             recursion_level=recursion_level + 1,
                         )
                     )
-                documents.append(document)
+                db.session.add(
+                    StoreDocumentSignal(
+                        debtor_info_locator=debtor_info_locator,
+                        debtor_id=debtor_id,
+                        peg_debtor_info_locator=peg_debtor_info_locator,
+                        peg_debtor_id=peg_debtor_id,
+                        peg_exchange_rate=peg_exchange_rate,
+                        will_not_change_until=document.will_not_change_until,
+                    )
+                )
 
         if retry:
             _retry_fetch(fetch)
         else:
             db.session.delete(fetch)
 
-    _save_debtor_info_documents(documents)
     return len(fetches)
 
 
@@ -128,11 +137,6 @@ def _query_debtor_info_fetches(max_count: int) -> List[DebtorInfoFetch]:
 def _perform_fetches(it: Iterable[DebtorInfoFetch]) -> List[FetchResult]:
     # TODO: Add a real implementation.
     return []
-
-
-def _save_debtor_info_documents(documents: List[DebtorInfoDocument]) -> None:
-    # TODO: Add a real implementation.
-    pass
 
 
 def _retry_fetch(fetch: DebtorInfoFetch) -> None:

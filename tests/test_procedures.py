@@ -10,6 +10,7 @@ from swpt_trade.models import (
     DebtorLocatorClaim,
     FetchDebtorInfoSignal,
     DebtorInfoFetch,
+    DebtorInfoDocument,
     TS0,
 )
 
@@ -232,6 +233,72 @@ def test_try_to_advance_turn_to_phase4(db_session):
     assert len(all_turns) == 1
     assert all_turns[0].phase == 4
     assert all_turns[0].phase_deadline is None
+
+
+def test_store_document(db_session, current_ts):
+    assert len(DebtorInfoDocument.query.all()) == 0
+
+    # Insert
+    p.store_document(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=666,
+        peg_debtor_info_locator="https://example.com/777",
+        peg_debtor_id=777,
+        peg_exchange_rate=3.14,
+        will_not_change_until=current_ts + timedelta(days=100),
+        ts=current_ts,
+    )
+    documents = DebtorInfoDocument.query.all()
+    assert len(documents) == 1
+    assert documents[0].debtor_info_locator == "https://example.com/666"
+    assert documents[0].debtor_id == 666
+    assert documents[0].peg_debtor_info_locator == "https://example.com/777"
+    assert documents[0].peg_debtor_id == 777
+    assert documents[0].peg_exchange_rate == 3.14
+    assert documents[0].will_not_change_until == (
+        current_ts + timedelta(days=100)
+    )
+    assert documents[0].fetched_at == current_ts
+
+    # Update
+    p.store_document(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=999,
+        peg_debtor_info_locator=None,
+        peg_debtor_id=None,
+        peg_exchange_rate=None,
+        will_not_change_until=None,
+        ts=current_ts + timedelta(seconds=60),
+    )
+    documents = DebtorInfoDocument.query.all()
+    assert len(documents) == 1
+    assert documents[0].debtor_info_locator == "https://example.com/666"
+    assert documents[0].debtor_id == 999
+    assert documents[0].peg_debtor_info_locator is None
+    assert documents[0].peg_debtor_id is None
+    assert documents[0].peg_exchange_rate is None
+    assert documents[0].will_not_change_until is None
+    assert documents[0].fetched_at == current_ts + timedelta(seconds=60)
+
+    # Old document (does nothing)
+    p.store_document(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=666,
+        peg_debtor_info_locator="https://example.com/777",
+        peg_debtor_id=777,
+        peg_exchange_rate=3.14,
+        will_not_change_until=current_ts + timedelta(days=100),
+        ts=current_ts,
+    )
+    documents = DebtorInfoDocument.query.all()
+    assert len(documents) == 1
+    assert documents[0].debtor_info_locator == "https://example.com/666"
+    assert documents[0].debtor_id == 999
+    assert documents[0].peg_debtor_info_locator is None
+    assert documents[0].peg_debtor_id is None
+    assert documents[0].peg_exchange_rate is None
+    assert documents[0].will_not_change_until is None
+    assert documents[0].fetched_at == current_ts + timedelta(seconds=60)
 
 
 def test_schedule_debtor_info_fetch(db_session, current_ts):

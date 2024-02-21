@@ -43,6 +43,43 @@ class FetchDebtorInfoMessageSchema(ValidateTypeMixin, Schema):
     ts = fields.DateTime(required=True)
 
 
+class StoreDocumentMessageSchema(ValidateTypeMixin, Schema):
+    """``StoreDocument`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    debtor_info_locator = fields.String(required=True)
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    peg_debtor_info_locator = fields.String(load_default=None)
+    peg_debtor_id = fields.Integer(
+        load_default=None,
+        validate=validate.Range(min=MIN_INT64, max=MAX_INT64),
+    )
+    peg_exchange_rate = fields.Float(
+        load_default=None, validate=validate.Range(min=0.0)
+    )
+    will_not_change_until = fields.DateTime(load_default=None)
+    ts = fields.DateTime(required=True)
+
+    @validates_schema
+    def validate_peg(self, data, **kwargs):
+        a = data["peg_debtor_info_locator"]
+        b = data["peg_debtor_id"]
+        c = data["peg_exchange_rate"]
+        if not (
+            (a is not None and b is not None and c is not None)
+            or (a is None and b is None and c is None)
+        ):
+            raise ValidationError(
+                "peg_exchange_rate, peg_debtor_id, and peg_exchange_rate"
+                " fields must all be missing, or must all be present."
+            )
+
+
 class DiscoverDebtorMessageSchema(ValidateTypeMixin, Schema):
     """``DiscoverDebtor`` message schema."""
 

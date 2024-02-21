@@ -1,7 +1,8 @@
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, Optional
 from datetime import datetime, timezone, timedelta
 from swpt_trade.extensions import db
 from swpt_trade.models import (
+    DebtorInfoDocument,
     DebtorLocatorClaim,
     FetchDebtorInfoSignal,
     DebtorInfoFetch,
@@ -119,5 +120,45 @@ def confirm_debtor(
                     debtor_id=debtor_id,
                     debtor_info_locator=debtor_info_locator,
                     latest_locator_fetch_at=ts,
+                )
+            )
+
+
+@atomic
+def store_document(
+        *,
+        debtor_info_locator: str,
+        debtor_id: int,
+        peg_debtor_info_locator: Optional[str],
+        peg_debtor_id: Optional[int],
+        peg_exchange_rate: Optional[float],
+        will_not_change_until: Optional[datetime],
+        ts: datetime,
+) -> None:
+    document = (
+        DebtorInfoDocument.query
+        .filter_by(debtor_info_locator=debtor_info_locator)
+        .with_for_update()
+        .one_or_none()
+    )
+    if document:
+        if document.fetched_at < ts:
+            document.debtor_id = debtor_id
+            document.peg_debtor_info_locator = peg_debtor_info_locator
+            document.peg_debtor_id = peg_debtor_id
+            document.peg_exchange_rate = peg_exchange_rate
+            document.will_not_change_until = will_not_change_until
+            document.fetched_at = ts
+    else:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                DebtorInfoDocument(
+                    debtor_info_locator=debtor_info_locator,
+                    debtor_id=debtor_id,
+                    peg_debtor_info_locator=peg_debtor_info_locator,
+                    peg_debtor_id=peg_debtor_id,
+                    peg_exchange_rate=peg_exchange_rate,
+                    will_not_change_until=will_not_change_until,
+                    fetched_at=ts,
                 )
             )

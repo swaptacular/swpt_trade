@@ -165,6 +165,46 @@ class FetchDebtorInfoSignal(Signal):
         return current_app.config["APP_FLUSH_FETCH_DEBTOR_INFO_BURST_COUNT"]
 
 
+class StoreDocumentSignal(Signal):
+    """Requests a debtor info document to be stored.
+
+    NOTE: Instead of sending a `StoreDocumentSignal`, a simpler
+    approach would be to directly "upsert" the document in the
+    database. The problem with this is that it is prone to database
+    serialization errors, because documents are usually fetched and
+    stored in large batches.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("StoreDocument")
+        debtor_info_locator = fields.String()
+        debtor_id = fields.Integer()
+        peg_debtor_info_locator = fields.String()
+        peg_debtor_id = fields.Integer()
+        peg_exchange_rate = fields.Float()
+        will_not_change_until = fields.DateTime()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    debtor_info_locator = db.Column(db.String, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    peg_debtor_info_locator = db.Column(db.String)
+    peg_debtor_id = db.Column(db.BigInteger)
+    peg_exchange_rate = db.Column(db.FLOAT)
+    will_not_change_until = db.Column(db.TIMESTAMP(timezone=True))
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_iri_routing_key(self.debtor_info_locator)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_STORE_DOCUMENT_BURST_COUNT"]
+
+
 class DiscoverDebtorSignal(Signal):
     """Starts the debtor-confirmation process for a given debtor.
 

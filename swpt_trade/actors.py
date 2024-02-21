@@ -304,6 +304,28 @@ def _on_fetch_debtor_info_signal(
     )
 
 
+def _on_store_document_signal(
+    debtor_info_locator: str,
+    debtor_id: int,
+    peg_debtor_info_locator: Optional[str],
+    peg_debtor_id: Optional[int],
+    peg_exchange_rate: Optional[float],
+    will_not_change_until: Optional[datetime],
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    procedures.store_document(
+        debtor_info_locator=debtor_info_locator,
+        debtor_id=debtor_id,
+        peg_debtor_info_locator=peg_debtor_info_locator,
+        peg_debtor_id=peg_debtor_id,
+        peg_exchange_rate=peg_exchange_rate,
+        will_not_change_until=will_not_change_until,
+        ts=ts,
+    )
+
+
 def _on_discover_debtor_signal(
     debtor_id: int,
     iri: str,
@@ -370,6 +392,10 @@ _MESSAGE_TYPES = {
     "FetchDebtorInfo": (
         schemas.FetchDebtorInfoMessageSchema(),
         _on_fetch_debtor_info_signal,
+    ),
+    "StoreDocument": (
+        schemas.StoreDocumentMessageSchema(),
+        _on_store_document_signal,
     ),
     "DiscoverDebtor": (
         schemas.DiscoverDebtorMessageSchema(),

@@ -46,6 +46,9 @@ DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
 IRI_SHARDED_MESSAGE_TYPES = set([
     "FetchDebtorInfo",
 ])
+DEBTOR_INFO_LOCATOR_SHARDED_MESSAGE_TYPES = set([
+    "StoreDocument",
+])
 
 
 def get_now_utc():
@@ -74,6 +77,10 @@ def message_belongs_to_this_shard(
     elif message_type in IRI_SHARDED_MESSAGE_TYPES:
         return sharding_realm.match_str(
             data["iri"], match_parent=match_parent
+        )
+    elif message_type in DEBTOR_INFO_LOCATOR_SHARDED_MESSAGE_TYPES:
+        return sharding_realm.match_str(
+            data["debtor_info_locator"], match_parent=match_parent
         )
     else:  # pragma: no cover
         raise RuntimeError("Unknown message type.")
