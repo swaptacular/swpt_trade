@@ -4,6 +4,7 @@ from swpt_pythonlib.utils import (
     calc_bin_routing_key,
     i64_to_hex_routing_key,
 )
+from datetime import timedelta
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade import models as m
 from swpt_trade import schemas
@@ -251,3 +252,19 @@ def test_finalize_transfer_signal(db_session, current_ts):
 
     with pytest.raises(RuntimeError):
         signal._create_message()
+
+
+def test_document_has_expired(current_ts):
+    document = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=666,
+        peg_debtor_info_locator=None,
+        peg_debtor_id=None,
+        peg_exchange_rate=None,
+        will_not_change_until=None,
+        fetched_at=current_ts - timedelta(days=10),
+    )
+    assert document.has_expired(current_ts, timedelta(days=7))
+
+    document.will_not_change_until = current_ts + timedelta(days=1)
+    assert not document.has_expired(current_ts, timedelta(days=7))

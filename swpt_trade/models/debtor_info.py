@@ -42,7 +42,7 @@ class DebtorInfoDocument(db.Model):
         is_frozen = frozen_until is not None and frozen_until > current_ts
         return (
             not is_frozen
-            and current_ts - self.fetched_at < expiration_period
+            and current_ts - self.fetched_at > expiration_period
         )
 
 
