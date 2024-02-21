@@ -1,3 +1,4 @@
+import random
 from typing import TypeVar, Callable, Tuple, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -10,12 +11,16 @@ from swpt_trade.models import (
     ConfirmDebtorSignal,
     FetchDebtorInfoSignal,
     StoreDocumentSignal,
+    MAX_INT16,
 )
 
 T = TypeVar("T")
 FetchTuple = Tuple[DebtorInfoFetch, Optional[DebtorInfoDocument]]
 Classifcation = Tuple[List[FetchTuple], List[FetchTuple], List[FetchTuple]]
 atomic: Callable[[T], T] = db.atomic
+
+RETRY_MIN_WAIT_SECONDS = 60.0  # 1 minute
+RETRY_MAX_WAIT_SECONDS = 30.0 * 24 * 3600  # 30 days
 
 
 @dataclass
@@ -180,5 +185,19 @@ def _perform_fetches(fetches: List[DebtorInfoFetch]) -> List[FetchResult]:
 
 
 def _retry_fetch(fetch: DebtorInfoFetch, errorcode: Optional[int]) -> None:
-    # TODO: Add a real implementation.
-    pass
+    """Re-schedule a new attempt with randomized exponential backoff.
+    """
+    current_ts = datetime.now(tz=timezone.utc)
+    n = min(fetch.attempts_count, 100)  # We must avoid float overflows!
+    wait_seconds = min(
+        RETRY_MIN_WAIT_SECONDS * (2.0 ** n),
+        RETRY_MAX_WAIT_SECONDS,
+    )
+    wait_seconds *= (0.5 + 0.5 * random.random())
+
+    if fetch.attempts_count < MAX_INT16:
+        fetch.attempts_count += 1
+
+    fetch.latest_attempt_at = current_ts
+    fetch.latest_attempt_errorcode = errorcode
+    fetch.next_attempt_at = current_ts + timedelta(seconds=wait_seconds)
