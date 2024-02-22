@@ -212,6 +212,12 @@ class DiscoverDebtorSignal(Signal):
     (IRI), from which a debtor info document for the given debtor can
     be fetched. Note that normally the given IRI will not be the same
     as the debtor's "debtor info locator".
+
+    NOTE: A `DiscoverDebtorSignal` should be sent periodically for
+    every collector account which is "alive". The easiest way to
+    achieve this is to arrange received SMP `UpdateAccount` messages
+    (aka account heartbeats) to periodically trigger the sending of
+    `DiscoverDebtorSignal`s.
     """
     exchange_name = TO_TRADE_EXCHANGE
 
