@@ -11,6 +11,8 @@ from swpt_trade.models import (
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
+TD_HOUR = timedelta(hours=1)
+
 
 @atomic
 def schedule_debtor_info_fetch(
@@ -67,7 +69,7 @@ def discover_debtor(
         needs_locator_fetch = (
             claim.debtor_info_locator is not None
             and current_ts - claim.latest_locator_fetch_at
-            > debtor_info_expiry_period
+            > debtor_info_expiry_period + TD_HOUR
         )
         if needs_locator_fetch:
             db.session.add(
@@ -83,7 +85,7 @@ def discover_debtor(
 
         needs_discovery_fetch = (
             current_ts - claim.latest_discovery_fetch_at
-            > locator_claim_expiry_period
+            > locator_claim_expiry_period + TD_HOUR
         )
         if needs_discovery_fetch:
             db.session.add(
