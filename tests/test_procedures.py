@@ -349,6 +349,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
+        debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
     )
 
@@ -372,6 +373,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
+        debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
     )
     claims = DebtorLocatorClaim.query.all()
@@ -424,7 +426,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     )
 
     # Process the same discover message again, but this time with
-    # expired debtor locator claim.
+    # expired debtor locator claim, and old `latest_locator_fetch_at`.
     claims[0].latest_discovery_fetch_at = current_ts - timedelta(days=40)
     claims[0].debtor_info_locator = "https:/example.com/locator"
     claims[0].latest_locator_fetch_at = current_ts - timedelta(days=39)
@@ -434,6 +436,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/777",
         ts=current_ts,
+        debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
     )
 
@@ -441,11 +444,11 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert len(claims) == 1
     assert claims[0].debtor_id == 666
     assert claims[0].debtor_info_locator == "https:/example.com/locator"
-    assert claims[0].latest_locator_fetch_at == current_ts - timedelta(days=39)
+    assert claims[0].latest_locator_fetch_at >= current_ts
     assert claims[0].latest_discovery_fetch_at >= current_ts
 
     fetch_signals = FetchDebtorInfoSignal.query.all()
-    assert len(fetch_signals) == 2
+    assert len(fetch_signals) == 3
     fetch_signals.sort(key=lambda signal: signal.iri)
     assert fetch_signals[0].iri == "https:/example.com/666"
     assert fetch_signals[1].iri == "https:/example.com/777"
@@ -453,6 +456,11 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[1].is_locator_fetch is False
     assert fetch_signals[1].is_discovery_fetch is True
     assert fetch_signals[1].recursion_level == 0
+    assert fetch_signals[2].iri == "https:/example.com/locator"
+    assert fetch_signals[2].debtor_id == 666
+    assert fetch_signals[2].is_locator_fetch is True
+    assert fetch_signals[2].is_discovery_fetch is False
+    assert fetch_signals[2].recursion_level == 0
 
     # Process a confirm message for another debtor.
     p.confirm_debtor(

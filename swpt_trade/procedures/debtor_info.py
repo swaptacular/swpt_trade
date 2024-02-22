@@ -53,21 +53,50 @@ def discover_debtor(
         debtor_id: int,
         iri: str,
         ts: datetime,
+        debtor_info_expiry_period: timedelta,
         locator_claim_expiry_period: timedelta,
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
-    locator_claim = (
+    claim = (
         DebtorLocatorClaim.query
         .filter_by(debtor_id=debtor_id)
         .one_or_none()
     )
-    if locator_claim:
-        age = current_ts - locator_claim.latest_discovery_fetch_at
-        if age < locator_claim_expiry_period:
-            # We should ignore this message because the existing
-            # locator claim is still valid.
-            return
-        locator_claim.latest_discovery_fetch_at = current_ts
+
+    if claim:
+        needs_locator_fetch = (
+            claim.debtor_info_locator is not None
+            and current_ts - claim.latest_locator_fetch_at
+            > debtor_info_expiry_period
+        )
+        if needs_locator_fetch:
+            db.session.add(
+                FetchDebtorInfoSignal(
+                    iri=claim.debtor_info_locator,
+                    debtor_id=debtor_id,
+                    is_locator_fetch=True,
+                    is_discovery_fetch=False,
+                    recursion_level=0,
+                )
+            )
+            claim.latest_locator_fetch_at = current_ts
+
+        needs_discovery_fetch = (
+            current_ts - claim.latest_discovery_fetch_at
+            > locator_claim_expiry_period
+        )
+        if needs_discovery_fetch:
+            db.session.add(
+                FetchDebtorInfoSignal(
+                    iri=iri,
+                    debtor_id=debtor_id,
+                    is_locator_fetch=False,
+                    is_discovery_fetch=True,
+                    recursion_level=0,
+                )
+            )
+            claim.latest_discovery_fetch_at = current_ts
+
     else:
         with db.retry_on_integrity_error():
             db.session.add(
@@ -77,16 +106,15 @@ def discover_debtor(
                     latest_discovery_fetch_at=current_ts,
                 )
             )
-
-    db.session.add(
-        FetchDebtorInfoSignal(
-            iri=iri,
-            debtor_id=debtor_id,
-            is_locator_fetch=False,
-            is_discovery_fetch=True,
-            recursion_level=0,
+        db.session.add(
+            FetchDebtorInfoSignal(
+                iri=iri,
+                debtor_id=debtor_id,
+                is_locator_fetch=False,
+                is_discovery_fetch=True,
+                recursion_level=0,
+            )
         )
-    )
 
 
 @atomic
