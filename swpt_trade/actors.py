@@ -337,8 +337,8 @@ def _on_discover_debtor_signal(
         debtor_id=debtor_id,
         iri=iri,
         ts=ts,
-        locator_claim_expiration_period=timedelta(
-            days=current_app.config["APP_LOCATOR_CLAIM_EXPIRATION_DAYS"]
+        locator_claim_expiry_period=timedelta(
+            days=current_app.config["APP_LOCATOR_CLAIM_EXPIRY_DAYS"]
         ),
     )
 

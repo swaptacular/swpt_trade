@@ -53,7 +53,7 @@ def discover_debtor(
         debtor_id: int,
         iri: str,
         ts: datetime,
-        locator_claim_expiration_period: timedelta,
+        locator_claim_expiry_period: timedelta,
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
     locator_claim = (
@@ -63,7 +63,7 @@ def discover_debtor(
     )
     if locator_claim:
         age = current_ts - locator_claim.latest_discovery_fetch_at
-        if age < locator_claim_expiration_period:
+        if age < locator_claim_expiry_period:
             # We should ignore this message because the existing
             # locator claim is still valid.
             return

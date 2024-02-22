@@ -36,14 +36,11 @@ class DebtorInfoDocument(db.Model):
     def has_expired(
             self,
             current_ts: datetime,
-            expiration_period: timedelta,
+            expiry_period: timedelta,
     ) -> bool:
         frozen_until = self.will_not_change_until
         is_frozen = frozen_until is not None and frozen_until > current_ts
-        return (
-            not is_frozen
-            and current_ts - self.fetched_at > expiration_period
-        )
+        return not is_frozen and current_ts - self.fetched_at > expiry_period
 
 
 class DebtorLocatorClaim(db.Model):

@@ -349,7 +349,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
-        locator_claim_expiration_period=timedelta(days=30),
+        locator_claim_expiry_period=timedelta(days=30),
     )
 
     claims = DebtorLocatorClaim.query.all()
@@ -372,7 +372,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/666",
         ts=current_ts,
-        locator_claim_expiration_period=timedelta(days=30),
+        locator_claim_expiry_period=timedelta(days=30),
     )
     claims = DebtorLocatorClaim.query.all()
     assert len(claims) == 1
@@ -434,7 +434,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
         debtor_id=666,
         iri="https:/example.com/777",
         ts=current_ts,
-        locator_claim_expiration_period=timedelta(days=30),
+        locator_claim_expiry_period=timedelta(days=30),
     )
 
     claims = DebtorLocatorClaim.query.all()

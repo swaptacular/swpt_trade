@@ -20,7 +20,6 @@ Classifcation = Tuple[List[FetchTuple], List[FetchTuple], List[FetchTuple]]
 atomic: Callable[[T], T] = db.atomic
 
 RETRY_MIN_WAIT_SECONDS = 60.0  # 1 minute
-RETRY_MAX_WAIT_SECONDS = 30.0 * 24 * 3600  # 30 days
 
 
 @dataclass
@@ -59,6 +58,9 @@ def _perform_debtor_info_fetches_burst(
     assert connections > 0
     assert timeout > 0.0
 
+    debtor_info_expiry_period = timedelta(
+        days=current_app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"]
+    )
     fetch_results = _resolve_debtor_info_fetches(burst_count)
 
     for r in fetch_results:
@@ -125,7 +127,7 @@ def _perform_debtor_info_fetches_burst(
                     )
 
         if retry:
-            _retry_fetch(fetch, errorcode)
+            _retry_fetch(fetch, errorcode, debtor_info_expiry_period)
         else:
             db.session.delete(fetch)
 
@@ -160,8 +162,8 @@ def _resolve_debtor_info_fetches(max_count: int) -> List[FetchResult]:
 def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
     current_ts = datetime.now(tz=timezone.utc)
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
-    exp_period = timedelta(
-        days=current_app.config["APP_DEBTOR_INFO_EXPIRATION_DAYS"]
+    expiry_period = timedelta(
+        days=current_app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"]
     )
     wrong_shard: List[FetchTuple] = []
     cached: List[FetchTuple] = []
@@ -171,7 +173,7 @@ def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
         fetch, document = t
         if not sharding_realm.match_str(fetch.iri):
             wrong_shard.append(t)
-        elif document and not document.has_expired(current_ts, exp_period):
+        elif document and not document.has_expired(current_ts, expiry_period):
             cached.append(t)
         else:
             new.append(t)
@@ -184,20 +186,25 @@ def _perform_fetches(fetches: List[DebtorInfoFetch]) -> List[FetchResult]:
     return [FetchResult(fetch=f, errorcode=500, retry=True) for f in fetches]
 
 
-def _retry_fetch(fetch: DebtorInfoFetch, errorcode: Optional[int]) -> None:
+def _retry_fetch(
+        fetch: DebtorInfoFetch,
+        errorcode: Optional[int],
+        expiry_period: timedelta,
+) -> None:
     """Re-schedule a new attempt with randomized exponential backoff.
     """
-    current_ts = datetime.now(tz=timezone.utc)
     n = min(fetch.attempts_count, 100)  # We must avoid float overflows!
-    wait_seconds = min(
-        RETRY_MIN_WAIT_SECONDS * (2.0 ** n),
-        RETRY_MAX_WAIT_SECONDS,
-    )
-    wait_seconds *= (0.5 + 0.5 * random.random())
+    wait_seconds = RETRY_MIN_WAIT_SECONDS * (2.0 ** n)
 
-    if fetch.attempts_count < MAX_INT16:
-        fetch.attempts_count += 1
+    if wait_seconds < expiry_period.total_seconds():
+        current_ts = datetime.now(tz=timezone.utc)
+        wait_seconds *= (0.5 + 0.5 * random.random())
 
-    fetch.latest_attempt_at = current_ts
-    fetch.latest_attempt_errorcode = errorcode
-    fetch.next_attempt_at = current_ts + timedelta(seconds=wait_seconds)
+        if fetch.attempts_count < MAX_INT16:
+            fetch.attempts_count += 1
+
+        fetch.latest_attempt_at = current_ts
+        fetch.latest_attempt_errorcode = errorcode
+        fetch.next_attempt_at = current_ts + timedelta(seconds=wait_seconds)
+    else:
+        db.session.delete(fetch)
