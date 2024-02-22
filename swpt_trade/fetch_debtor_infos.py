@@ -82,15 +82,6 @@ def _perform_debtor_info_fetches_burst(
                         debtor_info_locator=debtor_info_locator,
                     )
                 )
-                db.session.add(
-                    FetchDebtorInfoSignal(
-                        iri=debtor_info_locator,
-                        debtor_id=debtor_id,
-                        is_locator_fetch=True,
-                        is_discovery_fetch=False,
-                        recursion_level=0,
-                    )
-                )
 
             if fetch.is_locator_fetch and fetch.iri == debtor_info_locator:
                 peg_debtor_info_locator = document.peg_debtor_info_locator

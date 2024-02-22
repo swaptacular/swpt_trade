@@ -153,6 +153,16 @@ def confirm_debtor(
                 )
             )
 
+    db.session.add(
+        FetchDebtorInfoSignal(
+            iri=debtor_info_locator,
+            debtor_id=debtor_id,
+            is_locator_fetch=True,
+            is_discovery_fetch=False,
+            recursion_level=0,
+        )
+    )
+
 
 @atomic
 def store_document(
