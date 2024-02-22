@@ -389,9 +389,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert len(claims) == 1
     assert claims[0].debtor_id == 666
     assert claims[0].debtor_info_locator == "https:/example.com/old-locator"
-    assert (
-        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=10)
-    )
+    assert claims[0].latest_locator_fetch_at >= current_ts
     fetch_signals = FetchDebtorInfoSignal.query.all()
     assert len(fetch_signals) == 2
     fetch_signals.sort(key=lambda signal: signal.signal_id)
@@ -412,9 +410,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert len(claims) == 1
     assert claims[0].debtor_id == 666
     assert claims[0].debtor_info_locator == "https:/example.com/locator"
-    assert (
-        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=30)
-    )
+    assert claims[0].latest_locator_fetch_at >= current_ts
     fetch_signals = FetchDebtorInfoSignal.query.all()
     assert len(fetch_signals) == 3
     fetch_signals.sort(key=lambda signal: signal.signal_id)
@@ -435,9 +431,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert len(claims) == 1
     assert claims[0].debtor_id == 666
     assert claims[0].debtor_info_locator == "https:/example.com/locator"
-    assert (
-        claims[0].latest_locator_fetch_at == current_ts + timedelta(seconds=30)
-    )
+    assert claims[0].latest_locator_fetch_at >= current_ts
     assert len(FetchDebtorInfoSignal.query.all()) == 3
 
     # Process the same discover message again, but this time with
@@ -486,7 +480,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     claims.sort(key=lambda claim: claim.debtor_id)
     assert claims[1].debtor_id == 1234
     assert claims[1].debtor_info_locator == "https:/example.com/locator1234"
-    assert claims[1].latest_locator_fetch_at == current_ts
+    assert claims[1].latest_locator_fetch_at >= current_ts
     fetch_signals = FetchDebtorInfoSignal.query.all()
     assert len(fetch_signals) == 6
     fetch_signals.sort(key=lambda signal: signal.signal_id)

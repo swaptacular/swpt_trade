@@ -142,14 +142,14 @@ def confirm_debtor(
     )
     if locator_claim:
         locator_claim.debtor_info_locator = debtor_info_locator
-        locator_claim.latest_locator_fetch_at = ts
+        locator_claim.latest_locator_fetch_at = current_ts
     else:
         with db.retry_on_integrity_error():
             db.session.add(
                 DebtorLocatorClaim(
                     debtor_id=debtor_id,
                     debtor_info_locator=debtor_info_locator,
-                    latest_locator_fetch_at=ts,
+                    latest_locator_fetch_at=current_ts,
                 )
             )
 
