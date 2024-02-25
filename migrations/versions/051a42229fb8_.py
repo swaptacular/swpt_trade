@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 5cf37db22a04
+Revision ID: 051a42229fb8
 Revises: 286d0ee4d117
-Create Date: 2024-02-21 16:35:29.657575
+Create Date: 2024-02-25 18:51:17.639752
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '5cf37db22a04'
+revision = '051a42229fb8'
 down_revision = '286d0ee4d117'
 branch_labels = None
 depends_on = None
@@ -64,6 +64,7 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('is_locator_fetch', sa.BOOLEAN(), nullable=False),
     sa.Column('is_discovery_fetch', sa.BOOLEAN(), nullable=False),
+    sa.Column('ignore_cache', sa.BOOLEAN(), nullable=False),
     sa.Column('recursion_level', sa.SmallInteger(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('attempts_count', sa.SmallInteger(), nullable=False),
@@ -82,6 +83,7 @@ def upgrade_():
     sa.Column('debtor_info_locator', sa.String(), nullable=True),
     sa.Column('latest_locator_fetch_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('latest_discovery_fetch_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('forced_locator_refetch_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.CheckConstraint('debtor_info_locator IS NULL AND latest_locator_fetch_at IS NULL OR debtor_info_locator IS NOT NULL AND latest_locator_fetch_at IS NOT NULL'),
     sa.PrimaryKeyConstraint('debtor_id')
     )
@@ -91,6 +93,7 @@ def upgrade_():
     op.create_table('discover_debtor_signal',
     sa.Column('signal_id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('force_locator_refetch', sa.Boolean(), nullable=False),
     sa.Column('iri', sa.String(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('signal_id')
@@ -101,6 +104,7 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('is_locator_fetch', sa.BOOLEAN(), nullable=False),
     sa.Column('is_discovery_fetch', sa.BOOLEAN(), nullable=False),
+    sa.Column('ignore_cache', sa.BOOLEAN(), nullable=False),
     sa.Column('recursion_level', sa.SmallInteger(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('signal_id')

@@ -238,6 +238,7 @@ def test_fetch_debtor_info_message():
     "debtor_id": 2,
     "is_locator_fetch": true,
     "is_discovery_fetch": false,
+    "ignore_cache": false,
     "recursion_level": 5,
     "ts": "2022-01-01T00:00:00Z",
     "unknown": "ignored"
@@ -249,6 +250,7 @@ def test_fetch_debtor_info_message():
     assert type(data['debtor_id']) is int
     assert data['is_locator_fetch'] is True
     assert data['is_discovery_fetch'] is False
+    assert data['ignore_cache'] is False
     assert data['recursion_level'] == 5
     assert type(data['recursion_level']) is int
     assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
@@ -261,6 +263,7 @@ def test_fetch_debtor_info_message():
         "debtor_id": 2,
         "is_locator_fetch": true,
         "is_discovery_fetch": false,
+        "ignore_cache": false,
         "recursion_level": 5,
         "ts": "2022-01-01T00:00:00Z"
         }""")
@@ -351,12 +354,14 @@ def test_discover_debtor_message():
     "type": "DiscoverDebtor",
     "debtor_id": 2,
     "iri": "https://example.com/test",
+    "force_locator_refetch": false,
     "ts": "2022-01-01T00:00:00Z",
     "unknown": "ignored"
     }""")
 
     assert data['type'] == 'DiscoverDebtor'
     assert data['iri'] == 'https://example.com/test'
+    assert data['force_locator_refetch'] is False
     assert data['debtor_id'] == 2
     assert type(data['debtor_id']) is int
     assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
@@ -367,6 +372,7 @@ def test_discover_debtor_message():
         "type": "WrongType",
         "debtor_id": 2,
         "iri": "https://example.com/test",
+        "force_locator_refetch": false,
         "ts": "2022-01-01T00:00:00Z"
         }""")
 

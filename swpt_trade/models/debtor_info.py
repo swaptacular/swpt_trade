@@ -50,6 +50,7 @@ class DebtorLocatorClaim(db.Model):
     latest_discovery_fetch_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
+    forced_locator_refetch_at = db.Column(db.TIMESTAMP(timezone=True))
     __table_args__ = (
         db.CheckConstraint(
             or_(
@@ -76,6 +77,7 @@ class DebtorInfoFetch(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     is_locator_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
     is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
+    ignore_cache = db.Column(db.BOOLEAN, nullable=False, default=False)
     recursion_level = db.Column(db.SmallInteger, nullable=False, default=0)
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc

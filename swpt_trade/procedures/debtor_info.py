@@ -21,6 +21,7 @@ def schedule_debtor_info_fetch(
         debtor_id: int,
         is_locator_fetch: bool,
         is_discovery_fetch: bool,
+        ignore_cache: bool,
         recursion_level: int,
         ts: datetime,
 ) -> None:
@@ -31,8 +32,15 @@ def schedule_debtor_info_fetch(
         .one_or_none()
     )
     if debtor_info_fetch:
-        debtor_info_fetch.is_locator_fetch |= is_locator_fetch
-        debtor_info_fetch.is_discovery_fetch |= is_discovery_fetch
+        debtor_info_fetch.is_locator_fetch = (
+            is_locator_fetch or debtor_info_fetch.is_locator_fetch
+        )
+        debtor_info_fetch.is_discovery_fetch = (
+            is_discovery_fetch or debtor_info_fetch.is_discovery_fetch
+        )
+        debtor_info_fetch.ignore_cache = (
+            ignore_cache or debtor_info_fetch.ignore_cache
+        )
         debtor_info_fetch.recursion_level = min(
             recursion_level, debtor_info_fetch.recursion_level
         )
@@ -44,6 +52,7 @@ def schedule_debtor_info_fetch(
                     debtor_id=debtor_id,
                     is_locator_fetch=is_locator_fetch,
                     is_discovery_fetch=is_discovery_fetch,
+                    ignore_cache=ignore_cache,
                     recursion_level=recursion_level,
                 )
             )
@@ -54,6 +63,7 @@ def discover_debtor(
         *,
         debtor_id: int,
         iri: str,
+        force_locator_refetch: bool,
         ts: datetime,
         debtor_info_expiry_period: timedelta,
         locator_claim_expiry_period: timedelta,
@@ -66,22 +76,36 @@ def discover_debtor(
     )
 
     if claim:
-        needs_locator_fetch = (
-            claim.debtor_info_locator is not None
-            and current_ts - claim.latest_locator_fetch_at
-            > debtor_info_expiry_period + TD_HOUR
-        )
-        if needs_locator_fetch:
-            db.session.add(
-                FetchDebtorInfoSignal(
-                    iri=claim.debtor_info_locator,
-                    debtor_id=debtor_id,
-                    is_locator_fetch=True,
-                    is_discovery_fetch=False,
-                    recursion_level=0,
+        if claim.debtor_info_locator is not None:
+            expiry_period = debtor_info_expiry_period + TD_HOUR
+
+            forced_refetch = (
+                force_locator_refetch
+                and (
+                    # We should not allow forced refetches too often!
+                    claim.forced_locator_refetch_at is None
+                    or current_ts - claim.forced_locator_refetch_at
+                    > expiry_period
                 )
             )
-            claim.latest_locator_fetch_at = current_ts
+            if forced_refetch:
+                claim.forced_locator_refetch_at = current_ts
+
+            needs_refetch = (
+                current_ts - claim.latest_locator_fetch_at > expiry_period
+            )
+            if needs_refetch or forced_refetch:
+                db.session.add(
+                    FetchDebtorInfoSignal(
+                        iri=claim.debtor_info_locator,
+                        debtor_id=debtor_id,
+                        is_locator_fetch=True,
+                        is_discovery_fetch=False,
+                        ignore_cache=forced_refetch,
+                        recursion_level=0,
+                    )
+                )
+                claim.latest_locator_fetch_at = current_ts
 
         needs_discovery_fetch = (
             current_ts - claim.latest_discovery_fetch_at
@@ -94,6 +118,7 @@ def discover_debtor(
                     debtor_id=debtor_id,
                     is_locator_fetch=False,
                     is_discovery_fetch=True,
+                    ignore_cache=True,
                     recursion_level=0,
                 )
             )
@@ -114,6 +139,7 @@ def discover_debtor(
                 debtor_id=debtor_id,
                 is_locator_fetch=False,
                 is_discovery_fetch=True,
+                ignore_cache=True,
                 recursion_level=0,
             )
         )
@@ -159,6 +185,7 @@ def confirm_debtor(
             debtor_id=debtor_id,
             is_locator_fetch=True,
             is_discovery_fetch=False,
+            ignore_cache=True,
             recursion_level=0,
         )
     )

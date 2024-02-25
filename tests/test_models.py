@@ -122,6 +122,7 @@ def test_non_smp_signals(db_session):
         debtor_id=1,
         is_locator_fetch=True,
         is_discovery_fetch=False,
+        ignore_cache=False,
         recursion_level=0,
     )
     db_session.add(signal)
@@ -143,6 +144,7 @@ def test_non_smp_signals(db_session):
     signal = m.DiscoverDebtorSignal(
         iri="https://example.com",
         debtor_id=1,
+        force_locator_refetch=False,
     )
     db_session.add(signal)
     db_session.flush()

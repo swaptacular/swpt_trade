@@ -309,6 +309,7 @@ def test_schedule_debtor_info_fetch(db_session, current_ts):
         debtor_id=666,
         is_locator_fetch=True,
         is_discovery_fetch=False,
+        ignore_cache=False,
         recursion_level=4,
         ts=current_ts,
     )
@@ -318,6 +319,7 @@ def test_schedule_debtor_info_fetch(db_session, current_ts):
     assert fetches[0].debtor_id == 666
     assert fetches[0].is_locator_fetch is True
     assert fetches[0].is_discovery_fetch is False
+    assert fetches[0].ignore_cache is False
     assert fetches[0].recursion_level == 4
     assert fetches[0].attempts_count == 0
 
@@ -327,6 +329,7 @@ def test_schedule_debtor_info_fetch(db_session, current_ts):
         debtor_id=666,
         is_locator_fetch=False,
         is_discovery_fetch=True,
+        ignore_cache=True,
         recursion_level=2,
         ts=current_ts,
     )
@@ -336,6 +339,7 @@ def test_schedule_debtor_info_fetch(db_session, current_ts):
     assert fetches[0].debtor_id == 666
     assert fetches[0].is_locator_fetch is True
     assert fetches[0].is_discovery_fetch is True
+    assert fetches[0].ignore_cache is True
     assert fetches[0].recursion_level == 2
     assert fetches[0].attempts_count == 0
 
@@ -348,6 +352,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
+        force_locator_refetch=False,
         ts=current_ts,
         debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
@@ -364,12 +369,14 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[0].debtor_id == 666
     assert fetch_signals[0].is_locator_fetch is False
     assert fetch_signals[0].is_discovery_fetch is True
+    assert fetch_signals[0].ignore_cache is True
     assert fetch_signals[0].recursion_level == 0
 
     # Process the same discover message again (does nothing).
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/666",
+        force_locator_refetch=False,
         ts=current_ts,
         debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
@@ -397,6 +404,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[1].debtor_id == 666
     assert fetch_signals[1].is_locator_fetch is True
     assert fetch_signals[1].is_discovery_fetch is False
+    assert fetch_signals[1].ignore_cache is True
     assert fetch_signals[1].recursion_level == 0
 
     # Process another confirm message for this debtor.
@@ -418,6 +426,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[2].debtor_id == 666
     assert fetch_signals[2].is_locator_fetch is True
     assert fetch_signals[2].is_discovery_fetch is False
+    assert fetch_signals[2].ignore_cache is True
     assert fetch_signals[2].recursion_level == 0
 
     # Process a very old confirm message (does nothing).
@@ -443,6 +452,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     p.discover_debtor(
         debtor_id=666,
         iri="https:/example.com/777",
+        force_locator_refetch=True,
         ts=current_ts,
         debtor_info_expiry_period=timedelta(days=7),
         locator_claim_expiry_period=timedelta(days=30),
@@ -461,11 +471,13 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[0].debtor_id == 666
     assert fetch_signals[0].is_locator_fetch is False
     assert fetch_signals[0].is_discovery_fetch is True
+    assert fetch_signals[0].ignore_cache is True
     assert fetch_signals[0].recursion_level == 0
     assert fetch_signals[1].iri == "https:/example.com/locator"
     assert fetch_signals[1].debtor_id == 666
     assert fetch_signals[1].is_locator_fetch is True
     assert fetch_signals[1].is_discovery_fetch is False
+    assert fetch_signals[1].ignore_cache is True
     assert fetch_signals[1].recursion_level == 0
 
     # Process a confirm message for another debtor.
@@ -488,4 +500,5 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
     assert fetch_signals[5].debtor_id == 1234
     assert fetch_signals[5].is_locator_fetch is True
     assert fetch_signals[5].is_discovery_fetch is False
+    assert fetch_signals[5].ignore_cache is True
     assert fetch_signals[5].recursion_level == 0

@@ -289,6 +289,7 @@ def _on_fetch_debtor_info_signal(
     debtor_id: int,
     is_locator_fetch: bool,
     is_discovery_fetch: bool,
+    ignore_cache: bool,
     recursion_level: int,
     ts: datetime,
     *args,
@@ -299,6 +300,7 @@ def _on_fetch_debtor_info_signal(
         debtor_id=debtor_id,
         is_locator_fetch=is_locator_fetch,
         is_discovery_fetch=is_discovery_fetch,
+        ignore_cache=ignore_cache,
         recursion_level=recursion_level,
         ts=ts,
     )
@@ -329,6 +331,7 @@ def _on_store_document_signal(
 def _on_discover_debtor_signal(
     debtor_id: int,
     iri: str,
+    force_locator_refetch: bool,
     ts: datetime,
     *args,
     **kwargs
@@ -336,6 +339,7 @@ def _on_discover_debtor_signal(
     procedures.discover_debtor(
         debtor_id=debtor_id,
         iri=iri,
+        force_locator_refetch=force_locator_refetch,
         ts=ts,
         debtor_info_expiry_period=timedelta(
             days=current_app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"]

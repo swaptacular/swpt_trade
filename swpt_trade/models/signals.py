@@ -144,6 +144,7 @@ class FetchDebtorInfoSignal(Signal):
         debtor_id = fields.Integer()
         is_locator_fetch = fields.Boolean()
         is_discovery_fetch = fields.Boolean()
+        ignore_cache = fields.Boolean()
         recursion_level = fields.Integer()
         inserted_at = fields.DateTime(data_key="ts")
 
@@ -154,6 +155,7 @@ class FetchDebtorInfoSignal(Signal):
     debtor_id = db.Column(db.BigInteger, nullable=False)
     is_locator_fetch = db.Column(db.BOOLEAN, nullable=False)
     is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False)
+    ignore_cache = db.Column(db.BOOLEAN, nullable=False)
     recursion_level = db.Column(db.SmallInteger, nullable=False)
 
     @property
@@ -211,12 +213,15 @@ class DiscoverDebtorSignal(Signal):
     The `iri` field specifies an Internationalized Resource Identifier
     (IRI), from which a debtor info document for the given debtor can
     be fetched. Note that normally the given IRI will not be the same
-    as the debtor's "debtor info locator".
+    as the debtor's "debtor info locator". When
+    `force_locator_refetch` is `True`, this means that the debtor's
+    debtor info document has been changed, and should be re-fetched
+    even if a cached version exist which has not expired yet.
 
     NOTE: A `DiscoverDebtorSignal` should be sent periodically for
     every collector account which is "alive". The easiest way to
     achieve this is to arrange received SMP `UpdateAccount` messages
-    (aka account heartbeats) to periodically trigger the sending of
+    (aka account heartbeats) to trigger the sending of
     `DiscoverDebtorSignal`s.
     """
     exchange_name = TO_TRADE_EXCHANGE
@@ -225,12 +230,14 @@ class DiscoverDebtorSignal(Signal):
         type = fields.Constant("DiscoverDebtor")
         debtor_id = fields.Integer()
         iri = fields.String()
+        force_locator_refetch = fields.Boolean()
         inserted_at = fields.DateTime(data_key="ts")
 
     __marshmallow_schema__ = __marshmallow__()
 
     signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
+    force_locator_refetch = db.Column(db.Boolean, nullable=False)
     iri = db.Column(db.String, nullable=False)
 
     @property

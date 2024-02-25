@@ -3,6 +3,7 @@ from typing import TypeVar, Callable, Tuple, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from flask import current_app
+from sqlalchemy.sql.expression import and_, not_
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
 from swpt_trade.models import (
@@ -102,6 +103,7 @@ def _perform_debtor_info_fetches_burst(
                             debtor_id=peg_debtor_id,
                             is_locator_fetch=True,
                             is_discovery_fetch=False,
+                            ignore_cache=False,
                             recursion_level=recursion_level + 1,
                         )
                     )
@@ -132,7 +134,10 @@ def _resolve_debtor_info_fetches(max_count: int) -> List[FetchResult]:
         db.session.query(DebtorInfoFetch, DebtorInfoDocument)
         .outerjoin(
             DebtorInfoDocument,
-            DebtorInfoDocument.debtor_info_locator == DebtorInfoFetch.iri,
+            and_(
+                DebtorInfoDocument.debtor_info_locator == DebtorInfoFetch.iri,
+                not_(DebtorInfoFetch.ignore_cache),
+            ),
         )
         .filter(DebtorInfoFetch.next_attempt_at <= current_ts)
         .with_for_update(of=DebtorInfoFetch, skip_locked=True)

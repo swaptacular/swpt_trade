@@ -37,6 +37,7 @@ class FetchDebtorInfoMessageSchema(ValidateTypeMixin, Schema):
     )
     is_locator_fetch = fields.Boolean(required=True)
     is_discovery_fetch = fields.Boolean(required=True)
+    ignore_cache = fields.Boolean(required=True)
     recursion_level = fields.Integer(
         required=True, validate=validate.Range(min=0, max=MAX_INT16)
     )
@@ -91,6 +92,7 @@ class DiscoverDebtorMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     iri = fields.String(required=True)
+    force_locator_refetch = fields.Boolean(required=True)
     ts = fields.DateTime(required=True)
 
 
