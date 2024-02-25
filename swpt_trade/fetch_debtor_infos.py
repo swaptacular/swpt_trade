@@ -62,7 +62,9 @@ def _perform_debtor_info_fetches_burst(
     debtor_info_expiry_period = timedelta(
         days=current_app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"]
     )
-    fetch_results = _resolve_debtor_info_fetches(burst_count)
+    fetch_results = _resolve_debtor_info_fetches(
+        burst_count, connections, timeout
+    )
 
     for r in fetch_results:
         fetch = r.fetch
@@ -127,7 +129,11 @@ def _perform_debtor_info_fetches_burst(
     return len(fetch_results)
 
 
-def _resolve_debtor_info_fetches(max_count: int) -> List[FetchResult]:
+def _resolve_debtor_info_fetches(
+        max_count: int,
+        connections: int,
+        timeout: float,
+) -> List[FetchResult]:
     current_ts = datetime.now(tz=timezone.utc)
 
     fetch_tuples: List[FetchTuple] = (
@@ -148,7 +154,9 @@ def _resolve_debtor_info_fetches(max_count: int) -> List[FetchResult]:
 
     wrong_shard_results = [FetchResult(fetch=f) for f, _ in wrong_shard]
     cached_results = [FetchResult(fetch=f, document=d) for f, d in cached]
-    new_results = _perform_fetches([f for f, _ in new])
+    new_results = _perform_fetches(
+        [f for f, _ in new], connections=connections, timeout=timeout
+    )
 
     all_results = wrong_shard_results + cached_results + new_results
     assert len(all_results) == len(fetch_tuples)
@@ -177,7 +185,12 @@ def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
     return wrong_shard, cached, new
 
 
-def _perform_fetches(fetches: List[DebtorInfoFetch]) -> List[FetchResult]:
+def _perform_fetches(
+        fetches: List[DebtorInfoFetch],
+        *,
+        connections: int,
+        timeout: float,
+) -> List[FetchResult]:
     # TODO: Add a real implementation.
     return [FetchResult(fetch=f, errorcode=500, retry=True) for f in fetches]
 

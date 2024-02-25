@@ -111,7 +111,7 @@ def test_roll_turns(app, db_session):
 def test_fetch_debtor_infos(mocker, app, db_session):
     from swpt_trade.fetch_debtor_infos import FetchResult
 
-    def perform_fetches(fetches):
+    def perform_fetches(fetches, **kwargs):
         return [
             FetchResult(
                 fetch=f,

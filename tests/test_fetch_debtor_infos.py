@@ -19,7 +19,7 @@ def restore_expiry(app):
 def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
     app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"] = -10.0
 
-    def perform_fetches(fetches):
+    def perform_fetches(fetches, **kwargs):
         return [
             FetchResult(
                 fetch=f,
@@ -57,7 +57,7 @@ def test_cached_and_wrong_shard(
 ):
     app.config["SHARDING_REALM"] = ShardingRealm("0.#")
 
-    def perform_fetches(fetches):
+    def perform_fetches(fetches, **kwargs):
         assert len(fetches) == 0
         return []
 
@@ -99,7 +99,7 @@ def test_cached_and_wrong_shard(
 
 
 def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
-    def perform_fetches(fetches):
+    def perform_fetches(fetches, **kwargs):
         return [
             (
                 FetchResult(
