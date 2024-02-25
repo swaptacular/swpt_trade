@@ -98,7 +98,7 @@ def test_cached_and_wrong_shard(
     assert len(m.DebtorInfoDocument.query.all()) == 1
 
 
-def test_perform_debtor_info_fetches(mocker, app, db_session):
+def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
     def perform_fetches(fetches):
         return [
             (
@@ -156,6 +156,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session):
     fetches[0].attempts_count == 1
     fetches[0].latest_attempt_at is not None
     fetches[0].latest_attempt_errorcode == 500
+    fetches[0].next_attempt_at > current_ts + timedelta(seconds=15)
 
     fetch_signals = m.FetchDebtorInfoSignal.query.all()
     assert len(fetch_signals) == 1
