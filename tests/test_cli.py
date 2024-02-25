@@ -106,3 +106,85 @@ def test_roll_turns(app, db_session):
     turns = m.Turn.query.all()
     assert len(turns) == 1
     assert turns[0].phase == 4
+
+
+def test_fetch_debtor_infos(mocker, app, db_session):
+    from swpt_trade.fetch_debtor_infos import FetchResult
+
+    def perform_fetches(fetches):
+        return [
+            FetchResult(
+                fetch=f,
+                document=m.DebtorInfoDocument(
+                    debtor_info_locator=f.iri,
+                    debtor_id=f.debtor_id,
+                    peg_debtor_info_locator="https://example.com/777",
+                    peg_debtor_id=777,
+                    peg_exchange_rate=2.0,
+                ),
+                store_document=f.is_locator_fetch,
+            ) for f in fetches
+        ]
+
+    mocker.patch(
+        "swpt_trade.fetch_debtor_infos._perform_fetches",
+        new=perform_fetches,
+    )
+
+    dif = m.DebtorInfoFetch(
+        iri="https://example.com/666",
+        debtor_id=666,
+        is_locator_fetch=True,
+        is_discovery_fetch=True,
+        ignore_cache=True,
+    )
+    db.session.add(dif)
+    db.session.commit()
+    assert len(m.DebtorInfoFetch.query.all()) == 1
+    assert len(m.FetchDebtorInfoSignal.query.all()) == 0
+    db.session.commit()
+
+    runner = app.test_cli_runner()
+
+    def invoke():
+        return runner.invoke(
+            args=[
+                "swpt_trade",
+                "fetch_debtor_infos",
+                "--timeout", "0.1",
+                "--quit-early",
+            ]
+        )
+
+    result = invoke()
+    assert result.exit_code == 1
+
+    assert len(m.DebtorInfoFetch.query.all()) == 0
+    assert len(m.DiscoverDebtorSignal.query.all()) == 0
+    assert len(m.DebtorLocatorClaim.query.all()) == 0
+    assert len(m.DebtorInfoDocument.query.all()) == 0
+
+    fetch_signals = m.FetchDebtorInfoSignal.query.all()
+    assert len(fetch_signals) == 1
+    assert fetch_signals[0].iri == "https://example.com/777"
+    assert fetch_signals[0].debtor_id == 777
+    assert fetch_signals[0].is_locator_fetch is True
+    assert fetch_signals[0].is_discovery_fetch is False
+    assert fetch_signals[0].ignore_cache is False
+    assert fetch_signals[0].recursion_level == 1
+
+    stored_signals = m.StoreDocumentSignal.query.all()
+    assert len(stored_signals) == 1
+    assert stored_signals[0].debtor_info_locator == "https://example.com/666"
+    assert stored_signals[0].debtor_id == 666
+    assert stored_signals[0].peg_debtor_info_locator == (
+        "https://example.com/777"
+    )
+    assert stored_signals[0].peg_debtor_id == 777
+    assert stored_signals[0].peg_exchange_rate == 2.0
+    assert stored_signals[0].will_not_change_until is None
+
+    confirmations = m.ConfirmDebtorSignal.query.all()
+    assert len(confirmations) == 1
+    assert confirmations[0].debtor_id == 666
+    assert confirmations[0].debtor_info_locator == "https://example.com/666"
