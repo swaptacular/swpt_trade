@@ -75,3 +75,12 @@ def db_session(app):
 @pytest.fixture(scope="function")
 def current_ts():
     return datetime.now(tz=timezone.utc)
+
+
+@pytest.fixture()
+def restore_sharding_realm(app):
+    orig_sharding_realm = app.config["SHARDING_REALM"]
+    orig_delete_parent_recs = app.config["DELETE_PARENT_SHARD_RECORDS"]
+    yield
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = orig_delete_parent_recs
+    app.config["SHARDING_REALM"] = orig_sharding_realm

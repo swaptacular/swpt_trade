@@ -20,15 +20,6 @@ def test_sibnalbus_burst_count(app):
     assert isinstance(m.StoreDocumentSignal.signalbus_burst_count, int)
 
 
-@pytest.fixture()
-def restore_sharding_realm(app):
-    orig_sharding_realm = app.config["SHARDING_REALM"]
-    orig_delete_parent_recs = app.config["DELETE_PARENT_SHARD_RECORDS"]
-    yield
-    app.config["DELETE_PARENT_SHARD_RECORDS"] = orig_delete_parent_recs
-    app.config["SHARDING_REALM"] = orig_sharding_realm
-
-
 def test_sharding_realm(app, restore_sharding_realm, db_session, current_ts):
     app.config["SHARDING_REALM"] = ShardingRealm("1.#")
     app.config["DELETE_PARENT_SHARD_RECORDS"] = False
