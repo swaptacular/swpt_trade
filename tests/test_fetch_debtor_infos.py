@@ -115,7 +115,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
                 ) if f.iri.startswith("https://") else FetchResult(
                     fetch=f,
                     errorcode=500,
-                    retry=not f.iri.startswith("no retry"),
+                    retry=True,
                 )
             ) for f in fetches
         ]
