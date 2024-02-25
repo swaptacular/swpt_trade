@@ -261,6 +261,31 @@ class Configuration(metaclass=MetaEnvReader):
     APP_CREDITOR_SUBJECT_REGEX = "^creditors:([0-9]+)$"
 
 
+def _check_config_sanity(c):  # pragma: nocover
+    if c["APP_LOCATOR_CLAIM_EXPIRY_DAYS"] < 30.0:
+        raise RuntimeError(
+            "The configured value for APP_LOCATOR_CLAIM_EXPIRY_DAYS is"
+            " too small. Choose a more appropriate value."
+        )
+
+    if c["APP_DEBTOR_INFO_EXPIRY_DAYS"] < 1.0:
+        raise RuntimeError(
+            "The configured value for APP_DEBTOR_INFO_EXPIRY_DAYS is too"
+            " small. Choose a more appropriate value."
+        )
+
+    if (
+        c["APP_LOCATOR_CLAIM_EXPIRY_DAYS"]
+        < 5 * c["APP_DEBTOR_INFO_EXPIRY_DAYS"]
+    ):
+        raise RuntimeError(
+            "The configured value for APP_LOCATOR_CLAIM_EXPIRY_DAYS is"
+            " too small compared to the configured value for"
+            " APP_DEBTOR_INFO_EXPIRY_DAYS. Choose more appropriate"
+            " configuration values."
+        )
+
+
 def create_app(config_dict={}):
     from werkzeug.middleware.proxy_fix import ProxyFix
     from flask import Flask
@@ -300,6 +325,8 @@ def create_app(config_dict={}):
     api.init_app(app)
     api.register_blueprint(admin_api)
     app.cli.add_command(swpt_trade)
+    _check_config_sanity(app.config)
+
     return app
 
 
