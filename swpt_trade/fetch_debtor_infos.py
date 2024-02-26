@@ -1,5 +1,8 @@
+import logging
 import random
-from typing import TypeVar, Callable, Tuple, List, Optional
+import asyncio
+import aiohttp
+from typing import TypeVar, Callable, Tuple, List, Optional, Union
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from flask import current_app
@@ -30,6 +33,10 @@ class FetchResult:
     retry: bool = False
     document: Optional[DebtorInfoDocument] = None
     store_document: bool = False
+
+
+class InvalidDebtorInfoDocument(Exception):
+    """Invalid debtor info document."""
 
 
 def perform_debtor_info_fetches(connections: int, timeout: float) -> int:
@@ -185,16 +192,6 @@ def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
     return wrong_shard, cached, new
 
 
-def _perform_fetches(
-        fetches: List[DebtorInfoFetch],
-        *,
-        connections: int,
-        timeout: float,
-) -> List[FetchResult]:
-    # TODO: Add a real implementation.
-    return [FetchResult(fetch=f, errorcode=500, retry=True) for f in fetches]
-
-
 def _retry_fetch(
         fetch: DebtorInfoFetch,
         errorcode: Optional[int],
@@ -217,3 +214,123 @@ def _retry_fetch(
         fetch.next_attempt_at = current_ts + timedelta(seconds=wait_seconds)
     else:
         db.session.delete(fetch)
+
+
+def _perform_fetches(
+        fetches: List[DebtorInfoFetch],
+        *,
+        connections: int,
+        timeout: float,
+) -> List[FetchResult]:
+    results: List[FetchResult] = []
+    logger = logging.getLogger(__name__)
+    loop = _get_asyncio_loop()
+    results_and_errors = loop.run_until_complete(
+        _gather_results_and_errors(fetches, connections, timeout)
+    )
+    assert len(fetches) == len(results_and_errors)
+
+    for fetch, obj in zip(fetches, results_and_errors):
+        if isinstance(obj, Exception):  # pragma: no cover
+            # Normally this should never happen. However, it seems
+            # that due to some bug in aiohttp, it sometimes raises
+            # unexpected assertion errors when presented with invalid
+            # URLs ("invalid://swaptacular.github.io/" for example).
+            # Here we catch and log such errors as warnings.
+            logger.warning(
+                "Caught error during request to %s",
+                fetch.iri,
+                exc_info=obj,
+            )
+            results.append(FetchResult(fetch=fetch))
+        else:
+            assert isinstance(obj, FetchResult)
+            results.append(obj)
+
+    return results
+
+
+def _parse_debtor_info_document(
+        url: str,
+        content_type: str,
+        body: str,
+) -> DebtorInfoDocument:
+    # TODO: Add real implementation.
+    raise InvalidDebtorInfoDocument('ups!')
+
+
+async def _gather_results_and_errors(
+        fetches: List[DebtorInfoFetch],
+        connections: int,
+        timeout: float,
+) -> List[Union[FetchResult, Exception]]:
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(
+            limit=connections,
+            ttl_dns_cache=3600,
+        ),
+        timeout=aiohttp.ClientTimeout(total=timeout),
+    ) as client:
+        return await asyncio.gather(
+            *(_get_fetch_result(f, client) for f in fetches),
+            return_exceptions=True,
+        )
+
+
+async def _get_fetch_result(
+        fetch: DebtorInfoFetch,
+        client: aiohttp.ClientSession,
+) -> FetchResult:
+    iri = fetch.iri
+    try:
+        if not iri.startswith("https://"):
+            raise aiohttp.InvalidURL(iri)
+
+        async with client.get(iri, max_redirects=2) as response:
+            if response.status == 200:
+                return FetchResult(
+                    fetch=fetch,
+                    document=_parse_debtor_info_document(
+                        str(response.url),
+                        response.content_type,
+                        await response.text(),
+                    ),
+                    store_document=True,
+                )
+            else:
+                return FetchResult(
+                    fetch=fetch,
+                    errorcode=response.status,
+                    retry=True,
+                )
+
+    except aiohttp.ClientError as e:
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "Failed request to %s (%s: %s)",
+            iri,
+            type(e).__name__,
+            str(e),
+        )
+        retry = not isinstance(e, aiohttp.InvalidURL)
+        return FetchResult(fetch=fetch, retry=retry)
+
+    except asyncio.TimeoutError:  # pragma: no cover
+        logger = logging.getLogger(__name__)
+        logger.info("Timed out request to %s", iri)
+        return FetchResult(fetch=fetch, retry=True)
+
+    except InvalidDebtorInfoDocument:
+        logger = logging.getLogger(__name__)
+        logger.info("Invalid debtor info document at %s", iri)
+        return FetchResult(fetch=fetch, retry=True)
+
+
+def _get_asyncio_loop():
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:  # pragma: nocover
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop
