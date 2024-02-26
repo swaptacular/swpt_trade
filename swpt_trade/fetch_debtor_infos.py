@@ -297,7 +297,7 @@ async def _get_fetch_result(
                     ),
                     store_document=True,
                 )
-            else:
+            else:  # pragma: no cover
                 return FetchResult(
                     fetch=fetch,
                     errorcode=response.status,

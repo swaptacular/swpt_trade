@@ -5,7 +5,9 @@ from swpt_trade import models as m
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.fetch_debtor_infos import (
     FetchResult,
+    InvalidDebtorInfoDocument,
     perform_debtor_info_fetches,
+    _perform_fetches,
 )
 
 
@@ -182,3 +184,60 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
     assert len(confirmations) == 1
     assert confirmations[0].debtor_id == 666
     assert confirmations[0].debtor_info_locator == "https://example.com/666"
+
+
+def test_perform_fetches(app, mocker):
+    def parse_debtor_info_document(url, content_type, body):
+        assert url == "https://swaptacular.github.io/"
+        assert content_type == "text/html"
+        assert isinstance(body, str)
+        raise InvalidDebtorInfoDocument('ups!')
+
+    mocker.patch(
+        "swpt_trade.fetch_debtor_infos._parse_debtor_info_document",
+        new=parse_debtor_info_document,
+    )
+    results = _perform_fetches(
+        [
+            m.DebtorInfoFetch(
+                iri="https://raifj38jprjapt9j4at.com",
+                debtor_id=555,
+                is_locator_fetch=True,
+            ),
+            m.DebtorInfoFetch(
+                iri="invalid://swaptacular.github.io/",
+                debtor_id=666,
+                is_locator_fetch=True,
+            ),
+            m.DebtorInfoFetch(
+                iri="https://!q:2222hub.io/",
+                debtor_id=777,
+                is_locator_fetch=True,
+            ),
+            m.DebtorInfoFetch(
+                iri="https://swaptacular.github.io/",
+                debtor_id=888,
+                is_locator_fetch=True,
+            ),
+        ],
+        connections=10,
+        timeout=30.0,
+    )
+    assert len(results) == 4
+    results.sort(key=lambda r: r.fetch.debtor_id)
+
+    assert results[0].fetch.debtor_id == 555
+    assert results[0].document is None
+    assert results[0].retry is True
+
+    assert results[1].fetch.debtor_id == 666
+    assert results[1].document is None
+    assert results[1].retry is False
+
+    assert results[2].fetch.debtor_id == 777
+    assert results[2].document is None
+    assert results[2].retry is False
+
+    assert results[3].fetch.debtor_id == 888
+    assert results[3].document is None
+    assert results[3].retry is True
