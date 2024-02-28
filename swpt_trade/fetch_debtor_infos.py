@@ -2,13 +2,17 @@ import logging
 import random
 import asyncio
 import aiohttp
+import json
 from typing import TypeVar, Callable, Tuple, List, Optional, Union
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from marshmallow import ValidationError
 from flask import current_app
 from sqlalchemy.sql.expression import and_, not_
 from swpt_pythonlib.utils import ShardingRealm
+from swpt_pythonlib.swpt_uris import parse_debtor_uri
 from swpt_trade.extensions import db
+from swpt_trade.schemas import CoinInfoDocumentSchema
 from swpt_trade.models import (
     DebtorInfoFetch,
     DebtorInfoDocument,
@@ -24,6 +28,7 @@ Classifcation = Tuple[List[FetchTuple], List[FetchTuple], List[FetchTuple]]
 atomic: Callable[[T], T] = db.atomic
 
 RETRY_MIN_WAIT_SECONDS = 60.0  # 1 minute
+coininfo_schema = CoinInfoDocumentSchema()
 
 
 @dataclass
@@ -282,7 +287,7 @@ async def _get_fetch_result(
                 return FetchResult(
                     fetch=fetch,
                     document=_parse_debtor_info_document(
-                        response.content_type, await response.text()
+                        response.content_type, await response.read()
                     ),
                     store_document=True,
                 )
@@ -327,7 +332,46 @@ def _get_asyncio_loop():
 
 def _parse_debtor_info_document(
         content_type: str,
-        body: str,
+        body: bytes,
 ) -> DebtorInfoDocument:
-    # TODO: Add real implementation.
-    raise InvalidDebtorInfoDocument('ups!')
+    if content_type != "application/vnd.swaptacular.coin-info+json":
+        raise InvalidDebtorInfoDocument(
+            "Unknown debtor info document type: %s", content_type
+        )
+
+    try:
+        obj = json.loads(body.decode("utf8"))
+        coininfo = coininfo_schema.load(obj)
+    except (UnicodeError, json.JSONDecodeError, ValidationError):
+        raise InvalidDebtorInfoDocument("Invalid CoinInfo document")
+
+    try:
+        debtor_id = parse_debtor_uri(coininfo["debtor_identity"]["uri"])
+    except ValueError:
+        raise InvalidDebtorInfoDocument("Invalid debtor URI")
+
+    debtor_info_locator = coininfo["latest_debtor_info"]["uri"]
+    will_not_change_until = coininfo.get("optional_will_not_change_until")
+
+    peg = coininfo.get("optional_peg")
+    if peg is not None:
+        try:
+            peg_debtor_id = parse_debtor_uri(peg["debtor_identity"]["uri"])
+        except ValueError:
+            raise InvalidDebtorInfoDocument("Invalid peg debtor URI")
+
+        peg_debtor_info_locator = peg["latest_debtor_info"]["uri"]
+        peg_exchange_rate = peg["exchange_rate"]
+    else:
+        peg_debtor_id = None
+        peg_debtor_info_locator = None
+        peg_exchange_rate = None
+
+    return DebtorInfoDocument(
+        debtor_id=debtor_id,
+        debtor_info_locator=debtor_info_locator,
+        peg_debtor_id=peg_debtor_id,
+        peg_debtor_info_locator=peg_debtor_info_locator,
+        peg_exchange_rate=peg_exchange_rate,
+        will_not_change_until=will_not_change_until,
+    )

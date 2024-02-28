@@ -1,5 +1,5 @@
 import pytest
-from datetime import timedelta
+from datetime import datetime, timedelta
 from swpt_trade.extensions import db
 from swpt_trade import models as m
 from swpt_pythonlib.utils import ShardingRealm
@@ -8,6 +8,7 @@ from swpt_trade.fetch_debtor_infos import (
     InvalidDebtorInfoDocument,
     perform_debtor_info_fetches,
     _perform_fetches,
+    _parse_debtor_info_document,
 )
 
 
@@ -189,7 +190,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
 def test_perform_fetches(app, mocker):
     def parse_debtor_info_document(content_type, body):
         assert content_type == "text/html"
-        assert isinstance(body, str)
+        assert isinstance(body, bytes)
         raise InvalidDebtorInfoDocument('ups!')
 
     mocker.patch(
@@ -240,3 +241,136 @@ def test_perform_fetches(app, mocker):
     assert results[3].fetch.debtor_id == 888
     assert results[3].document is None
     assert results[3].retry is True
+
+
+def test_parse_debtor_info_document(app):
+    with pytest.raises(
+            InvalidDebtorInfoDocument,
+            match="Unknown debtor info document type",
+    ):
+        _parse_debtor_info_document("text/html", b'test')
+
+    with pytest.raises(
+            InvalidDebtorInfoDocument,
+            match="Invalid CoinInfo document",
+    ):
+        _parse_debtor_info_document(
+            "application/vnd.swaptacular.coin-info+json", b'test'
+        )
+
+    with pytest.raises(
+            InvalidDebtorInfoDocument,
+            match="Invalid CoinInfo document",
+    ):
+        _parse_debtor_info_document(
+            "application/vnd.swaptacular.coin-info+json", b'{}'
+        )
+
+    d = _parse_debtor_info_document(
+        "application/vnd.swaptacular.coin-info+json",
+        b"""{
+          "peg": {
+            "type": "Peg",
+            "exchangeRate": 3.14,
+            "debtorIdentity": {
+              "type": "DebtorIdentity",
+              "uri": "swpt:4640381880"
+            },
+            "latestDebtorInfo": {
+              "uri": "https://demo.swaptacular.org/debtors/4640381880"
+            }
+          },
+          "debtorIdentity": {
+            "type": "DebtorIdentity",
+            "uri": "swpt:6199429176"
+          },
+          "latestDebtorInfo": {
+            "uri": "https://demo.swaptacular.org/debtors/6199429176"
+          },
+          "type": "CoinInfo",
+          "willNotChangeUntil": "2030-10-22T07:10:11Z"
+        }""",
+    )
+    assert isinstance(d, m.DebtorInfoDocument)
+    assert d.debtor_id == 6199429176
+    assert d.debtor_info_locator == (
+        "https://demo.swaptacular.org/debtors/6199429176"
+    )
+    assert d.will_not_change_until == (
+        datetime.fromisoformat("2030-10-22T07:10:11Z")
+    )
+    assert d.peg_debtor_id == 4640381880
+    assert d.peg_debtor_info_locator == (
+        "https://demo.swaptacular.org/debtors/4640381880"
+    )
+    assert d.peg_exchange_rate == 3.14
+
+    d = _parse_debtor_info_document(
+        "application/vnd.swaptacular.coin-info+json",
+        b"""{
+          "debtorIdentity": {
+            "type": "DebtorIdentity",
+            "uri": "swpt:6199429176"
+          },
+          "latestDebtorInfo": {
+            "uri": "https://demo.swaptacular.org/debtors/6199429176"
+          },
+          "type": "CoinInfo"
+        }""",
+    )
+    assert isinstance(d, m.DebtorInfoDocument)
+    assert d.debtor_id == 6199429176
+    assert d.debtor_info_locator == (
+        "https://demo.swaptacular.org/debtors/6199429176"
+    )
+    assert d.will_not_change_until is None
+    assert d.peg_debtor_id is None
+    assert d.peg_debtor_info_locator is None
+    assert d.peg_exchange_rate is None
+
+    with pytest.raises(
+            InvalidDebtorInfoDocument,
+            match="Invalid debtor URI",
+    ):
+        _parse_debtor_info_document(
+            "application/vnd.swaptacular.coin-info+json",
+            b"""{
+              "debtorIdentity": {
+                "type": "DebtorIdentity",
+                "uri": "INVALID_DEBTOR_URI"
+              },
+              "latestDebtorInfo": {
+                "uri": "https://demo.swaptacular.org/debtors/6199429176"
+              },
+              "type": "CoinInfo"
+            }""",
+        )
+
+    with pytest.raises(
+            InvalidDebtorInfoDocument,
+            match="Invalid peg debtor URI",
+    ):
+        _parse_debtor_info_document(
+            "application/vnd.swaptacular.coin-info+json",
+            b"""{
+              "debtorIdentity": {
+                "type": "DebtorIdentity",
+                "uri": "swpt:6199429176"
+              },
+              "latestDebtorInfo": {
+                "uri": "https://demo.swaptacular.org/debtors/6199429176"
+              },
+              "peg": {
+                "type": "Peg",
+                "exchangeRate": 3.14,
+                "debtorIdentity": {
+                  "type": "DebtorIdentity",
+                  "uri": "INVALID_DEBTOR_URI"
+                },
+                "latestDebtorInfo": {
+                  "uri": "https://demo.swaptacular.org/debtors/4640381880"
+                }
+              },
+              "type": "CoinInfo"
+            }""",
+        )

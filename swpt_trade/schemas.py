@@ -209,3 +209,60 @@ class UpdatedFlagsMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
     )
     ts = fields.DateTime(required=True)
+
+
+class ShortLinkSchema(Schema):
+    uri = fields.String(required=True, validate=validate.Length(max=200))
+
+
+class DebtorIdentitySchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(
+        required=True,
+        validate=validate.Regexp("^DebtorIdentity(-v[1-9][0-9]{0,5})?$"),
+    )
+    uri = fields.String(required=True, validate=validate.Length(max=100))
+
+
+class PegSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(
+        required=True, validate=validate.Regexp("^Peg(-v[1-9][0-9]{0,5})?$")
+    )
+    latest_debtor_info = fields.Nested(
+        ShortLinkSchema, required=True, data_key="latestDebtorInfo"
+    )
+    debtor_identity = fields.Nested(
+        DebtorIdentitySchema, required=True, data_key="debtorIdentity"
+    )
+    exchange_rate = fields.Float(
+        required=True,
+        validate=validate.Range(min=0.0),
+        data_key="exchangeRate",
+    )
+
+
+class CoinInfoDocumentSchema(Schema):
+    """A debtor info document in ``CoinInfo`` JSON format."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(
+        required=True,
+        validate=validate.Regexp("^CoinInfo(-v[1-9][0-9]{0,5})?$"),
+    )
+    latest_debtor_info = fields.Nested(
+        ShortLinkSchema, required=True, data_key="latestDebtorInfo"
+    )
+    debtor_identity = fields.Nested(
+        DebtorIdentitySchema, required=True, data_key="debtorIdentity"
+    )
+    optional_will_not_change_until = fields.DateTime(
+        data_key="willNotChangeUntil"
+    )
+    optional_peg = fields.Nested(PegSchema, data_key="peg")

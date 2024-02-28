@@ -1,4 +1,5 @@
 import pytest
+import json
 from swpt_trade import schemas
 from marshmallow import ValidationError
 from datetime import datetime, date
@@ -416,3 +417,70 @@ def test_confirm_debtor_message():
         assert len(e.messages) == len(data)
         assert all(m == ['Missing data for required field.']
                    for m in e.messages.values())
+
+
+def test_coin_info_document():
+    s = schemas.CoinInfoDocumentSchema()
+
+    data = s.loads(r"""{
+      "summary": "This is a test currency.\n",
+      "debtorName": "Evgeni Pandurski",
+      "debtorHomepage": {
+        "uri": "https://swaptacular.org/"
+      },
+      "amountDivisor": 100,
+      "decimalPlaces": 2,
+      "unit": "USD",
+      "peg": {
+        "type": "Peg",
+        "exchangeRate": 1,
+        "debtorIdentity": {
+          "type": "DebtorIdentity",
+          "uri": "swpt:4640381880"
+        },
+        "latestDebtorInfo": {
+          "uri": "https://demo.swaptacular.org/debtors/4640381880/public"
+        },
+        "display": {
+          "type": "PegDisplay",
+          "amountDivisor": 100,
+          "decimalPlaces": 2,
+          "unit": "USD"
+        }
+      },
+      "debtorIdentity": {
+        "type": "DebtorIdentity",
+        "uri": "swpt:6199429176"
+      },
+      "revision": 82,
+      "latestDebtorInfo": {
+        "uri": "https://demo.swaptacular.org/debtors/6199429176/public"
+      },
+      "type": "CoinInfo"
+    }""")
+
+    assert data['type'] == 'CoinInfo'
+    assert data['latest_debtor_info']['uri'] == (
+        'https://demo.swaptacular.org/debtors/6199429176/public'
+    )
+    assert data['debtor_identity']['type'] == 'DebtorIdentity'
+    assert data['debtor_identity']['uri'] == 'swpt:6199429176'
+    assert 'optional_peg' in data
+    assert data['optional_peg']['debtor_identity']['type'] == 'DebtorIdentity'
+    assert data['optional_peg']['debtor_identity']['uri'] == 'swpt:4640381880'
+    assert data['optional_peg']['latest_debtor_info']['uri'] == (
+        'https://demo.swaptacular.org/debtors/4640381880/public'
+    )
+    assert data['optional_peg']['exchange_rate'] == 1.0
+    assert isinstance(data['optional_peg']['exchange_rate'], float)
+    assert 'optional_will_not_change_until' not in data
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == 3
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+    with pytest.raises(json.JSONDecodeError):
+        s.loads('invalid JSON')
