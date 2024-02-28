@@ -187,8 +187,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
 
 
 def test_perform_fetches(app, mocker):
-    def parse_debtor_info_document(url, content_type, body):
-        assert url == "https://swaptacular.github.io/"
+    def parse_debtor_info_document(content_type, body):
         assert content_type == "text/html"
         assert isinstance(body, str)
         raise InvalidDebtorInfoDocument('ups!')

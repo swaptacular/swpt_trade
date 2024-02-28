@@ -250,15 +250,6 @@ def _perform_fetches(
     return results
 
 
-def _parse_debtor_info_document(
-        url: str,
-        content_type: str,
-        body: str,
-) -> DebtorInfoDocument:
-    # TODO: Add real implementation.
-    raise InvalidDebtorInfoDocument('ups!')
-
-
 async def _gather_results_and_errors(
         fetches: List[DebtorInfoFetch],
         connections: int,
@@ -291,9 +282,7 @@ async def _get_fetch_result(
                 return FetchResult(
                     fetch=fetch,
                     document=_parse_debtor_info_document(
-                        str(response.url),
-                        response.content_type,
-                        await response.text(),
+                        response.content_type, await response.text()
                     ),
                     store_document=True,
                 )
@@ -334,3 +323,11 @@ def _get_asyncio_loop():
         asyncio.set_event_loop(loop)
 
     return loop
+
+
+def _parse_debtor_info_document(
+        content_type: str,
+        body: str,
+) -> DebtorInfoDocument:
+    # TODO: Add real implementation.
+    raise InvalidDebtorInfoDocument('ups!')
