@@ -247,8 +247,14 @@ class PegSchema(Schema):
 
 
 class CoinInfoDocumentSchema(Schema):
-    """A debtor info document in ``CoinInfo`` JSON format."""
+    """A debtor info document in ``CoinInfo`` JSON format.
 
+    NOTE: This schema validates only the fields that we are interested
+    in, ignoring any possible errors in the fields we *are not*
+    interested in. As a result, an invalid "CoinInfo"" document may be
+    treated as a valid one. Nevertheless, this should be OK for our
+    purposes.
+    """
     class Meta:
         unknown = EXCLUDE
 
