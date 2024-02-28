@@ -111,7 +111,7 @@ def test_roll_turns(app, db_session):
 def test_fetch_debtor_infos(mocker, app, db_session):
     from swpt_trade.fetch_debtor_infos import FetchResult
 
-    def perform_fetches(fetches, **kwargs):
+    def make_https_requests(fetches, **kwargs):
         return [
             FetchResult(
                 fetch=f,
@@ -127,8 +127,8 @@ def test_fetch_debtor_infos(mocker, app, db_session):
         ]
 
     mocker.patch(
-        "swpt_trade.fetch_debtor_infos._perform_fetches",
-        new=perform_fetches,
+        "swpt_trade.fetch_debtor_infos._make_https_requests",
+        new=make_https_requests,
     )
 
     dif = m.DebtorInfoFetch(

@@ -6,8 +6,8 @@ from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.fetch_debtor_infos import (
     FetchResult,
     InvalidDebtorInfoDocument,
-    perform_debtor_info_fetches,
-    _perform_fetches,
+    resolve_debtor_info_fetches,
+    _make_https_requests,
     _parse_debtor_info_document,
 )
 
@@ -22,7 +22,7 @@ def restore_expiry(app):
 def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
     app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"] = -10.0
 
-    def perform_fetches(fetches, **kwargs):
+    def make_https_requests(fetches, **kwargs):
         return [
             FetchResult(
                 fetch=f,
@@ -32,8 +32,8 @@ def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
         ]
 
     mocker.patch(
-        "swpt_trade.fetch_debtor_infos._perform_fetches",
-        new=perform_fetches,
+        "swpt_trade.fetch_debtor_infos._make_https_requests",
+        new=make_https_requests,
     )
 
     db.session.add(
@@ -47,7 +47,7 @@ def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
     )
     db.session.commit()
 
-    assert perform_debtor_info_fetches(1, 0.1) == 1
+    assert resolve_debtor_info_fetches(1, 0.1) == 1
     assert len(m.DebtorInfoFetch.query.all()) == 0
 
 
@@ -60,13 +60,13 @@ def test_cached_and_wrong_shard(
 ):
     app.config["SHARDING_REALM"] = ShardingRealm("0.#")
 
-    def perform_fetches(fetches, **kwargs):
+    def make_https_requests(fetches, **kwargs):
         assert len(fetches) == 0
         return []
 
     mocker.patch(
-        "swpt_trade.fetch_debtor_infos._perform_fetches",
-        new=perform_fetches,
+        "swpt_trade.fetch_debtor_infos._make_https_requests",
+        new=make_https_requests,
     )
 
     db.session.add(
@@ -96,13 +96,13 @@ def test_cached_and_wrong_shard(
     )
     db.session.commit()
 
-    assert perform_debtor_info_fetches(1, 0.1) == 2
+    assert resolve_debtor_info_fetches(1, 0.1) == 2
     assert len(m.DebtorInfoFetch.query.all()) == 0
     assert len(m.DebtorInfoDocument.query.all()) == 1
 
 
-def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
-    def perform_fetches(fetches, **kwargs):
+def test_resolve_debtor_info_fetches(mocker, app, db_session, current_ts):
+    def make_https_requests(fetches, **kwargs):
         return [
             (
                 FetchResult(
@@ -124,8 +124,8 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
         ]
 
     mocker.patch(
-        "swpt_trade.fetch_debtor_infos._perform_fetches",
-        new=perform_fetches,
+        "swpt_trade.fetch_debtor_infos._make_https_requests",
+        new=make_https_requests,
     )
 
     dif1 = m.DebtorInfoFetch(
@@ -146,7 +146,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
     db.session.add(dif2)
     db.session.commit()
 
-    assert perform_debtor_info_fetches(1, 0.1) == 2
+    assert resolve_debtor_info_fetches(1, 0.1) == 2
 
     fetches = m.DebtorInfoFetch.query.all()
     assert len(fetches) == 1
@@ -187,7 +187,7 @@ def test_perform_debtor_info_fetches(mocker, app, db_session, current_ts):
     assert confirmations[0].debtor_info_locator == "https://example.com/666"
 
 
-def test_perform_fetches(app, mocker):
+def test_make_https_requests(app, mocker):
     def parse_debtor_info_document(content_type, body):
         assert content_type == "text/html"
         assert isinstance(body, bytes)
@@ -197,7 +197,7 @@ def test_perform_fetches(app, mocker):
         "swpt_trade.fetch_debtor_infos._parse_debtor_info_document",
         new=parse_debtor_info_document,
     )
-    results = _perform_fetches(
+    results = _make_https_requests(
         [
             m.DebtorInfoFetch(
                 iri="https://raifj38jprjapt9j4at.com",
@@ -220,7 +220,7 @@ def test_perform_fetches(app, mocker):
                 is_locator_fetch=True,
             ),
         ],
-        connections=10,
+        max_connections=10,
         timeout=30.0,
     )
     assert len(results) == 4

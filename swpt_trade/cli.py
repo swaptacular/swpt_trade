@@ -17,7 +17,7 @@ from swpt_pythonlib.multiproc_utils import (
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
 from swpt_trade import procedures
-from swpt_trade.fetch_debtor_infos import perform_debtor_info_fetches
+from swpt_trade.fetch_debtor_infos import resolve_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
 
@@ -509,7 +509,7 @@ def fetch_debtor_infos(
             while not stopped:
                 started_at = time.time()
                 try:
-                    count = perform_debtor_info_fetches(connections, timeout)
+                    count = resolve_debtor_info_fetches(connections, timeout)
                 except Exception:
                     logger.exception(
                         "Caught error while fetching debtor info documents."

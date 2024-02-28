@@ -44,38 +44,38 @@ class InvalidDebtorInfoDocument(Exception):
     """Invalid debtor info document."""
 
 
-def perform_debtor_info_fetches(connections: int, timeout: float) -> int:
+def resolve_debtor_info_fetches(max_connections: int, timeout: float) -> int:
     count = 0
-    burst_count = current_app.config["APP_DEBTOR_INFO_FETCH_BURST_COUNT"]
+    batch_size = current_app.config["APP_DEBTOR_INFO_FETCH_BURST_COUNT"]
 
     while True:
-        n = _perform_debtor_info_fetches_burst(
-            burst_count, connections, timeout
+        n = _resolve_debtor_info_fetches_batch(
+            batch_size, max_connections, timeout
         )
         count += n
-        if n < burst_count:
+        if n < batch_size:
             break
 
     return count
 
 
 @atomic
-def _perform_debtor_info_fetches_burst(
-        burst_count: int,
-        connections: int,
+def _resolve_debtor_info_fetches_batch(
+        batch_size: int,
+        max_connections: int,
         timeout: float,
 ) -> int:
     max_distance_to_base = current_app.config["MAX_DISTANCE_TO_BASE"]
     assert max_distance_to_base > 1
-    assert burst_count > 0
-    assert connections > 0
+    assert batch_size > 0
+    assert max_connections > 0
     assert timeout > 0.0
 
     debtor_info_expiry_period = timedelta(
         days=current_app.config["APP_DEBTOR_INFO_EXPIRY_DAYS"]
     )
-    fetch_results = _resolve_debtor_info_fetches(
-        burst_count, connections, timeout
+    fetch_results = _query_and_resolve_pending_fetches(
+        batch_size, max_connections, timeout
     )
 
     for r in fetch_results:
@@ -141,13 +141,14 @@ def _perform_debtor_info_fetches_burst(
     return len(fetch_results)
 
 
-def _resolve_debtor_info_fetches(
-        max_count: int,
-        connections: int,
+def _query_and_resolve_pending_fetches(
+        batch_size: int,
+        max_connections: int,
         timeout: float,
 ) -> List[FetchResult]:
     current_ts = datetime.now(tz=timezone.utc)
 
+    # Query the database for pending `DebtorInfoFetch`es.
     fetch_tuples: List[FetchTuple] = (
         db.session.query(DebtorInfoFetch, DebtorInfoDocument)
         .outerjoin(
@@ -159,15 +160,16 @@ def _resolve_debtor_info_fetches(
         )
         .filter(DebtorInfoFetch.next_attempt_at <= current_ts)
         .with_for_update(of=DebtorInfoFetch, skip_locked=True)
-        .limit(max_count)
+        .limit(batch_size)
         .all()
     )
-    wrong_shard, cached, new = _classify_fetch_tuples(fetch_tuples)
 
+    # Resolve the pending `DebtorInfoFetch`es that we've got.
+    wrong_shard, cached, new = _classify_fetch_tuples(fetch_tuples)
     wrong_shard_results = [FetchResult(fetch=f) for f, _ in wrong_shard]
     cached_results = [FetchResult(fetch=f, document=d) for f, d in cached]
-    new_results = _perform_fetches(
-        [f for f, _ in new], connections=connections, timeout=timeout
+    new_results = _make_https_requests(
+        [f for f, _ in new], max_connections=max_connections, timeout=timeout
     )
 
     all_results = wrong_shard_results + cached_results + new_results
@@ -176,6 +178,12 @@ def _resolve_debtor_info_fetches(
 
 
 def _classify_fetch_tuples(fetch_tuples: List[FetchTuple]) -> Classifcation:
+    """Classify the list of pending fetches in 3 categories.
+
+    1. Fetches this shard is not responsible for (and must be ignored).
+    2. Fetches for which we have a cached response.
+    3. Fetches for which an HTTPS request must be made.
+    """
     current_ts = datetime.now(tz=timezone.utc)
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     expiry_period = timedelta(
@@ -202,7 +210,9 @@ def _retry_fetch(
         errorcode: Optional[int],
         expiry_period: timedelta,
 ) -> None:
-    """Re-schedule a new attempt with randomized exponential backoff.
+    """Try to re-schedule a new fetch attempt with randomized
+    exponential backoff. Give up if this would take more time than the
+    passed `expiry_period`.
     """
     n = min(fetch.attempts_count, 100)  # We must avoid float overflows!
     wait_seconds = RETRY_MIN_WAIT_SECONDS * (2.0 ** n)
@@ -221,17 +231,17 @@ def _retry_fetch(
         db.session.delete(fetch)
 
 
-def _perform_fetches(
+def _make_https_requests(
         fetches: List[DebtorInfoFetch],
         *,
-        connections: int,
+        max_connections: int,
         timeout: float,
 ) -> List[FetchResult]:
     results: List[FetchResult] = []
     logger = logging.getLogger(__name__)
     loop = _get_asyncio_loop()
     results_and_errors = loop.run_until_complete(
-        _gather_results_and_errors(fetches, connections, timeout)
+        _gather_https_request_results(fetches, max_connections, timeout)
     )
     assert len(fetches) == len(results_and_errors)
 
@@ -255,27 +265,27 @@ def _perform_fetches(
     return results
 
 
-async def _gather_results_and_errors(
+async def _gather_https_request_results(
         fetches: List[DebtorInfoFetch],
-        connections: int,
+        max_connections: int,
         timeout: float,
 ) -> List[Union[FetchResult, Exception]]:
     async with aiohttp.ClientSession(
         connector=aiohttp.TCPConnector(
-            limit=connections,
+            limit=max_connections,
             ttl_dns_cache=3600,
         ),
         timeout=aiohttp.ClientTimeout(total=timeout),
     ) as client:
         return await asyncio.gather(
-            *(_get_fetch_result(f, client) for f in fetches),
+            *(_make_https_request(client, f) for f in fetches),
             return_exceptions=True,
         )
 
 
-async def _get_fetch_result(
-        fetch: DebtorInfoFetch,
+async def _make_https_request(
         client: aiohttp.ClientSession,
+        fetch: DebtorInfoFetch,
 ) -> FetchResult:
     iri = fetch.iri
     try:
@@ -306,8 +316,8 @@ async def _get_fetch_result(
             type(e).__name__,
             str(e),
         )
-        retry = not isinstance(e, aiohttp.InvalidURL)
-        return FetchResult(fetch=fetch, retry=retry)
+        is_invalid_url = isinstance(e, aiohttp.InvalidURL)
+        return FetchResult(fetch=fetch, retry=not is_invalid_url)
 
     except asyncio.TimeoutError:  # pragma: no cover
         logger = logging.getLogger(__name__)
@@ -334,6 +344,11 @@ def _parse_debtor_info_document(
         content_type: str,
         body: bytes,
 ) -> DebtorInfoDocument:
+    """Parse the HTTP request body.
+
+    NOTE: Currently, the only supported format for debtor info
+    documents is the "CoinInfo" JSON document format.
+    """
     if content_type != "application/vnd.swaptacular.coin-info+json":
         raise InvalidDebtorInfoDocument(
             "Unknown debtor info document type: %s", content_type
