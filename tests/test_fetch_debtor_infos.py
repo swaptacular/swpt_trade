@@ -6,7 +6,7 @@ from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.fetch_debtor_infos import (
     FetchResult,
     InvalidDebtorInfoDocument,
-    resolve_debtor_info_fetches,
+    process_debtor_info_fetches,
     _make_https_requests,
     _parse_debtor_info_document,
 )
@@ -47,7 +47,7 @@ def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
     )
     db.session.commit()
 
-    assert resolve_debtor_info_fetches(1, 0.1) == 1
+    assert process_debtor_info_fetches(1, 0.1) == 1
     assert len(m.DebtorInfoFetch.query.all()) == 0
 
 
@@ -96,12 +96,12 @@ def test_cached_and_wrong_shard(
     )
     db.session.commit()
 
-    assert resolve_debtor_info_fetches(1, 0.1) == 2
+    assert process_debtor_info_fetches(1, 0.1) == 2
     assert len(m.DebtorInfoFetch.query.all()) == 0
     assert len(m.DebtorInfoDocument.query.all()) == 1
 
 
-def test_resolve_debtor_info_fetches(mocker, app, db_session, current_ts):
+def test_process_debtor_info_fetches(mocker, app, db_session, current_ts):
     def make_https_requests(fetches, **kwargs):
         return [
             (
@@ -146,7 +146,7 @@ def test_resolve_debtor_info_fetches(mocker, app, db_session, current_ts):
     db.session.add(dif2)
     db.session.commit()
 
-    assert resolve_debtor_info_fetches(1, 0.1) == 2
+    assert process_debtor_info_fetches(1, 0.1) == 2
 
     fetches = m.DebtorInfoFetch.query.all()
     assert len(fetches) == 1

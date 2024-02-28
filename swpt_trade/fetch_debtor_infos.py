@@ -44,12 +44,12 @@ class InvalidDebtorInfoDocument(Exception):
     """Invalid debtor info document."""
 
 
-def resolve_debtor_info_fetches(max_connections: int, timeout: float) -> int:
+def process_debtor_info_fetches(max_connections: int, timeout: float) -> int:
     count = 0
     batch_size = current_app.config["APP_DEBTOR_INFO_FETCH_BURST_COUNT"]
 
     while True:
-        n = _resolve_debtor_info_fetches_batch(
+        n = _process_debtor_info_fetches_batch(
             batch_size, max_connections, timeout
         )
         count += n
@@ -60,7 +60,7 @@ def resolve_debtor_info_fetches(max_connections: int, timeout: float) -> int:
 
 
 @atomic
-def _resolve_debtor_info_fetches_batch(
+def _process_debtor_info_fetches_batch(
         batch_size: int,
         max_connections: int,
         timeout: float,
@@ -164,7 +164,7 @@ def _query_and_resolve_pending_fetches(
         .all()
     )
 
-    # Resolve the pending `DebtorInfoFetch`es that we've got.
+    # Resolve the `DebtorInfoFetch`es that we've got.
     wrong_shard, cached, new = _classify_fetch_tuples(fetch_tuples)
     wrong_shard_results = [FetchResult(fetch=f) for f, _ in wrong_shard]
     cached_results = [FetchResult(fetch=f, document=d) for f, d in cached]
