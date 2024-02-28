@@ -251,7 +251,7 @@ class CoinInfoDocumentSchema(Schema):
 
     NOTE: This schema validates only the fields that we are interested
     in, ignoring any possible errors in the fields we *are not*
-    interested in. As a result, an invalid "CoinInfo"" document may be
+    interested in. As a result, an invalid "CoinInfo" document may be
     treated as a valid one. Nevertheless, this should be OK for our
     purposes.
     """
