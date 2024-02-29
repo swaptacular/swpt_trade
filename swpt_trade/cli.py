@@ -6,7 +6,7 @@ import sys
 import click
 import pika
 from typing import Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import current_app
 from flask.cli import with_appcontext
 from flask_sqlalchemy.model import Model
@@ -16,6 +16,7 @@ from swpt_pythonlib.multiproc_utils import (
     HANDLED_SIGNALS,
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
+from swpt_trade.extensions import db
 from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
@@ -662,3 +663,59 @@ def roll_turns(period, period_offset, check_interval, quit_early):
             break
         if wait_seconds > 0.0:  # pragma: no cover
             time.sleep(wait_seconds)
+
+
+@swpt_trade.command("scan_debtor_info_documents")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_debtor_info_documents(days, quit_early):
+    """Start a process that garbage collects stale debtor info documents.
+
+    The specified number of days determines the intended duration of a
+    single pass through the debtor info documents table. If the number
+    of days is not specified, the value of the environment variable
+    APP_DEBTOR_INFO_DOCUMENTS_SCAN_DAYS is taken. If it is not set,
+    the default number of days is 7.
+    """
+    from swpt_trade.table_scanners import DebtorInfoDocumentScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started debtor info documents scanner.")
+    days = days or current_app.config["APP_DEBTOR_INFO_DOCUMENTS_SCAN_DAYS"]
+    assert days > 0.0
+    scanner = DebtorInfoDocumentScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_debtor_locator_claims")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_debtor_locator_claims(days, quit_early):
+    """Start a process that garbage collects stale debtor locator claims.
+
+    The specified number of days determines the intended duration of a
+    single pass through the debtor locator claims table. If the number
+    of days is not specified, the value of the environment variable
+    APP_DEBTOR_LOCATOR_CLAIMS_SCAN_DAYS is taken. If it is not set,
+    the default number of days is 1.
+    """
+    from swpt_trade.table_scanners import DebtorLocatorClaimScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started debtor locator claims scanner.")
+    days = days or current_app.config["APP_DEBTOR_LOCATOR_CLAIMS_SCAN_DAYS"]
+    assert days > 0.0
+    scanner = DebtorLocatorClaimScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)

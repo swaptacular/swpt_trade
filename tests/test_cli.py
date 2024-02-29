@@ -1,5 +1,7 @@
-from datetime import datetime, timezone
+import sqlalchemy
+from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock
+from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
 from swpt_trade import models as m
 
@@ -188,3 +190,146 @@ def test_fetch_debtor_infos(mocker, app, db_session):
     assert len(confirmations) == 1
     assert confirmations[0].debtor_id == 666
     assert confirmations[0].debtor_info_locator == "https://example.com/666"
+
+
+def test_delete_parent_documents(app, db_session, restore_sharding_realm):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    d1 = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=666,
+    )
+    d2 = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/888",
+        debtor_id=888,
+    )
+    d3 = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/999",
+        debtor_id=999,
+    )
+    db.session.add(d1)
+    db.session.add(d2)
+    db.session.add(d3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE debtor_info_document"))
+
+    assert len(m.DebtorInfoDocument.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_debtor_info_documents",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    documents = m.DebtorInfoDocument.query.all()
+    assert len(documents) == 1
+    assert documents[0].debtor_info_locator == "https://example.com/666"
+
+
+def test_delete_stale_documents(app, db_session, current_ts):
+    d1 = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/666",
+        debtor_id=666,
+        fetched_at=current_ts - timedelta(days=10000),
+    )
+    d2 = m.DebtorInfoDocument(
+        debtor_info_locator="https://example.com/888",
+        debtor_id=888,
+    )
+    db.session.add(d1)
+    db.session.add(d2)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE debtor_info_document"))
+
+    assert len(m.DebtorInfoDocument.query.all()) == 2
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_debtor_info_documents",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    documents = m.DebtorInfoDocument.query.all()
+    assert len(documents) == 1
+    assert documents[0].debtor_info_locator == "https://example.com/888"
+
+
+def test_delete_parent_claims(app, db_session, restore_sharding_realm):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    c1 = m.DebtorLocatorClaim(debtor_id=666)
+    c2 = m.DebtorLocatorClaim(debtor_id=777)
+    c3 = m.DebtorLocatorClaim(debtor_id=888)
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE debtor_locator_claim"))
+
+    assert len(m.DebtorLocatorClaim.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_debtor_locator_claims",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    claims = m.DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 888
+
+
+def test_delete_stale_claims(app, db_session, current_ts):
+    c1 = m.DebtorLocatorClaim(debtor_id=666)
+    c2 = m.DebtorLocatorClaim(
+        debtor_id=777,
+        latest_discovery_fetch_at=current_ts - timedelta(days=10),
+    )
+    c3 = m.DebtorLocatorClaim(
+        debtor_id=888,
+        debtor_info_locator="https://example.com/888",
+        latest_locator_fetch_at=current_ts - timedelta(days=100),
+    )
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE debtor_info_document"))
+
+    assert len(m.DebtorLocatorClaim.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_debtor_locator_claims",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    claims = m.DebtorLocatorClaim.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
