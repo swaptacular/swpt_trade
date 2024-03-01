@@ -2,7 +2,6 @@ from typing import TypeVar, Callable
 from datetime import datetime, timedelta, timezone
 from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
-from sqlalchemy.sql.expression import tuple_
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorInfoDocument,
@@ -17,7 +16,11 @@ class DebtorInfoDocumentScanner(TableScanner):
     """Garbage collects stale debtor info documents."""
 
     table = DebtorInfoDocument.__table__
-    pk = tuple_(DebtorInfoDocument.debtor_info_locator)
+    pk = table.c.debtor_info_locator
+    columns = [
+        DebtorInfoDocument.debtor_info_locator,
+        DebtorInfoDocument.fetched_at,
+    ]
 
     def __init__(self):
         super().__init__()
@@ -59,7 +62,7 @@ class DebtorInfoDocumentScanner(TableScanner):
             )
 
         pks_to_delete = [
-            (row[c_debtor_info_locator],)
+            row[c_debtor_info_locator]
             for row in rows
             if belongs_to_parent_shard(row)
         ]
@@ -85,7 +88,7 @@ class DebtorInfoDocumentScanner(TableScanner):
             return row[c_fetched_at] < cutoff_ts
 
         pks_to_delete = [
-            (row[c_debtor_info_locator],) for row in rows if is_stale(row)
+            row[c_debtor_info_locator] for row in rows if is_stale(row)
         ]
         if pks_to_delete:
             to_delete = (
@@ -104,7 +107,12 @@ class DebtorLocatorClaimScanner(TableScanner):
     """Garbage collects stale debtor locator claims."""
 
     table = DebtorLocatorClaim.__table__
-    pk = tuple_(DebtorLocatorClaim.debtor_id)
+    pk = table.c.debtor_id
+    columns = [
+        DebtorLocatorClaim.debtor_id,
+        DebtorLocatorClaim.latest_locator_fetch_at,
+        DebtorLocatorClaim.latest_discovery_fetch_at,
+    ]
 
     def __init__(self):
         super().__init__()
@@ -149,7 +157,7 @@ class DebtorLocatorClaimScanner(TableScanner):
             )
 
         pks_to_delete = [
-            (row[c_debtor_id],) for row in rows if belongs_to_parent_shard(row)
+            row[c_debtor_id] for row in rows if belongs_to_parent_shard(row)
         ]
         if pks_to_delete:
             to_delete = (
@@ -182,7 +190,7 @@ class DebtorLocatorClaimScanner(TableScanner):
             )
 
         pks_to_delete = [
-            (row[c_debtor_id],) for row in rows if is_stale(row)
+            row[c_debtor_id] for row in rows if is_stale(row)
         ]
         if pks_to_delete:
             to_delete = (
