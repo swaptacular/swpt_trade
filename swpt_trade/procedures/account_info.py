@@ -21,7 +21,7 @@ def process_updated_ledger_signal(
 ) -> None:
     account_info = (
         AccountInfo.query
-        .filter_by(debtor_id=debtor_id, creditor_id=creditor_id)
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .with_for_update()
         .one_or_none()
     )
@@ -64,7 +64,7 @@ def process_updated_policy_signal(
 ) -> None:
     account_info = (
         AccountInfo.query
-        .filter_by(debtor_id=debtor_id, creditor_id=creditor_id)
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .with_for_update()
         .one_or_none()
     )
@@ -105,7 +105,7 @@ def process_updated_flags_signal(
 ) -> None:
     account_info = (
         AccountInfo.query
-        .filter_by(debtor_id=debtor_id, creditor_id=creditor_id)
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .with_for_update()
         .one_or_none()
     )

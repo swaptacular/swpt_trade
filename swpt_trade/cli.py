@@ -737,7 +737,7 @@ def scan_account_infos(days, quit_early):
     single pass through the account infos table. If the number of days
     is not specified, the value of the environment variable
     APP_ACCOUNT_INFOS_SCAN_DAYS is taken. If it is not set, the
-    default number of days is 30.
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import AccountInfosScanner
 
