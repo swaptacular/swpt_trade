@@ -21,6 +21,12 @@ from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
+# TODO: Implement a CLI command which extracts account infos from the
+# "swpt_creditors" microservice via its admin Web API, and loads them
+# into the "account_info" table. This CLI command is intended to be
+# run only once at the beginning, to synchronize the swpt_trade's
+# database with the swpt_creditors's database.
+
 
 @click.group("swpt_trade")
 def swpt_trade():
