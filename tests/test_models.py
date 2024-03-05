@@ -261,3 +261,30 @@ def test_document_has_expired(current_ts):
 
     document.will_not_change_until = current_ts + timedelta(days=1)
     assert not document.has_expired(current_ts, timedelta(days=7))
+
+
+def test_account_info_is_useless(current_ts):
+    ai = m.AccountInfo(
+        creditor_id=777,
+        debtor_id=666,
+        latest_ledger_update_id=1,
+        latest_ledger_update_ts=current_ts,
+        account_id="",
+        creation_date=m.DATE0,
+        principal=0,
+        last_transfer_number=0,
+        latest_policy_update_id=2,
+        latest_policy_update_ts=current_ts,
+        policy_name=None,
+        min_principal=m.MIN_INT64,
+        max_principal=m.MAX_INT64,
+        peg_debtor_id=None,
+        peg_exchange_rate=None,
+        latest_flags_update_id=3,
+        latest_flags_update_ts=current_ts,
+        config_flags=m.DEFAULT_CONFIG_FLAGS,
+    )
+    assert ai.is_useless
+
+    ai.principal = 1000
+    assert not ai.is_useless

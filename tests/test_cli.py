@@ -333,3 +333,64 @@ def test_delete_stale_claims(app, db_session, current_ts):
     claims = m.DebtorLocatorClaim.query.all()
     assert len(claims) == 1
     assert claims[0].debtor_id == 666
+
+
+def test_delete_parent_account_infos(app, db_session, restore_sharding_realm):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    ai1 = m.AccountInfo(creditor_id=666, debtor_id=1, account_id='row1')
+    ai2 = m.AccountInfo(creditor_id=777, debtor_id=2, account_id='row2')
+    ai3 = m.AccountInfo(creditor_id=888, debtor_id=2, account_id='row3')
+    db.session.add(ai1)
+    db.session.add(ai2)
+    db.session.add(ai3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE account_info"))
+
+    assert len(m.AccountInfo.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_account_infos",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    ais = m.AccountInfo.query.all()
+    assert len(ais) == 1
+    assert ais[0].creditor_id == 888
+
+
+def test_delete_useless_account_infos(app, db_session, current_ts):
+    ai1 = m.AccountInfo(creditor_id=666, debtor_id=1)
+    ai2 = m.AccountInfo(creditor_id=777, debtor_id=2, account_id='test')
+    ai3 = m.AccountInfo(creditor_id=888, debtor_id=2)
+    db.session.add(ai1)
+    db.session.add(ai2)
+    db.session.add(ai3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE debtor_info_document"))
+
+    assert len(m.AccountInfo.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_account_infos",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    ais = m.AccountInfo.query.all()
+    assert len(ais) == 1
+    assert ais[0].creditor_id == 777

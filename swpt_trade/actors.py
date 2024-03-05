@@ -239,8 +239,8 @@ def _on_finalized_agent_transfer_signal(
 
 
 def _on_updated_ledger_signal(
-    debtor_id: int,
     creditor_id: int,
+    debtor_id: int,
     update_id: int,
     account_id: str,
     creation_date: date,
@@ -250,13 +250,20 @@ def _on_updated_ledger_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.process_updated_ledger_signal(
+        creditor_id=creditor_id,
+        debtor_id=debtor_id,
+        update_id=update_id,
+        creation_date=creation_date,
+        principal=principal,
+        last_transfer_number=last_transfer_number,
+        ts=ts,
+    )
 
 
 def _on_updated_policy_signal(
-    debtor_id: int,
     creditor_id: int,
+    debtor_id: int,
     update_id: int,
     policy_name: Optional[str],
     min_principal: int,
@@ -267,21 +274,35 @@ def _on_updated_policy_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.process_updated_policy_signal(
+        creditor_id=creditor_id,
+        debtor_id=debtor_id,
+        update_id=update_id,
+        policy_name=policy_name,
+        min_principal=min_principal,
+        max_principal=max_principal,
+        peg_exchange_rate=peg_exchange_rate,
+        peg_debtor_id=peg_debtor_id,
+        ts=ts,
+    )
 
 
 def _on_updated_flags_signal(
-    debtor_id: int,
     creditor_id: int,
+    debtor_id: int,
     update_id: int,
     config_flags: int,
     ts: datetime,
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement
-    raise NotImplementedError
+    procedures.process_updated_flags_signal(
+        creditor_id=creditor_id,
+        debtor_id=debtor_id,
+        update_id=update_id,
+        config_flags=config_flags,
+        ts=ts,
+    )
 
 
 def _on_fetch_debtor_info_signal(
