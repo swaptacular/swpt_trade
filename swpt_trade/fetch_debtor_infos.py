@@ -106,11 +106,13 @@ def _process_debtor_info_fetches_batch(
                 recursion_level = fetch.recursion_level
 
                 if (
-                    peg_debtor_info_locator is not None
+                    fetch.debtor_id == debtor_id
+                    and peg_debtor_info_locator is not None
                     and peg_debtor_id is not None
                     and peg_exchange_rate is not None
                     and recursion_level < max_distance_to_base
                 ):
+                    # Follow the peg-chain recursively.
                     db.session.add(
                         FetchDebtorInfoSignal(
                             iri=peg_debtor_info_locator,
