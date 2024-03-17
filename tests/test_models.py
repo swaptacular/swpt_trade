@@ -201,7 +201,15 @@ def test_configure_account_signal(db_session, current_ts):
     assert message.routing_key == i64_to_hex_routing_key(1)
 
 
-def test_finalize_transfer_signal(db_session, current_ts):
+def test_finalize_transfer_signal(
+        db_session,
+        app,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = False
+
     signal = m.FinalizeTransferSignal(
         debtor_id=1,
         creditor_id=4294967297,
@@ -232,7 +240,7 @@ def test_finalize_transfer_signal(db_session, current_ts):
 
     signal = m.FinalizeTransferSignal(
         debtor_id=1,
-        creditor_id=0,
+        creditor_id=2,
         transfer_id=4567,
         coordinator_id=4294967298,
         coordinator_request_id=112233,

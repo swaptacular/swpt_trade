@@ -182,8 +182,8 @@ class MetaEnvReader(type):
 
 
 class Configuration(metaclass=MetaEnvReader):
-    MIN_CREDITOR_ID: _parse_creditor_id = None
-    MAX_CREDITOR_ID: _parse_creditor_id = None
+    MIN_COLLECTOR_ID: _parse_creditor_id = None
+    MAX_COLLECTOR_ID: _parse_creditor_id = None
 
     TURN_PERIOD = "1d"
     TURN_PERIOD_OFFSET = "0"

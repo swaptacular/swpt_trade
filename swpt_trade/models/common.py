@@ -71,12 +71,7 @@ def message_belongs_to_this_shard(
 
     if message_type in CREDITOR_ID_SHARDED_MESSAGE_TYPES:
         creditor_id = data["creditor_id"]
-        min_creditor_id = current_app.config["MIN_CREDITOR_ID"]
-        max_creditor_id = current_app.config["MAX_CREDITOR_ID"]
-        return (
-            min_creditor_id <= creditor_id <= max_creditor_id
-            and sharding_realm.match(creditor_id, match_parent=match_parent)
-        )
+        return sharding_realm.match(creditor_id, match_parent=match_parent)
     elif message_type in DEBTOR_ID_SHARDED_MESSAGE_TYPES:
         return sharding_realm.match(
             data["debtor_id"], match_parent=match_parent
