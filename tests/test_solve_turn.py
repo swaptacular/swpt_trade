@@ -55,13 +55,19 @@ def test_try_to_advance_turn_to_phase3(db_session):
         )
     )
     db_session.add(
-        CollectorAccount(debtor_id=101, collector_id=997, account_id="997")
+        CollectorAccount(
+            debtor_id=101, collector_id=997, account_id="997", status=1
+        )
     )
     db_session.add(
-        CollectorAccount(debtor_id=101, collector_id=998, account_id="998")
+        CollectorAccount(
+            debtor_id=101, collector_id=998, account_id="998", status=1
+        )
     )
     db_session.add(
-        CollectorAccount(debtor_id=102, collector_id=999, account_id="999")
+        CollectorAccount(
+            debtor_id=102, collector_id=999, account_id="999", status=1
+        )
     )
     db_session.add(
         SellOffer(
@@ -115,6 +121,16 @@ def test_try_to_advance_turn_to_phase3(db_session):
         )
     )
     db_session.commit()
+
+    ca = CollectorAccount.query.all()
+    ca.sort(key=lambda row: row.collector_id)
+    assert len(ca) == 3
+    assert ca[0].collector_id == 997
+    assert ca[0].collector_hash == calc_hash(ca[0].collector_id)
+    assert ca[1].collector_id == 998
+    assert ca[1].collector_hash == calc_hash(ca[1].collector_id)
+    assert ca[2].collector_id == 999
+    assert ca[2].collector_hash == calc_hash(ca[2].collector_id)
 
     try_to_advance_turn_to_phase3(turn)
 

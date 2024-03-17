@@ -1,14 +1,41 @@
 from __future__ import annotations
 from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
-from .common import get_now_utc
+from .common import get_now_utc, calc_i64_column_hash
 
 
 class CollectorAccount(db.Model):
     __bind_key__ = "solver"
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     collector_id = db.Column(db.BigInteger, primary_key=True)
-    account_id = db.Column(db.String, nullable=False)
+    collector_hash = db.Column(
+        db.SmallInteger,
+        nullable=False,
+        default=lambda ctx: calc_i64_column_hash(ctx, "collector_id"),
+    )
+    account_id = db.Column(db.String, nullable=False, default="")
+    status = db.Column(
+        db.SmallInteger,
+        nullable=False,
+        default=0,
+        comment=(
+            "Collector account's status: 0) requested account creation;"
+            " 1) created and operational; 2) disabled."
+        ),
+    )
+    latest_status_change_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_now_utc,
+    )
+    __table_args__ = (
+        db.CheckConstraint(and_(status >= 0, status <= 2)),
+        db.Index(
+            "idx_collector_account_creation_request",
+            status,
+            postgresql_where=status == 0,
+        ),
+    )
 
 
 class Turn(db.Model):
@@ -44,11 +71,11 @@ class Turn(db.Model):
         db.CheckConstraint(or_(phase < 2, collection_deadline != null())),
         db.CheckConstraint(or_(phase < 3, collection_started_at != null())),
         db.Index(
-            "idx_phase",
+            "idx_turn_phase",
             phase,
             postgresql_where=phase < 4,
         ),
-        db.Index("idx_started_at", started_at),
+        db.Index("idx_turn_started_at", started_at),
     )
 
 
@@ -87,7 +114,7 @@ class CurrencyInfo(db.Model):
     is_confirmed = db.Column(db.BOOLEAN, nullable=False)
     __table_args__ = (
         db.Index(
-            "idx_confirmed_debtor_id",
+            "idx_currency_info_confirmed_debtor_id",
             turn_id,
             debtor_id,
             unique=True,

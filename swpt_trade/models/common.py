@@ -5,6 +5,7 @@ from flask import current_app
 from swpt_trade.extensions import db, publisher
 from swpt_pythonlib import rabbitmq
 from swpt_pythonlib.utils import ShardingRealm
+from swpt_trade.utils import calc_hash
 
 MIN_INT16 = -1 << 15
 MAX_INT16 = (1 << 15) - 1
@@ -55,6 +56,10 @@ DEBTOR_INFO_LOCATOR_SHARDED_MESSAGE_TYPES = set([
 
 def get_now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def calc_i64_column_hash(context, column_name) -> int:
+    return calc_hash(context.get_current_parameters()[column_name])
 
 
 def message_belongs_to_this_shard(

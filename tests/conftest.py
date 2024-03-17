@@ -58,6 +58,7 @@ def db_session(app):
         "TRUNCATE TABLE debtor_info",
         "TRUNCATE TABLE confirmed_debtor",
         "TRUNCATE TABLE currency_info",
+        "TRUNCATE TABLE buy_offer",
         "TRUNCATE TABLE sell_offer",
         "TRUNCATE TABLE creditor_taking",
         "TRUNCATE TABLE collector_collecting",
