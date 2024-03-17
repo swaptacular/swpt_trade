@@ -192,9 +192,9 @@ def ensure_collector_accounts(
         number_of_accounts: int = 1,
 ) -> None:
     """Ensure that for the given `debtor_id`, there are at least
-    `number_of_accounts` live (status != 2) collector accounts.
+    `number_of_accounts` alive (status != 2) collector accounts.
 
-    When the number of existing live collector accounts is less than
+    When the number of existing alive collector accounts is less than
     the given `number_of_accounts`, new collector accounts will be
     created until the given number is reached.
 
@@ -221,10 +221,10 @@ def ensure_collector_accounts(
         while True:
             yield rgen.randint(min_collector_id, max_collector_id)
 
-    number_of_live_accounts = sum(
+    number_of_alive_accounts = sum(
         1 for account in existing_acconts if account.status != 2
     )
-    if number_of_live_accounts < number_of_accounts:
+    if number_of_alive_accounts < number_of_accounts:
         with db.retry_on_integrity_error():
             existing_ids = set(x.collector_id for x in existing_acconts)
 
@@ -237,6 +237,6 @@ def ensure_collector_accounts(
                         )
                     )
                     existing_ids.add(collector_id)
-                    number_of_live_accounts += 1
-                    if number_of_live_accounts == number_of_accounts:
+                    number_of_alive_accounts += 1
+                    if number_of_alive_accounts == number_of_accounts:
                         break
