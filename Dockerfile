@@ -58,8 +58,9 @@ COPY --from=venv-image /usr/src/app/tests/*.so tests/
 
 COPY docker/entrypoint.sh \
      docker/gunicorn.conf.py \
+     docker/supervisord-worker.conf \
+     docker/supervisord-solver.conf \
      docker/supervisord-webserver.conf \
-     docker/supervisord-all.conf \
      docker/trigger_supervisor_process.py \
      wsgi.py \
      pytest.ini \

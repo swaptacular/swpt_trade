@@ -147,10 +147,14 @@ case $1 in
         shift
         exec flask swpt_trade flush_messages $signal_name "$@"
         ;;
-    all)
-        # Spawns all the necessary processes in one container.
+    worker)
+        # Spawns all the necessary worker processes in one container.
+        exec supervisord -c "$APP_ROOT_DIR/supervisord-worker.conf"
+        ;;
+    solver)
+        # Spawns all the necessary solver processes in one container.
         generate_oathkeeper_configuration
-        exec supervisord -c "$APP_ROOT_DIR/supervisord-all.conf"
+        exec supervisord -c "$APP_ROOT_DIR/supervisord-solver.conf"
         ;;
     *)
         exec "$@"
