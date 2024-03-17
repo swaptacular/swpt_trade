@@ -232,8 +232,7 @@ def ensure_collector_accounts(
                 if collector_id not in existing_ids:
                     db.session.add(
                         CollectorAccount(
-                            debtor_id=debtor_id,
-                            collector_id=collector_id,
+                            debtor_id=debtor_id, collector_id=collector_id
                         )
                     )
                     existing_ids.add(collector_id)
