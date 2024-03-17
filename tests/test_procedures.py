@@ -4,6 +4,7 @@ from swpt_trade import procedures as p
 from swpt_trade.models import (
     Turn,
     DebtorInfo,
+    CollectorAccount,
     ConfirmedDebtor,
     CurrencyInfo,
     CollectorSending,
@@ -698,3 +699,60 @@ def test_process_updated_flags_signal(db_session, current_ts):
     assert ais[0].latest_flags_update_id == 124
     assert ais[0].latest_flags_update_ts == current_ts + timedelta(hours=1)
     assert ais[0].config_flags == 4567
+
+
+def test_activate_collector_account(db_session, current_ts):
+    db_session.add(
+        CollectorAccount(
+            debtor_id=666,
+            collector_id=123,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=777,
+            collector_id=123,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=666,
+            collector_id=321,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.commit()
+
+    # non-existing account
+    assert not p.activate_collector_account(
+        debtor_id=666,
+        collector_id=999,
+        account_id="acconut999",
+    )
+
+    # existing account
+    assert p.activate_collector_account(
+        debtor_id=666,
+        collector_id=123,
+        account_id="acconut123",
+    )
+
+    # already activated account
+    assert not p.activate_collector_account(
+        debtor_id=666,
+        collector_id=123,
+        account_id="changed-acconut-id",
+    )
+
+    cas = CollectorAccount.query.all()
+    cas.sort(key=lambda r: (r.debtor_id, r.collector_id))
+    assert len(cas) == 3
+    assert cas[0].status == 1
+    assert cas[0].account_id == "acconut123"
+    assert cas[0].latest_status_change_at >= current_ts
+    assert cas[1].status == 0
+    assert cas[1].account_id == ""
+    assert cas[2].status == 0
+    assert cas[2].account_id == ""

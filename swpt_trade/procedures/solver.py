@@ -7,6 +7,7 @@ from swpt_trade.extensions import db
 from swpt_trade.models import (
     Turn,
     DebtorInfo,
+    CollectorAccount,
     ConfirmedDebtor,
     CurrencyInfo,
     CollectorDispatching,
@@ -155,3 +156,27 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
             # There are no pending rows.
             turn.phase = 4
             turn.phase_deadline = None
+
+
+@atomic
+def activate_collector_account(
+        *,
+        debtor_id: int,
+        collector_id: int,
+        account_id: str,
+) -> bool:
+    current_ts = datetime.now(tz=timezone.utc)
+    updated_rows = (
+        CollectorAccount.query
+        .filter_by(debtor_id=debtor_id, collector_id=collector_id, status=0)
+        .update(
+            {
+                CollectorAccount.account_id: account_id,
+                CollectorAccount.status: 1,
+                CollectorAccount.latest_status_change_at: current_ts,
+            },
+            synchronize_session=False,
+        )
+    )
+    assert updated_rows <= 1
+    return updated_rows > 0
