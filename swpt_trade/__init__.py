@@ -271,6 +271,12 @@ class Configuration(metaclass=MetaEnvReader):
 
 
 def _check_config_sanity(c):  # pragma: nocover
+    if (c["SHARDING_REALM"].realm_mask << 16) != 0:
+        raise RuntimeError(
+            "The configured SHARDING_REALM indicates that there are"
+            " too many shards."
+        )
+
     if c["APP_LOCATOR_CLAIM_EXPIRY_DAYS"] < 30.0:
         raise RuntimeError(
             "The configured value for APP_LOCATOR_CLAIM_EXPIRY_DAYS is"
