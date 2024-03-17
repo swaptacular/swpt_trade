@@ -1,4 +1,5 @@
-from typing import TypeVar, Callable, List
+from typing import TypeVar, Callable, List, Iterable
+from random import Random
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, insert, text
 from sqlalchemy.sql.expression import null, and_
@@ -180,3 +181,62 @@ def activate_collector_account(
     )
     assert updated_rows <= 1
     return updated_rows > 0
+
+
+@atomic
+def ensure_collector_accounts(
+        *,
+        debtor_id: int,
+        min_collector_id: int,
+        max_collector_id: int,
+        number_of_accounts: int = 1,
+) -> None:
+    """Ensure that for the given `debtor_id`, there are at least
+    `number_of_accounts` live (status != 2) collector accounts.
+
+    When the number of existing live collector accounts is less than
+    the given `number_of_accounts`, new collector accounts will be
+    created until the given number is reached.
+
+    The collector IDs for the created accounts will be picked from a
+    *repeatable* pseudoranom sequence. Thus, when two or more
+    processes happen to call this procedure simultaneously (that is: a
+    race condition has occurred), all the processes will pick the same
+    collector IDs, avoiding the creation of unneeded collector
+    accounts.
+    """
+    existing_acconts = (
+        CollectorAccount.query
+        .filter_by(debtor_id=debtor_id)
+        .all()
+    )
+
+    def collector_ids_iter() -> Iterable[int]:
+        ids_total_count = 1 + max_collector_id - min_collector_id
+        if ids_total_count < 2 * (len(existing_acconts) + number_of_accounts):
+            raise RuntimeError(
+                "The number of available collector IDs is not big enough."
+            )
+        rgen = Random(debtor_id)
+        while True:
+            yield rgen.randint(min_collector_id, max_collector_id)
+
+    number_of_live_accounts = sum(
+        1 for account in existing_acconts if account.status != 2
+    )
+    if number_of_live_accounts < number_of_accounts:
+        with db.retry_on_integrity_error():
+            existing_ids = set(x.collector_id for x in existing_acconts)
+
+            for collector_id in collector_ids_iter():
+                if collector_id not in existing_ids:
+                    db.session.add(
+                        CollectorAccount(
+                            debtor_id=debtor_id,
+                            collector_id=collector_id,
+                        )
+                    )
+                    existing_ids.add(collector_id)
+                    number_of_live_accounts += 1
+                    if number_of_live_accounts == number_of_accounts:
+                        break

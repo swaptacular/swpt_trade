@@ -756,3 +756,47 @@ def test_activate_collector_account(db_session, current_ts):
     assert cas[1].account_id == ""
     assert cas[2].status == 0
     assert cas[2].account_id == ""
+
+
+def test_ensure_collector_accounts(db_session):
+    p.ensure_collector_accounts(
+        debtor_id=666,
+        min_collector_id=1000,
+        max_collector_id=2000,
+        number_of_accounts=3,
+    )
+
+    cas = CollectorAccount.query.all()
+    assert len(cas) == 3
+    for ca in cas:
+        assert ca.status == 0
+        assert 1000 <= ca.collector_id <= 2000
+
+    db_session.add(CollectorAccount(debtor_id=777, collector_id=1, status=1))
+    db_session.add(CollectorAccount(debtor_id=666, collector_id=1, status=2))
+    db_session.commit()
+
+    p.ensure_collector_accounts(
+        debtor_id=666,
+        min_collector_id=1000,
+        max_collector_id=2000,
+        number_of_accounts=4,
+    )
+
+    cas = CollectorAccount.query.filter_by(debtor_id=666).all()
+    cas.sort(key=lambda x: x.status)
+    assert len(cas) == 5
+    for ca in cas[:-1]:
+        assert ca.status == 0
+        assert 1000 <= ca.collector_id <= 2000
+
+    assert cas[-1].status == 2
+    assert len(CollectorAccount.query.filter_by(debtor_id=777).all()) == 1
+
+    with pytest.raises(RuntimeError):
+        p.ensure_collector_accounts(
+            debtor_id=666,
+            min_collector_id=1,
+            max_collector_id=2,
+            number_of_accounts=40,
+        )
