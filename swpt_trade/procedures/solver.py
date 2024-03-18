@@ -3,6 +3,7 @@ from random import Random
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, insert, text
 from sqlalchemy.sql.expression import null, and_
+from sqlalchemy.orm import load_only
 from swpt_trade.utils import can_start_new_turn
 from swpt_trade.extensions import db
 from swpt_trade.models import (
@@ -208,6 +209,7 @@ def ensure_collector_accounts(
     existing_acconts = (
         CollectorAccount.query
         .filter_by(debtor_id=debtor_id)
+        .options(load_only(CollectorAccount.status))
         .all()
     )
 
