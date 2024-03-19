@@ -19,8 +19,8 @@ class CollectorAccount(db.Model):
         nullable=False,
         default=0,
         comment=(
-            "Collector account's status: 0) requested account creation;"
-            " 1) created and operational; 2) disabled."
+            "Collector account's status: 0) pristine; 1) account creation"
+            " has been requested; 2) created and operational; 3) disabled."
         ),
     )
     latest_status_change_at = db.Column(
@@ -29,7 +29,7 @@ class CollectorAccount(db.Model):
         default=get_now_utc,
     )
     __table_args__ = (
-        db.CheckConstraint(and_(status >= 0, status <= 2)),
+        db.CheckConstraint(and_(status >= 0, status <= 3)),
         db.Index(
             "idx_collector_account_creation_request",
             status,

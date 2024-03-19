@@ -138,6 +138,7 @@ case $1 in
         flush_store_documents=StoreDocumentSignal
         flush_discover_debtors=DiscoverDebtorSignal
         flush_confirm_debtors=ConfirmDebtorSignal
+        flush_activate_collectors=ActivateCollectorSignal
         flush_all=
 
         # For example: if `$1` is "flush_configure_accounts",

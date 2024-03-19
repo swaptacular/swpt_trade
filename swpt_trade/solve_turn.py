@@ -83,7 +83,7 @@ def _register_collector_accounts(solver: Solver, turn_id: int) -> None:
                     CollectorAccount.collector_id,
                     CollectorAccount.debtor_id,
                 )
-                .where(CollectorAccount.status == 1)
+                .where(CollectorAccount.status == 2)
         ) as result:
             for row in result:
                 solver.register_collector_account(*row)

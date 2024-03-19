@@ -701,11 +701,13 @@ def test_process_updated_flags_signal(db_session, current_ts):
     assert ais[0].config_flags == 4567
 
 
-def test_activate_collector_account(db_session, current_ts):
+@pytest.mark.parametrize("status", [0, 1])
+def test_activate_collector_account(db_session, current_ts, status):
     db_session.add(
         CollectorAccount(
             debtor_id=666,
             collector_id=123,
+            status=status,
             latest_status_change_at=current_ts - timedelta(days=1),
         )
     )
@@ -713,6 +715,7 @@ def test_activate_collector_account(db_session, current_ts):
         CollectorAccount(
             debtor_id=777,
             collector_id=123,
+            status=status,
             latest_status_change_at=current_ts - timedelta(days=1),
         )
     )
@@ -720,6 +723,7 @@ def test_activate_collector_account(db_session, current_ts):
         CollectorAccount(
             debtor_id=666,
             collector_id=321,
+            status=status,
             latest_status_change_at=current_ts - timedelta(days=1),
         )
     )
@@ -749,13 +753,64 @@ def test_activate_collector_account(db_session, current_ts):
     cas = CollectorAccount.query.all()
     cas.sort(key=lambda r: (r.debtor_id, r.collector_id))
     assert len(cas) == 3
-    assert cas[0].status == 1
+    assert cas[0].status == 2
     assert cas[0].account_id == "acconut123"
     assert cas[0].latest_status_change_at >= current_ts
-    assert cas[1].status == 0
+    assert cas[1].status == status
     assert cas[1].account_id == ""
-    assert cas[2].status == 0
+    assert cas[2].status == status
     assert cas[2].account_id == ""
+
+
+def test_mark_requested_collector_account(db_session, current_ts):
+    db_session.add(
+        CollectorAccount(
+            debtor_id=666,
+            collector_id=123,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=777,
+            collector_id=123,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=666,
+            collector_id=321,
+            latest_status_change_at=current_ts - timedelta(days=1),
+        )
+    )
+    db_session.commit()
+
+    # non-existing account
+    assert not p.mark_requested_collector_account(
+        debtor_id=666,
+        collector_id=999,
+    )
+
+    # existing account
+    assert p.mark_requested_collector_account(
+        debtor_id=666,
+        collector_id=123,
+    )
+
+    # already marked account
+    assert not p.mark_requested_collector_account(
+        debtor_id=666,
+        collector_id=123,
+    )
+
+    cas = CollectorAccount.query.all()
+    cas.sort(key=lambda r: (r.debtor_id, r.collector_id))
+    assert len(cas) == 3
+    assert cas[0].status == 1
+    assert cas[0].latest_status_change_at >= current_ts
+    assert cas[1].status == 0
+    assert cas[2].status == 0
 
 
 def test_ensure_collector_accounts(db_session):
@@ -772,8 +827,8 @@ def test_ensure_collector_accounts(db_session):
         assert ca.status == 0
         assert 1000 <= ca.collector_id <= 2000
 
-    db_session.add(CollectorAccount(debtor_id=777, collector_id=1, status=1))
-    db_session.add(CollectorAccount(debtor_id=666, collector_id=1, status=2))
+    db_session.add(CollectorAccount(debtor_id=777, collector_id=1, status=2))
+    db_session.add(CollectorAccount(debtor_id=666, collector_id=1, status=3))
     db_session.commit()
 
     p.ensure_collector_accounts(
@@ -790,7 +845,7 @@ def test_ensure_collector_accounts(db_session):
         assert ca.status == 0
         assert 1000 <= ca.collector_id <= 2000
 
-    assert cas[-1].status == 2
+    assert cas[-1].status == 3
     assert len(CollectorAccount.query.filter_by(debtor_id=777).all()) == 1
 
     with pytest.raises(RuntimeError):

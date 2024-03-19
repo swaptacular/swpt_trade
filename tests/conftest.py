@@ -45,10 +45,13 @@ def db_session(app):
         "TRUNCATE TABLE store_document_signal",
         "TRUNCATE TABLE discover_debtor_signal",
         "TRUNCATE TABLE confirm_debtor_signal",
+        "TRUNCATE TABLE activate_collector_signal",
         "TRUNCATE TABLE debtor_info_document",
         "TRUNCATE TABLE debtor_locator_claim",
         "TRUNCATE TABLE debtor_info_fetch",
         "TRUNCATE TABLE account_info",
+        "TRUNCATE TABLE worker_account",
+        "TRUNCATE TABLE needed_worker_account",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
 

@@ -388,6 +388,21 @@ def _on_confirm_debtor_signal(
     )
 
 
+def _on_activate_collector_signal(
+    debtor_id: int,
+    creditor_id: int,
+    account_id: str,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    procedures.activate_collector_account(
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        account_id=account_id,
+    )
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -432,6 +447,10 @@ _MESSAGE_TYPES = {
     "ConfirmDebtor": (
         schemas.ConfirmDebtorMessageSchema(),
         _on_confirm_debtor_signal,
+    ),
+    "ActivateCollector": (
+        schemas.ActivateCollectorMessageSchema(),
+        _on_activate_collector_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),

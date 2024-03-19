@@ -56,17 +56,17 @@ def test_try_to_advance_turn_to_phase3(db_session):
     )
     db_session.add(
         CollectorAccount(
-            debtor_id=101, collector_id=997, account_id="997", status=1
+            debtor_id=101, collector_id=997, account_id="997", status=2
         )
     )
     db_session.add(
         CollectorAccount(
-            debtor_id=101, collector_id=998, account_id="998", status=1
+            debtor_id=101, collector_id=998, account_id="998", status=2
         )
     )
     db_session.add(
         CollectorAccount(
-            debtor_id=102, collector_id=999, account_id="999", status=1
+            debtor_id=102, collector_id=999, account_id="999", status=2
         )
     )
     db_session.add(

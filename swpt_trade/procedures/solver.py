@@ -161,6 +161,28 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
 
 
 @atomic
+def mark_requested_collector_account(
+        *,
+        debtor_id: int,
+        collector_id: int,
+) -> bool:
+    current_ts = datetime.now(tz=timezone.utc)
+    updated_rows = (
+        CollectorAccount.query
+        .filter_by(debtor_id=debtor_id, collector_id=collector_id, status=0)
+        .update(
+            {
+                CollectorAccount.status: 1,
+                CollectorAccount.latest_status_change_at: current_ts,
+            },
+            synchronize_session=False,
+        )
+    )
+    assert updated_rows <= 1
+    return updated_rows > 0
+
+
+@atomic
 def activate_collector_account(
         *,
         debtor_id: int,
@@ -170,11 +192,12 @@ def activate_collector_account(
     current_ts = datetime.now(tz=timezone.utc)
     updated_rows = (
         CollectorAccount.query
-        .filter_by(debtor_id=debtor_id, collector_id=collector_id, status=0)
+        .filter_by(debtor_id=debtor_id, collector_id=collector_id)
+        .filter(CollectorAccount.status <= 1)
         .update(
             {
                 CollectorAccount.account_id: account_id,
-                CollectorAccount.status: 1,
+                CollectorAccount.status: 2,
                 CollectorAccount.latest_status_change_at: current_ts,
             },
             synchronize_session=False,
@@ -193,7 +216,7 @@ def ensure_collector_accounts(
         number_of_accounts: int = 1,
 ) -> None:
     """Ensure that for the given `debtor_id`, there are at least
-    `number_of_accounts` alive (status != 2) collector accounts.
+    `number_of_accounts` alive (status != 3) collector accounts.
 
     When the number of existing alive collector accounts is less than
     the given `number_of_accounts`, new collector accounts will be
@@ -224,7 +247,7 @@ def ensure_collector_accounts(
             yield rgen.randint(min_collector_id, max_collector_id)
 
     number_of_alive_accounts = sum(
-        1 for account in existing_acconts if account.status != 2
+        1 for account in existing_acconts if account.status != 3
     )
     if number_of_alive_accounts < number_of_accounts:
         with db.retry_on_integrity_error():
