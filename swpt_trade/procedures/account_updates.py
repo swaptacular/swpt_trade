@@ -163,7 +163,14 @@ def process_account_purge_signal(
         debtor_id: int,
         creditor_id: int,
         creation_date: date,
-) -> None:
+) -> bool:
+    needed_worker_account = (
+        NeededWorkerAccount.query.filter_by(
+            creditor_id=creditor_id, debtor_id=debtor_id
+        )
+        .with_for_update(read=True)
+        .one_or_none()
+    )
     worker_account = (
         WorkerAccount.query.filter_by(
             creditor_id=creditor_id, debtor_id=debtor_id
@@ -175,6 +182,8 @@ def process_account_purge_signal(
     )
     if worker_account:
         db.session.delete(worker_account)
+
+    return needed_worker_account is not None
 
 
 def _discard_orphaned_account(

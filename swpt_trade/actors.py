@@ -100,11 +100,19 @@ def _on_account_purge_signal(
     *args,
     **kwargs
 ) -> None:
-    procedures.process_account_purge_signal(
+    is_needed_account = procedures.process_account_purge_signal(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         creation_date=creation_date,
     )
+    if is_needed_account:
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "Received AccountPurge message"
+            " for NeededWorkerAccount(creditor_id=%d, debtor_id=%d).",
+            creditor_id,
+            debtor_id,
+        )
 
 
 def _on_account_transfer_signal(
