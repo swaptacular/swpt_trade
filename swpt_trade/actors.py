@@ -24,15 +24,12 @@ def _on_rejected_config_signal(
     *args,
     **kwargs
 ) -> None:
-    procedures.process_rejected_config_signal(
-        debtor_id=debtor_id,
-        creditor_id=creditor_id,
-        config_ts=config_ts,
-        config_seqnum=config_seqnum,
-        negligible_amount=negligible_amount,
-        config_data=config_data,
-        config_flags=config_flags,
-        rejection_code=rejection_code,
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "Received RejectedConfig message"
+        " for WorkerAccount(creditor_id=%d, debtor_id=%d).",
+        creditor_id,
+        debtor_id,
     )
 
 
@@ -74,6 +71,8 @@ def _on_account_update_signal(
         principal=principal,
         interest=interest,
         interest_rate=interest_rate,
+        demurrage_rate=demurrage_rate,
+        commit_period=commit_period,
         last_interest_rate_change_ts=last_interest_rate_change_ts,
         transfer_note_max_bytes=transfer_note_max_bytes,
         last_config_ts=last_config_ts,

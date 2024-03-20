@@ -277,6 +277,8 @@ def activate_collector(
         collector_id: int,
         account_id: str,
 ) -> bool:
+    assert account_id
+
     current_ts = datetime.now(tz=timezone.utc)
     updated_rows = (
         CollectorAccount.query

@@ -124,7 +124,9 @@ class ActivateCollectorMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     account_id = fields.String(
-        required=True, validate=validate.Length(max=ACCOUNT_ID_MAX_BYTES)
+        required=True, validate=validate.Length(
+            min=1, max=ACCOUNT_ID_MAX_BYTES
+        )
     )
     ts = fields.DateTime(required=True)
 

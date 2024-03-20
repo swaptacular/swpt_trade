@@ -13,6 +13,8 @@ class NeededWorkerAccount(db.Model):
 
 
 class WorkerAccount(db.Model):
+    CONFIG_SCHEDULED_FOR_DELETION_FLAG = 1 << 0
+
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creation_date = db.Column(db.DATE, nullable=False)
