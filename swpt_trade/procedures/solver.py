@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, List, Iterable
+from typing import TypeVar, Callable, List, Iterable, Tuple
 from random import Random
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, insert, text
@@ -9,6 +9,9 @@ from swpt_trade.extensions import db
 from swpt_trade.models import (
     Turn,
     DebtorInfo,
+    NeededWorkerAccount,
+    WorkerAccount,
+    ConfigureAccountSignal,
     CollectorAccount,
     ConfirmedDebtor,
     CurrencyInfo,
@@ -19,6 +22,8 @@ from swpt_trade.models import (
     CreditorGiving,
     CreditorTaking,
     TS0,
+    HUGE_NEGLIGIBLE_AMOUNT,
+    DEFAULT_CONFIG_FLAGS,
 )
 
 
@@ -161,7 +166,90 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
 
 
 @atomic
-def mark_requested_collector_account(
+def get_pristine_collectors(
+        *,
+        hash_mask: int,
+        hash_prefix: int,
+        max_count: int = None,
+) -> List[Tuple[int, int]]:
+    query = (
+        db.session.query(
+            CollectorAccount.debtor_id, CollectorAccount.collector_id
+        )
+        .filter(
+            and_(
+                CollectorAccount.status == 0,
+                CollectorAccount.collector_hash.op("&")(hash_mask)
+                == hash_prefix,
+            )
+        )
+    )
+    if max_count is not None:
+        query = query.limit(max_count)
+
+    return query.all()
+
+
+@atomic
+def process_pristine_collector(
+        *,
+        debtor_id: int,
+        collector_id: int,
+        max_delay: timedelta,
+) -> str:
+    current_ts = datetime.now(tz=timezone.utc)
+    needed_worker_account = (
+        NeededWorkerAccount.query
+        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+        .one_or_none()
+    )
+    worker_account = (
+        WorkerAccount.query
+        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+        .options(load_only(WorkerAccount.account_id))
+        .one_or_none()
+    )
+
+    if needed_worker_account is None:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                NeededWorkerAccount(
+                    creditor_id=collector_id,
+                    debtor_id=debtor_id,
+                    configured_at=current_ts,
+                )
+            )
+        must_configure_account = True
+    elif (
+            worker_account is None
+            and needed_worker_account.configured_at + max_delay < current_ts
+    ):
+        # It's been a while since the last `ConfigureAccount` message
+        # was sent for this collector account, and yet there is no
+        # account created. The only reasonable thing that we can do in
+        # this case, is to send another `ConfigureAccount` message for
+        # the account, hoping that this will fix the problem.
+        needed_worker_account.configured_at = current_ts
+        must_configure_account = True
+    else:
+        must_configure_account = False
+
+    if must_configure_account:
+        db.session.add(
+            ConfigureAccountSignal(
+                creditor_id=collector_id,
+                debtor_id=debtor_id,
+                ts=current_ts,
+                seqnum=0,
+                negligible_amount=HUGE_NEGLIGIBLE_AMOUNT,
+                config_flags=DEFAULT_CONFIG_FLAGS,
+            )
+        )
+    return worker_account.account_id if worker_account else ""
+
+
+@atomic
+def mark_requested_collector(
         *,
         debtor_id: int,
         collector_id: int,
@@ -183,7 +271,7 @@ def mark_requested_collector_account(
 
 
 @atomic
-def activate_collector_account(
+def activate_collector(
         *,
         debtor_id: int,
         collector_id: int,

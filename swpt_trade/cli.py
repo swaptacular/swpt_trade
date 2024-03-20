@@ -10,12 +10,15 @@ from datetime import datetime, timezone, timedelta
 from flask import current_app
 from flask.cli import with_appcontext
 from flask_sqlalchemy.model import Model
+from swpt_pythonlib.utils import ShardingRealm
 from swpt_pythonlib.multiproc_utils import (
+    ThreadPoolProcessor,
     spawn_worker_processes,
     try_unblock_signals,
     HANDLED_SIGNALS,
 )
 from swpt_pythonlib.flask_signalbus import SignalBus, get_models_to_flush
+from swpt_trade.utils import u16_to_i16
 from swpt_trade.extensions import db
 from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
@@ -753,3 +756,85 @@ def scan_account_infos(days, quit_early):
     assert days > 0.0
     scanner = AccountInfosScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("process_pristine_collectors")
+@with_appcontext
+@click.option(
+    "-t", "--threads", type=int, help="The number of worker threads."
+)
+@click.option(
+    "-w",
+    "--wait",
+    type=float,
+    help=(
+        "The minimal number of seconds between"
+        " the queries to obtain pristine collector accounts."
+    ),
+)
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def process_pristine_collectors(threads, wait, quit_early):
+    """Process all pristine collector accounts.
+
+    If --threads is not specified, the value of the configuration
+    variable PROCESS_PRISTINE_COLLECTORS_THREADS is taken. If it is
+    not set, the default number of threads is 1.
+
+    If --wait is not specified, the value of the configuration
+    variable APP_PROCESS_PRISTINE_COLLECTORS_WAIT is taken. If it is
+    not set, the default number of seconds is 60.
+    """
+
+    threads = threads or current_app.config[
+        "PROCESS_PRISTINE_COLLECTORS_THREADS"
+    ]
+    wait = (
+        wait
+        if wait is not None
+        else current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_WAIT"]
+    )
+    max_count = current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_MAX_COUNT"]
+    max_delay = timedelta(
+        days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
+    )
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    def get_args_collection():
+        return procedures.get_pristine_collectors(
+            hash_mask=hash_mask,
+            hash_prefix=hash_prefix,
+            max_count=max_count,
+        )
+
+    def process_pristine_collector(debtor_id, collector_id):
+        account_id = procedures.process_pristine_collector(
+            debtor_id=debtor_id, collector_id=collector_id, max_delay=max_delay
+        )
+        if account_id:
+            procedures.activate_collector(
+                debtor_id=debtor_id,
+                collector_id=collector_id,
+                account_id=account_id,
+            )
+        else:
+            procedures.mark_requested_collector(
+                debtor_id=debtor_id, collector_id=collector_id
+            )
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started pristine collector accounts processor.")
+
+    ThreadPoolProcessor(
+        threads,
+        get_args_collection=get_args_collection,
+        process_func=process_pristine_collector,
+        wait_seconds=wait,
+        max_count=max_count,
+    ).run(quit_early=quit_early)

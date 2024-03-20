@@ -702,7 +702,7 @@ def test_process_updated_flags_signal(db_session, current_ts):
 
 
 @pytest.mark.parametrize("status", [0, 1])
-def test_activate_collector_account(db_session, current_ts, status):
+def test_activate_collector(db_session, current_ts, status):
     db_session.add(
         CollectorAccount(
             debtor_id=666,
@@ -730,21 +730,21 @@ def test_activate_collector_account(db_session, current_ts, status):
     db_session.commit()
 
     # non-existing account
-    assert not p.activate_collector_account(
+    assert not p.activate_collector(
         debtor_id=666,
         collector_id=999,
         account_id="acconut999",
     )
 
     # existing account
-    assert p.activate_collector_account(
+    assert p.activate_collector(
         debtor_id=666,
         collector_id=123,
         account_id="acconut123",
     )
 
     # already activated account
-    assert not p.activate_collector_account(
+    assert not p.activate_collector(
         debtor_id=666,
         collector_id=123,
         account_id="changed-acconut-id",
@@ -762,7 +762,7 @@ def test_activate_collector_account(db_session, current_ts, status):
     assert cas[2].account_id == ""
 
 
-def test_mark_requested_collector_account(db_session, current_ts):
+def test_mark_requested_collector(db_session, current_ts):
     db_session.add(
         CollectorAccount(
             debtor_id=666,
@@ -787,19 +787,19 @@ def test_mark_requested_collector_account(db_session, current_ts):
     db_session.commit()
 
     # non-existing account
-    assert not p.mark_requested_collector_account(
+    assert not p.mark_requested_collector(
         debtor_id=666,
         collector_id=999,
     )
 
     # existing account
-    assert p.mark_requested_collector_account(
+    assert p.mark_requested_collector(
         debtor_id=666,
         collector_id=123,
     )
 
     # already marked account
-    assert not p.mark_requested_collector_account(
+    assert not p.mark_requested_collector(
         debtor_id=666,
         collector_id=123,
     )

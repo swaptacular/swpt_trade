@@ -221,6 +221,8 @@ class Configuration(metaclass=MetaEnvReader):
     CHORES_BROKER_PREFETCH_SIZE = 0
     CHORES_BROKER_PREFETCH_COUNT = 1
 
+    PROCESS_PRISTINE_COLLECTORS_THREADS = 1
+
     FLUSH_PROCESSES = 1
     FLUSH_PERIOD = 2.0
 
@@ -245,6 +247,8 @@ class Configuration(metaclass=MetaEnvReader):
     )
 
     APP_ENABLE_CORS = False
+    APP_PROCESS_PRISTINE_COLLECTORS_WAIT = 60.0
+    APP_PROCESS_PRISTINE_COLLECTORS_MAX_COUNT = 100000
     APP_LOCATOR_CLAIM_EXPIRY_DAYS = 45.0
     APP_DEBTOR_INFO_EXPIRY_DAYS = 7.0
     APP_INTRANET_EXTREME_DELAY_DAYS = 14.0
@@ -272,7 +276,7 @@ class Configuration(metaclass=MetaEnvReader):
 
 
 def _check_config_sanity(c):  # pragma: nocover
-    if (c["SHARDING_REALM"].realm_mask << 16) != 0:
+    if (c["SHARDING_REALM"].realm_mask & 0x0000ffff) != 0:
         raise RuntimeError(
             "The configured SHARDING_REALM indicates that there are"
             " too many shards."

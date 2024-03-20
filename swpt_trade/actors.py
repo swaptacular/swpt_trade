@@ -396,7 +396,7 @@ def _on_activate_collector_signal(
     *args,
     **kwargs
 ) -> None:
-    procedures.activate_collector_account(
+    procedures.activate_collector(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         account_id=account_id,

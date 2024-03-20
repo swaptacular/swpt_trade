@@ -394,3 +394,101 @@ def test_delete_useless_account_infos(app, db_session, current_ts):
     ais = m.AccountInfo.query.all()
     assert len(ais) == 1
     assert ais[0].creditor_id == 777
+
+
+def test_process_pristine_collectors(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = sr = ShardingRealm("1.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = False
+
+    assert sr.match(123)
+    assert sr.match(127)
+    assert sr.match(128)
+    assert not sr.match(129)
+
+    ca1 = m.CollectorAccount(debtor_id=666, collector_id=123, status=0)
+    ca2 = m.CollectorAccount(debtor_id=666, collector_id=127, status=0)
+    nwa2 = m.NeededWorkerAccount(creditor_id=127, debtor_id=666)
+    wa2 = m.WorkerAccount(
+        creditor_id=127,
+        debtor_id=666,
+        creation_date=m.DATE0,
+        last_change_ts=current_ts,
+        last_change_seqnum=1,
+        principal=0,
+        interest=0.0,
+        interest_rate=0.0,
+        last_interest_rate_change_ts=m.TS0,
+        last_config_ts=current_ts,
+        last_config_seqnum=1,
+        negligible_amount=1e30,
+        config_flags=0,
+        config_data="",
+        account_id="Account127",
+        last_transfer_number=0,
+        last_transfer_committed_at=current_ts,
+        demurrage_rate=-50.0,
+        commit_period=1000000,
+        transfer_note_max_bytes=500,
+        last_heartbeat_ts=current_ts,
+    )
+    ca3 = m.CollectorAccount(debtor_id=666, collector_id=128, status=0)
+    nwa3 = m.NeededWorkerAccount(
+        creditor_id=128, debtor_id=666, configured_at=m.TS0
+    )
+
+    # Collector account from another shard (will be ignored).
+    ca4 = m.CollectorAccount(debtor_id=666, collector_id=129, status=0)
+
+    db.session.add(ca1)
+    db.session.add(ca2)
+    db.session.add(nwa2)
+    db.session.add(wa2)
+    db.session.add(ca3)
+    db.session.add(nwa3)
+    db.session.commit()
+    db.session.add(ca4)
+
+    assert len(m.CollectorAccount.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "process_pristine_collectors",
+            "--wait",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    cas = m.CollectorAccount.query.all()
+    cas.sort(key=lambda x: (x.debtor_id, x.collector_id))
+    assert len(cas) == 4
+    assert cas[0].status == 1
+    assert cas[0].account_id == ""
+    assert cas[1].status == 2
+    assert cas[1].account_id == "Account127"
+    assert cas[2].status == 1
+    assert cas[2].account_id == ""
+    assert cas[3].status == 0
+    assert cas[3].account_id == ""
+
+    ca_signals = m.ConfigureAccountSignal.query.all()
+    ca_signals.sort(key=lambda x: (x.debtor_id, x.creditor_id))
+    assert len(ca_signals) == 2
+    assert ca_signals[0].creditor_id == 123
+    assert ca_signals[0].debtor_id == 666
+    assert ca_signals[0].ts >= current_ts
+    assert ca_signals[0].negligible_amount == 1e30
+    assert ca_signals[0].config_data == ""
+    assert ca_signals[0].config_flags == 0
+    assert ca_signals[1].creditor_id == 128
+    assert ca_signals[1].debtor_id == 666
+    assert ca_signals[1].ts >= current_ts
+    assert ca_signals[1].negligible_amount == 1e30
+    assert ca_signals[1].config_data == ""
+    assert ca_signals[1].config_flags == 0
