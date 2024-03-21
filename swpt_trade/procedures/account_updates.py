@@ -34,15 +34,10 @@ def process_account_update_signal(
         commit_period: int,
         last_interest_rate_change_ts: datetime,
         transfer_note_max_bytes: int,
-        last_config_ts: datetime,
-        last_config_seqnum: int,
         negligible_amount: float,
         config_flags: int,
-        config_data: str,
         account_id: str,
         debtor_info_iri: Optional[str],
-        debtor_info_content_type: Optional[str],
-        debtor_info_sha256: Optional[bytes],
         last_transfer_number: int,
         last_transfer_committed_at: datetime,
         ts: datetime,
@@ -86,15 +81,9 @@ def process_account_update_signal(
                     interest=interest,
                     interest_rate=interest_rate,
                     last_interest_rate_change_ts=last_interest_rate_change_ts,
-                    last_config_ts=last_config_ts,
-                    last_config_seqnum=last_config_seqnum,
-                    negligible_amount=negligible_amount,
                     config_flags=config_flags,
-                    config_data=config_data,
                     account_id=account_id,
                     debtor_info_iri=debtor_info_iri,
-                    debtor_info_content_type=debtor_info_content_type,
-                    debtor_info_sha256=debtor_info_sha256,
                     last_transfer_number=last_transfer_number,
                     last_transfer_committed_at=last_transfer_committed_at,
                     demurrage_rate=demurrage_rate,
@@ -134,15 +123,9 @@ def process_account_update_signal(
         data.demurrage_rate = demurrage_rate
         data.commit_period = commit_period
         data.last_interest_rate_change_ts = last_interest_rate_change_ts
-        data.last_config_ts = last_config_ts
-        data.last_config_seqnum = last_config_seqnum
-        data.negligible_amount = negligible_amount
         data.config_flags = config_flags
-        data.config_data = config_data
         data.transfer_note_max_bytes = transfer_note_max_bytes
         data.debtor_info_iri = debtor_info_iri
-        data.debtor_info_content_type = debtor_info_content_type
-        data.debtor_info_sha256 = debtor_info_sha256
         data.last_transfer_number = last_transfer_number
         data.last_transfer_committed_at = last_transfer_committed_at
 

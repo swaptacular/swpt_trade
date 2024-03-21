@@ -12,7 +12,7 @@ from swpt_trade.models import (
     FetchDebtorInfoSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
-    AccountInfo,
+    TradingPolicy,
     TS0,
 )
 
@@ -507,7 +507,7 @@ def test_discover_and_confirm_debtor(db_session, current_ts):
 
 
 def test_process_updated_ledger_signal(db_session, current_ts):
-    assert len(AccountInfo.query.all()) == 0
+    assert len(TradingPolicy.query.all()) == 0
 
     p.process_updated_ledger_signal(
         creditor_id=-777,
@@ -519,16 +519,16 @@ def test_process_updated_ledger_signal(db_session, current_ts):
         last_transfer_number=456,
         ts=current_ts,
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_ledger_update_id == 123
-    assert ais[0].latest_ledger_update_ts == current_ts
-    assert ais[0].account_id == "test_account"
-    assert ais[0].creation_date == date(2020, 5, 17)
-    assert ais[0].principal == 10000
-    assert ais[0].last_transfer_number == 456
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_ledger_update_id == 123
+    assert tps[0].latest_ledger_update_ts == current_ts
+    assert tps[0].account_id == "test_account"
+    assert tps[0].creation_date == date(2020, 5, 17)
+    assert tps[0].principal == 10000
+    assert tps[0].last_transfer_number == 456
 
     # Receiving an older signal.
     p.process_updated_ledger_signal(
@@ -541,16 +541,16 @@ def test_process_updated_ledger_signal(db_session, current_ts):
         last_transfer_number=457,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_ledger_update_id == 123
-    assert ais[0].latest_ledger_update_ts == current_ts
-    assert ais[0].account_id == "test_account"
-    assert ais[0].creation_date == date(2020, 5, 17)
-    assert ais[0].principal == 10000
-    assert ais[0].last_transfer_number == 456
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_ledger_update_id == 123
+    assert tps[0].latest_ledger_update_ts == current_ts
+    assert tps[0].account_id == "test_account"
+    assert tps[0].creation_date == date(2020, 5, 17)
+    assert tps[0].principal == 10000
+    assert tps[0].last_transfer_number == 456
 
     # Receiving an newer signal.
     p.process_updated_ledger_signal(
@@ -563,20 +563,20 @@ def test_process_updated_ledger_signal(db_session, current_ts):
         last_transfer_number=457,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_ledger_update_id == 124
-    assert ais[0].latest_ledger_update_ts == current_ts + timedelta(hours=1)
-    assert ais[0].account_id == "new_account_id"
-    assert ais[0].creation_date == date(2021, 6, 18)
-    assert ais[0].principal == 20000
-    assert ais[0].last_transfer_number == 457
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_ledger_update_id == 124
+    assert tps[0].latest_ledger_update_ts == current_ts + timedelta(hours=1)
+    assert tps[0].account_id == "new_account_id"
+    assert tps[0].creation_date == date(2021, 6, 18)
+    assert tps[0].principal == 20000
+    assert tps[0].last_transfer_number == 457
 
 
 def test_process_updated_policy_signal(db_session, current_ts):
-    assert len(AccountInfo.query.all()) == 0
+    assert len(TradingPolicy.query.all()) == 0
 
     p.process_updated_policy_signal(
         creditor_id=-777,
@@ -589,17 +589,17 @@ def test_process_updated_policy_signal(db_session, current_ts):
         peg_debtor_id=999,
         ts=current_ts,
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_policy_update_id == 123
-    assert ais[0].latest_policy_update_ts == current_ts
-    assert ais[0].policy_name == "test_policy"
-    assert ais[0].min_principal == 2000
-    assert ais[0].max_principal == 6000
-    assert ais[0].peg_exchange_rate == 3.14
-    assert ais[0].peg_debtor_id == 999
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_policy_update_id == 123
+    assert tps[0].latest_policy_update_ts == current_ts
+    assert tps[0].policy_name == "test_policy"
+    assert tps[0].min_principal == 2000
+    assert tps[0].max_principal == 6000
+    assert tps[0].peg_exchange_rate == 3.14
+    assert tps[0].peg_debtor_id == 999
 
     # Receiving an older signal.
     p.process_updated_policy_signal(
@@ -613,17 +613,17 @@ def test_process_updated_policy_signal(db_session, current_ts):
         peg_debtor_id=None,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_policy_update_id == 123
-    assert ais[0].latest_policy_update_ts == current_ts
-    assert ais[0].policy_name == "test_policy"
-    assert ais[0].min_principal == 2000
-    assert ais[0].max_principal == 6000
-    assert ais[0].peg_exchange_rate == 3.14
-    assert ais[0].peg_debtor_id == 999
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_policy_update_id == 123
+    assert tps[0].latest_policy_update_ts == current_ts
+    assert tps[0].policy_name == "test_policy"
+    assert tps[0].min_principal == 2000
+    assert tps[0].max_principal == 6000
+    assert tps[0].peg_exchange_rate == 3.14
+    assert tps[0].peg_debtor_id == 999
 
     # Receiving an newer signal.
     p.process_updated_policy_signal(
@@ -637,21 +637,21 @@ def test_process_updated_policy_signal(db_session, current_ts):
         peg_debtor_id=None,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_policy_update_id == 124
-    assert ais[0].latest_policy_update_ts == current_ts + timedelta(hours=1)
-    assert ais[0].policy_name is None
-    assert ais[0].min_principal == 20000
-    assert ais[0].max_principal == 60000
-    assert ais[0].peg_exchange_rate is None
-    assert ais[0].peg_debtor_id is None
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_policy_update_id == 124
+    assert tps[0].latest_policy_update_ts == current_ts + timedelta(hours=1)
+    assert tps[0].policy_name is None
+    assert tps[0].min_principal == 20000
+    assert tps[0].max_principal == 60000
+    assert tps[0].peg_exchange_rate is None
+    assert tps[0].peg_debtor_id is None
 
 
 def test_process_updated_flags_signal(db_session, current_ts):
-    assert len(AccountInfo.query.all()) == 0
+    assert len(TradingPolicy.query.all()) == 0
 
     p.process_updated_flags_signal(
         creditor_id=-777,
@@ -660,13 +660,13 @@ def test_process_updated_flags_signal(db_session, current_ts):
         config_flags=7890,
         ts=current_ts,
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_flags_update_id == 123
-    assert ais[0].latest_flags_update_ts == current_ts
-    assert ais[0].config_flags == 7890
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_flags_update_id == 123
+    assert tps[0].latest_flags_update_ts == current_ts
+    assert tps[0].config_flags == 7890
 
     # Receiving an older signal.
     p.process_updated_flags_signal(
@@ -676,13 +676,13 @@ def test_process_updated_flags_signal(db_session, current_ts):
         config_flags=4567,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_flags_update_id == 123
-    assert ais[0].latest_flags_update_ts == current_ts
-    assert ais[0].config_flags == 7890
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_flags_update_id == 123
+    assert tps[0].latest_flags_update_ts == current_ts
+    assert tps[0].config_flags == 7890
 
     # Receiving an newer signal.
     p.process_updated_flags_signal(
@@ -692,13 +692,13 @@ def test_process_updated_flags_signal(db_session, current_ts):
         config_flags=4567,
         ts=current_ts + timedelta(hours=1),
     )
-    ais = AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == -777
-    assert ais[0].debtor_id == 666
-    assert ais[0].latest_flags_update_id == 124
-    assert ais[0].latest_flags_update_ts == current_ts + timedelta(hours=1)
-    assert ais[0].config_flags == 4567
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_flags_update_id == 124
+    assert tps[0].latest_flags_update_ts == current_ts + timedelta(hours=1)
+    assert tps[0].config_flags == 4567
 
 
 @pytest.mark.parametrize("status", [0, 1])

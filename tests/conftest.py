@@ -49,7 +49,7 @@ def db_session(app):
         "TRUNCATE TABLE debtor_info_document",
         "TRUNCATE TABLE debtor_locator_claim",
         "TRUNCATE TABLE debtor_info_fetch",
-        "TRUNCATE TABLE account_info",
+        "TRUNCATE TABLE trading_policy",
         "TRUNCATE TABLE worker_account",
         "TRUNCATE TABLE needed_worker_account",
     ]:

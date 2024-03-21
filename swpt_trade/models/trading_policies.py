@@ -10,7 +10,7 @@ from .common import (
 )
 
 
-class AccountInfo(db.Model):
+class TradingPolicy(db.Model):
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
 

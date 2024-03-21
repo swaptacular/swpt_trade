@@ -24,11 +24,11 @@ from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
-# TODO: Implement a CLI command which extracts account infos from the
-# "swpt_creditors" microservice via its admin Web API, and loads them
-# into the "account_info" table. This CLI command is intended to be
-# run only once at the beginning, to synchronize the swpt_trade's
-# database with the swpt_creditors's database.
+# TODO: Implement a CLI command which extracts trading policies from
+# the "swpt_creditors" microservice via its admin Web API, and loads
+# them into the "trading policies" table. This CLI command is intended
+# to be run only once at the beginning, to synchronize the
+# swpt_trade's database with the swpt_creditors's database.
 
 
 @click.group("swpt_trade")
@@ -730,7 +730,7 @@ def scan_debtor_locator_claims(days, quit_early):
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 
-@swpt_trade.command("scan_account_infos")
+@swpt_trade.command("scan_trading_policies")
 @with_appcontext
 @click.option("-d", "--days", type=float, help="The number of days.")
 @click.option(
@@ -739,22 +739,22 @@ def scan_debtor_locator_claims(days, quit_early):
     default=False,
     help="Exit after some time (mainly useful during testing).",
 )
-def scan_account_infos(days, quit_early):
-    """Start a process that garbage collects useless account infos.
+def scan_trading_policies(days, quit_early):
+    """Start a process that garbage collects useless trading policies.
 
     The specified number of days determines the intended duration of a
-    single pass through the account infos table. If the number of days
-    is not specified, the value of the environment variable
-    APP_ACCOUNT_INFOS_SCAN_DAYS is taken. If it is not set, the
+    single pass through the trading policies table. If the number of
+    days is not specified, the value of the environment variable
+    APP_TRADING_POLICIES_SCAN_DAYS is taken. If it is not set, the
     default number of days is 7.
     """
-    from swpt_trade.table_scanners import AccountInfosScanner
+    from swpt_trade.table_scanners import TradingPoliciesScanner
 
     logger = logging.getLogger(__name__)
-    logger.info("Started account infos scanner.")
-    days = days or current_app.config["APP_ACCOUNT_INFOS_SCAN_DAYS"]
+    logger.info("Started trading policies scanner.")
+    days = days or current_app.config["APP_TRADING_POLICIES_SCAN_DAYS"]
     assert days > 0.0
-    scanner = AccountInfosScanner()
+    scanner = TradingPoliciesScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 

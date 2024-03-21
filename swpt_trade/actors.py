@@ -2,7 +2,6 @@ import logging
 import json
 from typing import Optional
 from datetime import datetime, date, timedelta
-from base64 import b16decode
 from marshmallow import ValidationError
 from flask import current_app
 import swpt_pythonlib.protocol_schemas as ps
@@ -47,18 +46,13 @@ def _on_account_update_signal(
     last_interest_rate_change_ts: datetime,
     last_transfer_number: int,
     last_transfer_committed_at: datetime,
-    last_config_ts: datetime,
-    last_config_seqnum: int,
     creation_date: date,
     negligible_amount: float,
-    config_data: str,
     config_flags: int,
     ts: datetime,
     ttl: int,
     account_id: str,
     debtor_info_iri: str,
-    debtor_info_content_type: str,
-    debtor_info_sha256: str,
     *args,
     **kwargs
 ) -> None:
@@ -75,16 +69,10 @@ def _on_account_update_signal(
         commit_period=commit_period,
         last_interest_rate_change_ts=last_interest_rate_change_ts,
         transfer_note_max_bytes=transfer_note_max_bytes,
-        last_config_ts=last_config_ts,
-        last_config_seqnum=last_config_seqnum,
         negligible_amount=negligible_amount,
         config_flags=config_flags,
-        config_data=config_data,
         account_id=account_id,
         debtor_info_iri=debtor_info_iri or None,
-        debtor_info_content_type=debtor_info_content_type or None,
-        debtor_info_sha256=b16decode(debtor_info_sha256, casefold=True)
-        or None,
         last_transfer_number=last_transfer_number,
         last_transfer_committed_at=last_transfer_committed_at,
         ts=ts,

@@ -272,8 +272,8 @@ def test_document_has_expired(current_ts):
     assert not document.has_expired(current_ts, timedelta(days=7))
 
 
-def test_account_info_is_useless(current_ts):
-    ai = m.AccountInfo(
+def test_trading_policy_is_useless(current_ts):
+    tp = m.TradingPolicy(
         creditor_id=777,
         debtor_id=666,
         latest_ledger_update_id=1,
@@ -293,7 +293,7 @@ def test_account_info_is_useless(current_ts):
         latest_flags_update_ts=current_ts,
         config_flags=m.DEFAULT_CONFIG_FLAGS,
     )
-    assert ai.is_useless
+    assert tp.is_useless
 
-    ai.principal = 1000
-    assert not ai.is_useless
+    tp.principal = 1000
+    assert not tp.is_useless

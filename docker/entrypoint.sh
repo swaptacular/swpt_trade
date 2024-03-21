@@ -125,7 +125,7 @@ case $1 in
         exec supervisord -c "$APP_ROOT_DIR/supervisord-webserver.conf"
         ;;
     process_pristine_collectors | consume_messages | consume_chore_messages \
-        | scan_debtor_info_documents | scan_debtor_locator_claims | scan_account_infos \
+        | scan_debtor_info_documents | scan_debtor_locator_claims | scan_trading_policies \
         | roll_turns | fetch_debtor_infos)
         exec flask swpt_trade "$@"
         ;;

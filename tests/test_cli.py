@@ -335,65 +335,69 @@ def test_delete_stale_claims(app, db_session, current_ts):
     assert claims[0].debtor_id == 666
 
 
-def test_delete_parent_account_infos(app, db_session, restore_sharding_realm):
+def test_delete_parent_trading_policies(
+        app,
+        db_session,
+        restore_sharding_realm,
+):
     app.config["SHARDING_REALM"] = ShardingRealm("0.#")
     app.config["DELETE_PARENT_SHARD_RECORDS"] = True
 
-    ai1 = m.AccountInfo(creditor_id=666, debtor_id=1, account_id='row1')
-    ai2 = m.AccountInfo(creditor_id=777, debtor_id=2, account_id='row2')
-    ai3 = m.AccountInfo(creditor_id=888, debtor_id=2, account_id='row3')
-    db.session.add(ai1)
-    db.session.add(ai2)
-    db.session.add(ai3)
+    tp1 = m.TradingPolicy(creditor_id=666, debtor_id=1, account_id='row1')
+    tp2 = m.TradingPolicy(creditor_id=777, debtor_id=2, account_id='row2')
+    tp3 = m.TradingPolicy(creditor_id=888, debtor_id=2, account_id='row3')
+    db.session.add(tp1)
+    db.session.add(tp2)
+    db.session.add(tp3)
     db.session.commit()
 
     with db.engine.connect() as conn:
-        conn.execute(sqlalchemy.text("ANALYZE account_info"))
+        conn.execute(sqlalchemy.text("ANALYZE trading_policy"))
 
-    assert len(m.AccountInfo.query.all()) == 3
+    assert len(m.TradingPolicy.query.all()) == 3
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
             "swpt_trade",
-            "scan_account_infos",
+            "scan_trading_policies",
             "--days",
             "0.000001",
             "--quit-early",
         ]
     )
     assert result.exit_code == 0
-    ais = m.AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == 888
+    tps = m.TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == 888
 
 
-def test_delete_useless_account_infos(app, db_session, current_ts):
-    ai1 = m.AccountInfo(creditor_id=666, debtor_id=1)
-    ai2 = m.AccountInfo(creditor_id=777, debtor_id=2, account_id='test')
-    ai3 = m.AccountInfo(creditor_id=888, debtor_id=2)
-    db.session.add(ai1)
-    db.session.add(ai2)
-    db.session.add(ai3)
+def test_delete_useless_trading_policies(app, db_session, current_ts):
+    tp1 = m.TradingPolicy(creditor_id=666, debtor_id=1)
+    tp2 = m.TradingPolicy(creditor_id=777, debtor_id=2, account_id='test')
+    tp3 = m.TradingPolicy(creditor_id=888, debtor_id=2)
+    db.session.add(tp1)
+    db.session.add(tp2)
+    db.session.add(tp3)
     db.session.commit()
 
     with db.engine.connect() as conn:
         conn.execute(sqlalchemy.text("ANALYZE debtor_info_document"))
 
-    assert len(m.AccountInfo.query.all()) == 3
+    assert len(m.TradingPolicy.query.all()) == 3
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
             "swpt_trade",
-            "scan_account_infos",
+            "scan_trading_policies",
             "--days",
             "0.000001",
             "--quit-early",
         ]
     )
     assert result.exit_code == 0
-    ais = m.AccountInfo.query.all()
-    assert len(ais) == 1
-    assert ais[0].creditor_id == 777
+    tps = m.TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == 777
 
 
 def test_process_pristine_collectors(
@@ -423,11 +427,7 @@ def test_process_pristine_collectors(
         interest=0.0,
         interest_rate=0.0,
         last_interest_rate_change_ts=m.TS0,
-        last_config_ts=current_ts,
-        last_config_seqnum=1,
-        negligible_amount=1e30,
         config_flags=0,
-        config_data="",
         account_id="Account127",
         last_transfer_number=0,
         last_transfer_committed_at=current_ts,
