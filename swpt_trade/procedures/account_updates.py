@@ -8,6 +8,7 @@ from swpt_trade.models import (
     WorkerAccount,
     ConfigureAccountSignal,
     ActivateCollectorSignal,
+    DiscoverDebtorSignal,
     HUGE_NEGLIGIBLE_AMOUNT,
     DEFAULT_CONFIG_FLAGS,
 )
@@ -51,23 +52,24 @@ def process_account_update_signal(
     if (current_ts - ts).total_seconds() > ttl:
         return
 
-    needed_worker_account = (
-        NeededWorkerAccount.query.filter_by(
-            creditor_id=creditor_id, debtor_id=debtor_id
+    is_needed_account = (
+        db.session.query(
+            NeededWorkerAccount.query
+            .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
+            .with_for_update(read=True)
+            .exists()
         )
-        .with_for_update(read=True)
-        .one_or_none()
+        .scalar()
     )
-    if needed_worker_account is None:
+    if not is_needed_account:
         _discard_orphaned_account(
             creditor_id, debtor_id, config_flags, negligible_amount
         )
         return
 
     data = (
-        WorkerAccount.query.filter_by(
-            creditor_id=creditor_id, debtor_id=debtor_id
-        )
+        WorkerAccount.query
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .with_for_update()
         .one_or_none()
     )
@@ -101,14 +103,9 @@ def process_account_update_signal(
                     last_heartbeat_ts=min(ts, current_ts),
                 )
             )
-        if account_id != "":
-            db.session.add(
-                ActivateCollectorSignal(
-                    debtor_id=debtor_id,
-                    creditor_id=creditor_id,
-                    account_id=account_id,
-                )
-            )
+        must_activate_collector = account_id != ""
+        has_new_debtor_info_iri = True
+
     else:
         if ts > data.last_heartbeat_ts:
             data.last_heartbeat_ts = min(ts, current_ts)
@@ -124,7 +121,10 @@ def process_account_update_signal(
         if this_event <= prev_event:
             return
 
-        assert creation_date >= data.creation_date
+        must_activate_collector = account_id != "" and data.account_id == ""
+        has_new_debtor_info_iri = debtor_info_iri != data.debtor_info_iri
+
+        data.account_id = data.account_id or account_id
         data.creation_date = creation_date
         data.last_change_ts = last_change_ts
         data.last_change_seqnum = last_change_seqnum
@@ -146,15 +146,23 @@ def process_account_update_signal(
         data.last_transfer_number = last_transfer_number
         data.last_transfer_committed_at = last_transfer_committed_at
 
-        if account_id != "" and data.account_id == "":
-            db.session.add(
-                ActivateCollectorSignal(
-                    debtor_id=debtor_id,
-                    creditor_id=creditor_id,
-                    account_id=account_id,
-                )
+    if must_activate_collector:
+        db.session.add(
+            ActivateCollectorSignal(
+                debtor_id=debtor_id,
+                creditor_id=creditor_id,
+                account_id=account_id,
             )
-            data.account_id = account_id
+        )
+
+    if account_id and debtor_info_iri:
+        db.session.add(
+            DiscoverDebtorSignal(
+                debtor_id=debtor_id,
+                iri=debtor_info_iri,
+                force_locator_refetch=has_new_debtor_info_iri,
+            )
+        )
 
 
 @atomic
@@ -164,12 +172,14 @@ def process_account_purge_signal(
         creditor_id: int,
         creation_date: date,
 ) -> bool:
-    needed_worker_account = (
-        NeededWorkerAccount.query.filter_by(
-            creditor_id=creditor_id, debtor_id=debtor_id
+    is_needed_account = (
+        db.session.query(
+            NeededWorkerAccount.query
+            .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
+            .with_for_update(read=True)
+            .exists()
         )
-        .with_for_update(read=True)
-        .one_or_none()
+        .scalar()
     )
     worker_account = (
         WorkerAccount.query.filter_by(
@@ -181,9 +191,10 @@ def process_account_purge_signal(
         .one_or_none()
     )
     if worker_account:
+        # TODO: Consider deleting related records in other tables as well.
         db.session.delete(worker_account)
 
-    return needed_worker_account is not None
+    return is_needed_account
 
 
 def _discard_orphaned_account(
