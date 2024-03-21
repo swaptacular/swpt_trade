@@ -8,12 +8,18 @@ from swpt_trade.models import (
     ConfirmedDebtor,
     CurrencyInfo,
     CollectorSending,
+    NeededWorkerAccount,
+    WorkerAccount,
     DebtorLocatorClaim,
     FetchDebtorInfoSignal,
+    DiscoverDebtorSignal,
+    ActivateCollectorSignal,
+    ConfigureAccountSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
     TS0,
+    DATE0,
 )
 
 
@@ -855,3 +861,257 @@ def test_ensure_collector_accounts(db_session):
             max_collector_id=2,
             number_of_accounts=40,
         )
+
+
+def test_process_account_purge_signal(db_session, current_ts):
+    nwa1 = NeededWorkerAccount(debtor_id=666, creditor_id=123)
+    wa1 = WorkerAccount(
+        creditor_id=123,
+        debtor_id=666,
+        creation_date=DATE0,
+        last_change_ts=current_ts,
+        last_change_seqnum=1,
+        principal=0,
+        interest=0.0,
+        interest_rate=0.0,
+        last_interest_rate_change_ts=TS0,
+        config_flags=0,
+        account_id="Account123",
+        last_transfer_number=0,
+        last_transfer_committed_at=current_ts,
+        demurrage_rate=-50.0,
+        commit_period=1000000,
+        transfer_note_max_bytes=500,
+        last_heartbeat_ts=current_ts,
+    )
+    wa2 = WorkerAccount(
+        creditor_id=124,
+        debtor_id=666,
+        creation_date=DATE0,
+        last_change_ts=current_ts,
+        last_change_seqnum=1,
+        principal=0,
+        interest=0.0,
+        interest_rate=0.0,
+        last_interest_rate_change_ts=TS0,
+        config_flags=0,
+        account_id="Account124",
+        last_transfer_number=0,
+        last_transfer_committed_at=current_ts,
+        demurrage_rate=-50.0,
+        commit_period=1000000,
+        transfer_note_max_bytes=500,
+        last_heartbeat_ts=current_ts,
+    )
+    db_session.add(nwa1)
+    db_session.add(wa1)
+    db_session.add(wa2)
+    db_session.commit()
+    assert len(WorkerAccount.query.all()) == 2
+
+    assert p.process_account_purge_signal(
+        debtor_id=666, creditor_id=123, creation_date=DATE0,
+    )
+    was = WorkerAccount.query.all()
+    assert len(was) == 1
+    assert was[0].creditor_id == 124
+
+    assert not p.process_account_purge_signal(
+        debtor_id=666, creditor_id=124, creation_date=DATE0,
+    )
+    assert len(WorkerAccount.query.all()) == 0
+
+    assert not p.process_account_purge_signal(
+        debtor_id=666, creditor_id=125, creation_date=DATE0,
+    )
+
+
+def test_process_account_update_signal(db_session, current_ts):
+    nwa1 = NeededWorkerAccount(debtor_id=666, creditor_id=123)
+    wa1 = WorkerAccount(
+        creditor_id=123,
+        debtor_id=666,
+        creation_date=DATE0,
+        last_change_ts=current_ts - timedelta(hours=1),
+        last_change_seqnum=1,
+        principal=0,
+        interest=0.0,
+        interest_rate=0.0,
+        last_interest_rate_change_ts=TS0,
+        config_flags=0,
+        account_id="",
+        last_transfer_number=0,
+        last_transfer_committed_at=current_ts - timedelta(hours=1),
+        demurrage_rate=-50.0,
+        commit_period=1000000,
+        transfer_note_max_bytes=500,
+        last_heartbeat_ts=current_ts - timedelta(hours=1),
+    )
+    wa2 = WorkerAccount(
+        creditor_id=124,
+        debtor_id=666,
+        creation_date=DATE0,
+        last_change_ts=current_ts - timedelta(hours=1),
+        last_change_seqnum=1,
+        principal=0,
+        interest=0.0,
+        interest_rate=0.0,
+        last_interest_rate_change_ts=TS0,
+        config_flags=0,
+        account_id="Account124",
+        last_transfer_number=0,
+        last_transfer_committed_at=current_ts - timedelta(hours=1),
+        demurrage_rate=-50.0,
+        commit_period=1000000,
+        transfer_note_max_bytes=500,
+        last_heartbeat_ts=current_ts - timedelta(hours=1),
+    )
+    nwa3 = NeededWorkerAccount(debtor_id=666, creditor_id=125)
+    db_session.add(nwa1)
+    db_session.add(wa1)
+    db_session.add(wa2)
+    db_session.add(nwa3)
+    db_session.commit()
+
+    params = {
+        "debtor_id": 666,
+        "creation_date": DATE0,
+        "principal": 100,
+        "interest": 31.4,
+        "interest_rate": 5.0,
+        "last_interest_rate_change_ts": TS0 + timedelta(days=10),
+        "config_flags": 0,
+        "account_id": "Account123",
+        "last_transfer_number": 2,
+        "last_transfer_committed_at": TS0 + timedelta(days=20),
+        "demurrage_rate": -50.0,
+        "commit_period": 1000000,
+        "transfer_note_max_bytes": 500,
+        "negligible_amount": 1e30,
+        "debtor_info_iri": "https://example.com/666",
+        "ttl": 10000,
+    }
+
+    p.process_account_update_signal(
+        **params,
+        creditor_id=123,
+        last_change_ts=current_ts - timedelta(hours=1),
+        last_change_seqnum=1,
+        ts=current_ts - timedelta(seconds=11000),
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=123).one()
+    assert wa.debtor_info_iri is None
+    assert wa.account_id == ""
+    assert wa.last_change_ts == current_ts - timedelta(hours=1)
+    assert wa.last_change_seqnum == 1
+    assert len(DiscoverDebtorSignal.query.all()) == 0
+    assert len(ActivateCollectorSignal.query.all()) == 0
+
+    # Old last_change_ts/seqnum:
+    p.process_account_update_signal(
+        **params,
+        creditor_id=123,
+        last_change_ts=current_ts - timedelta(hours=1),
+        last_change_seqnum=1,
+        ts=current_ts,
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=123).one()
+    assert wa.debtor_info_iri is None
+    assert wa.account_id == ""
+    assert wa.last_change_ts == current_ts - timedelta(hours=1)
+    assert wa.last_change_seqnum == 1
+    assert len(DiscoverDebtorSignal.query.all()) == 0
+    assert len(ActivateCollectorSignal.query.all()) == 0
+    assert len(ConfigureAccountSignal.query.all()) == 0
+
+    # Expired TTL:
+    p.process_account_update_signal(
+        **params,
+        creditor_id=123,
+        last_change_ts=current_ts,
+        last_change_seqnum=2,
+        ts=current_ts - timedelta(seconds=11000),
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=123).one()
+    assert wa.debtor_info_iri is None
+    assert wa.account_id == ""
+    assert wa.last_change_ts == current_ts - timedelta(hours=1)
+    assert wa.last_change_seqnum == 1
+    assert len(DiscoverDebtorSignal.query.all()) == 0
+    assert len(ActivateCollectorSignal.query.all()) == 0
+    assert len(ConfigureAccountSignal.query.all()) == 0
+
+    # Successful update of existing WorkerAccount:
+    p.process_account_update_signal(
+        **params,
+        creditor_id=123,
+        last_change_ts=current_ts,
+        last_change_seqnum=2,
+        ts=current_ts,
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=123).one()
+    assert wa.debtor_info_iri == "https://example.com/666"
+    assert wa.account_id == "Account123"
+    assert wa.last_change_ts == current_ts
+    assert wa.last_change_seqnum == 2
+    dds = DiscoverDebtorSignal.query.one()
+    assert dds.debtor_id == 666
+    assert dds.iri == "https://example.com/666"
+    assert dds.force_locator_refetch is True
+    acs = ActivateCollectorSignal.query.one()
+    assert acs.debtor_id == 666
+    assert acs.creditor_id == 123
+    assert acs.account_id == "Account123"
+    assert len(ConfigureAccountSignal.query.all()) == 0
+
+    # Receiving AccountUpdate message for account that is not needed:
+    p.process_account_update_signal(
+        **params,
+        creditor_id=124,
+        last_change_ts=current_ts,
+        last_change_seqnum=2,
+        ts=current_ts,
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=124).one()
+    assert wa.debtor_info_iri is None
+    assert wa.account_id == "Account124"
+    assert wa.last_change_ts == current_ts - timedelta(hours=1)
+    assert wa.last_change_seqnum == 1
+    assert len(DiscoverDebtorSignal.query.all()) == 1
+    assert len(ActivateCollectorSignal.query.all()) == 1
+    cas = ConfigureAccountSignal.query.one()
+    assert cas.debtor_id == 666
+    assert cas.creditor_id == 124
+    assert cas.ts >= current_ts
+    assert cas.negligible_amount >= 1e20
+    assert cas.config_data == ""
+    assert cas.config_flags & WorkerAccount.CONFIG_SCHEDULED_FOR_DELETION_FLAG
+
+    # Receiving AccountUpdate message for the first time for a needed account:
+    p.process_account_update_signal(
+        **params,
+        creditor_id=125,
+        last_change_ts=current_ts,
+        last_change_seqnum=10,
+        ts=current_ts,
+    )
+    wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=125).one()
+    assert wa.creation_date == DATE0
+    assert wa.last_change_ts == current_ts
+    assert wa.last_change_seqnum == 10
+    assert wa.principal == 100
+    assert wa.interest == 31.4
+    assert wa.interest_rate == 5.0
+    assert wa.last_interest_rate_change_ts == TS0 + timedelta(days=10)
+    assert wa.config_flags == 0
+    assert wa.account_id == "Account123"
+    assert wa.debtor_info_iri == "https://example.com/666"
+    assert wa.last_transfer_number == 2
+    assert wa.last_transfer_committed_at == TS0 + timedelta(days=20)
+    assert wa.demurrage_rate == -50.0
+    assert wa.commit_period == 1000000
+    assert wa.transfer_note_max_bytes == 500
+    assert wa.last_heartbeat_ts == current_ts
+    assert len(ConfigureAccountSignal.query.all()) == 1
+    assert len(ActivateCollectorSignal.query.all()) == 2
+    assert len(DiscoverDebtorSignal.query.all()) == 2

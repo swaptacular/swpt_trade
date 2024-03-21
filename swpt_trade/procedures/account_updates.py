@@ -170,7 +170,7 @@ def process_account_purge_signal(
         )
         .filter(WorkerAccount.creation_date <= creation_date)
         .with_for_update()
-        .options(load_only())
+        .options(load_only(WorkerAccount.creation_date))
         .one_or_none()
     )
     if worker_account:
