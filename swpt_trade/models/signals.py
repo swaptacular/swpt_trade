@@ -282,7 +282,7 @@ class ActivateCollectorSignal(Signal):
     """Mark a collector account as activated.
 
     This signal informs that the given collector account has been
-    successfully created and is operational.
+    successfully created, and an account ID has been assigned to it.
     """
     exchange_name = TO_TRADE_EXCHANGE
 

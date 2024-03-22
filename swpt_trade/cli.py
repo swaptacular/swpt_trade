@@ -814,19 +814,12 @@ def process_pristine_collectors(threads, wait, quit_early):
         )
 
     def process_pristine_collector(debtor_id, collector_id):
-        account_id = procedures.process_pristine_collector(
+        procedures.process_pristine_collector(
             debtor_id=debtor_id, collector_id=collector_id, max_delay=max_delay
         )
-        if account_id:
-            procedures.activate_collector(
-                debtor_id=debtor_id,
-                collector_id=collector_id,
-                account_id=account_id,
-            )
-        else:
-            procedures.mark_requested_collector(
-                debtor_id=debtor_id, collector_id=collector_id
-            )
+        procedures.mark_requested_collector(
+            debtor_id=debtor_id, collector_id=collector_id
+        )
 
     logger = logging.getLogger(__name__)
     logger.info("Started pristine collector accounts processor.")

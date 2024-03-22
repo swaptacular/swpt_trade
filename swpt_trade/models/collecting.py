@@ -10,6 +10,15 @@ class NeededWorkerAccount(db.Model):
     configured_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
+    __table_args__ = (
+        {
+            "comment": (
+                'Represents the fact that a "worker" server has requested'
+                ' the configuration (aka creation) of a Swaptacular account,'
+                ' which will be used to collect and dispatch transfers.'
+            ),
+        },
+    )
 
 
 class WorkerAccount(db.Model):
@@ -47,4 +56,11 @@ class WorkerAccount(db.Model):
             and_(demurrage_rate >= -100.0, demurrage_rate <= 0.0)
         ),
         db.CheckConstraint(commit_period >= 0),
+        {
+            "comment": (
+                'Represents an existing Swaptacular account, managed by a '
+                ' "worker" server. The account is used to collect and dispatch'
+                ' transfers.'
+            ),
+        },
     )

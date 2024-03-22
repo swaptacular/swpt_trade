@@ -31,6 +31,13 @@ class DebtorInfoDocument(db.Model):
                 ),
             )
         ),
+        {
+            "comment": (
+                "Represents relevant trading information about a given"
+                " currency (aka debtor), that have been parsed from the"
+                " debtor's debtor info document, obtained via HTTP request."
+            ),
+        },
     )
 
     def has_expired(
@@ -69,6 +76,13 @@ class DebtorLocatorClaim(db.Model):
             latest_locator_fetch_at,
             postgresql_where=latest_locator_fetch_at != null(),
         ),
+        {
+            "comment": (
+                "Represents a reliable claim made by a given debtor,"
+                " declaring what the official debtor info locator for"
+                " the given debtor is."
+            ),
+        },
     )
 
 
@@ -104,4 +118,17 @@ class DebtorInfoFetch(db.Model):
             )
         ),
         db.Index("idx_debtor_info_fetch_next_attempt_at", next_attempt_at),
+        {
+            "comment": (
+                "Represents a scheduled HTTP request (HTTP fetch) to obtain"
+                " relevant trading information about a given currency (aka"
+                " debtor). There are two non-mutually exclusive request types:"
+                " 1) a locator fetch, which wants to obtain the latest version"
+                " of the debtor's debtor info document, from the official"
+                " debtor info locator; 2) a discovery fetch, which wants to"
+                " obtain a particular (possibly obsolete) version of the"
+                " debtor's debtor info document, not necessarily from the"
+                " official debtor info locator."
+            ),
+        },
     )

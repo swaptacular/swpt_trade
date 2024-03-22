@@ -196,20 +196,23 @@ def process_pristine_collector(
         debtor_id: int,
         collector_id: int,
         max_delay: timedelta,
-) -> str:
+) -> None:
+    def has_worker_account():
+        return (
+            db.session.query(
+                WorkerAccount.query
+                .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+                .exists()
+            )
+            .scalar()
+        )
+
     current_ts = datetime.now(tz=timezone.utc)
     needed_worker_account = (
         NeededWorkerAccount.query
         .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
         .one_or_none()
     )
-    worker_account = (
-        WorkerAccount.query
-        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
-        .options(load_only(WorkerAccount.account_id))
-        .one_or_none()
-    )
-
     if needed_worker_account is None:
         with db.retry_on_integrity_error():
             db.session.add(
@@ -221,8 +224,8 @@ def process_pristine_collector(
             )
         must_configure_account = True
     elif (
-            worker_account is None
-            and needed_worker_account.configured_at + max_delay < current_ts
+            needed_worker_account.configured_at + max_delay < current_ts
+            and not has_worker_account()
     ):
         # It's been a while since the last `ConfigureAccount` message
         # was sent for this collector account, and yet there is no
@@ -245,7 +248,6 @@ def process_pristine_collector(
                 config_flags=DEFAULT_CONFIG_FLAGS,
             )
         )
-    return worker_account.account_id if worker_account else ""
 
 
 @atomic

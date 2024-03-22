@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 12a876a559e5
+Revision ID: 3184f1789ce3
 Revises: 
-Create Date: 2024-03-21 15:00:58.858020
+Create Date: 2024-03-22 19:34:16.549928
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '12a876a559e5'
+revision = '3184f1789ce3'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -65,7 +65,8 @@ def upgrade_():
     sa.Column('fetched_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('peg_debtor_info_locator IS NULL AND peg_debtor_id IS NULL AND peg_exchange_rate IS NULL OR peg_debtor_info_locator IS NOT NULL AND peg_debtor_id IS NOT NULL AND peg_exchange_rate IS NOT NULL'),
     sa.CheckConstraint('peg_exchange_rate >= 0.0'),
-    sa.PrimaryKeyConstraint('debtor_info_locator')
+    sa.PrimaryKeyConstraint('debtor_info_locator'),
+    comment="Represents relevant trading information about a given currency (aka debtor), that have been parsed from the debtor's debtor info document, obtained via HTTP request."
     )
     op.create_table('debtor_info_fetch',
     sa.Column('iri', sa.String(), nullable=False),
@@ -81,7 +82,8 @@ def upgrade_():
     sa.Column('next_attempt_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('attempts_count = 0 AND latest_attempt_at IS NULL AND latest_attempt_errorcode IS NULL OR attempts_count > 0 AND latest_attempt_at IS NOT NULL'),
     sa.CheckConstraint('recursion_level >= 0'),
-    sa.PrimaryKeyConstraint('iri', 'debtor_id')
+    sa.PrimaryKeyConstraint('iri', 'debtor_id'),
+    comment="Represents a scheduled HTTP request (HTTP fetch) to obtain relevant trading information about a given currency (aka debtor). There are two non-mutually exclusive request types: 1) a locator fetch, which wants to obtain the latest version of the debtor's debtor info document, from the official debtor info locator; 2) a discovery fetch, which wants to obtain a particular (possibly obsolete) version of the debtor's debtor info document, not necessarily from the official debtor info locator."
     )
     with op.batch_alter_table('debtor_info_fetch', schema=None) as batch_op:
         batch_op.create_index('idx_debtor_info_fetch_next_attempt_at', ['next_attempt_at'], unique=False)
@@ -93,7 +95,8 @@ def upgrade_():
     sa.Column('latest_discovery_fetch_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('forced_locator_refetch_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.CheckConstraint('debtor_info_locator IS NULL AND latest_locator_fetch_at IS NULL OR debtor_info_locator IS NOT NULL AND latest_locator_fetch_at IS NOT NULL'),
-    sa.PrimaryKeyConstraint('debtor_id')
+    sa.PrimaryKeyConstraint('debtor_id'),
+    comment='Represents a reliable claim made by a given debtor, declaring what the official debtor info locator for the given debtor is.'
     )
     with op.batch_alter_table('debtor_locator_claim', schema=None) as batch_op:
         batch_op.create_index('idx_debtor_locator_claim_latest_locator_fetch_at', ['latest_locator_fetch_at'], unique=False, postgresql_where=sa.text('latest_locator_fetch_at IS NOT NULL'))
@@ -134,7 +137,8 @@ def upgrade_():
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('configured_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
+    comment='Represents the fact that a "worker" server has requested the configuration (aka creation) of a Swaptacular account, which will be used to collect and dispatch transfers.'
     )
     op.create_table('prepare_transfer_signal',
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
@@ -183,7 +187,8 @@ def upgrade_():
     sa.CheckConstraint('latest_policy_update_id >= 0'),
     sa.CheckConstraint('peg_debtor_id IS NULL AND peg_exchange_rate IS NULL OR peg_debtor_id IS NOT NULL AND peg_exchange_rate IS NOT NULL'),
     sa.CheckConstraint('peg_exchange_rate >= 0.0'),
-    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
+    comment="Represents important information about a given customer account. This includes things like: the account's ID, the available amount, the customer's trading policy etc."
     )
     op.create_table('worker_account',
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
@@ -209,7 +214,8 @@ def upgrade_():
     sa.CheckConstraint('interest_rate >= -100.0'),
     sa.CheckConstraint('last_transfer_number >= 0'),
     sa.CheckConstraint('transfer_note_max_bytes >= 0'),
-    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
+    comment='Represents an existing Swaptacular account, managed by a  "worker" server. The account is used to collect and dispatch transfers.'
     )
     # ### end Alembic commands ###
 
@@ -247,17 +253,19 @@ def upgrade_solver():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id'),
+    comment='Represents a buy offer, participating in a given trading turn. "Worker" servers are responsible for populating this table during the phase 2 of each turn. The "solver" server will read from this table, and will delete the records before advancing to phase 3 of the turn.'
     )
     op.create_table('collector_account',
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.Column('collector_hash', sa.SmallInteger(), nullable=False),
     sa.Column('account_id', sa.String(), nullable=False),
-    sa.Column('status', sa.SmallInteger(), nullable=False, comment="Collector account's status: 0) pristine; 1) account creation has been requested; 2) created and operational; 3) disabled."),
+    sa.Column('status', sa.SmallInteger(), nullable=False, comment="Collector account's status: 0) pristine; 1) account creation has been requested; 2) the account has been created, and an account ID has been assigned to it; 3) disabled."),
     sa.Column('latest_status_change_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('status >= 0 AND status <= 3'),
-    sa.PrimaryKeyConstraint('debtor_id', 'collector_id')
+    sa.PrimaryKeyConstraint('debtor_id', 'collector_id'),
+    comment='Represents a planned or existing Swaptacular account, which should be used to collect and dispatch transfers. "Worker" servers will watch for new (pristine) records inserted in this table, and will try to create and use all the accounts catalogued in this table.'
     )
     with op.batch_alter_table('collector_account', schema=None) as batch_op:
         batch_op.create_index('idx_collector_account_creation_request', ['status'], unique=False, postgresql_where=sa.text('status = 0'))
@@ -270,7 +278,8 @@ def upgrade_solver():
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.Column('collector_hash', sa.SmallInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id'),
+    comment='Informs the "worker" server responsible for the given collector, that the given amount will be withdrawn (collected) from the given customer account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('collector_dispatching',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -280,7 +289,8 @@ def upgrade_solver():
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.Column('collector_hash', sa.SmallInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id'),
+    comment='Informs the "worker" server responsible for the given collector, that the given amount must be deposited (dispatched) to the given customer account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('collector_receiving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -290,7 +300,8 @@ def upgrade_solver():
     sa.Column('to_collector_hash', sa.SmallInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'to_collector_id', 'from_collector_id')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'to_collector_id', 'from_collector_id'),
+    comment='Informs the "worker" server responsible for the given "to collector" account, that the given amount will be transferred (received) from another collector account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('collector_sending',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -300,12 +311,14 @@ def upgrade_solver():
     sa.Column('from_collector_hash', sa.SmallInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'from_collector_id', 'to_collector_id')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'from_collector_id', 'to_collector_id'),
+    comment='Informs the "worker" server responsible for the given "from collector" account, that the given amount must be transferred (sent) to another collector account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('confirmed_debtor',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_info_locator', sa.String(), nullable=False),
+    comment='Represents the fact that a given currency (aka debtor) is verified (confirmed), so that this currency can be traded during the given trading turn. "Worker" servers are responsible for populating this table during the phase 1 of each turn. The "solver" server will read from this table, and will delete the records before advancing to phase 2 of the turn.'
     )
     # Create a "covering" index instead of a "normal" index.
     op.execute('CREATE UNIQUE INDEX idx_confirmed_debtor_pk ON confirmed_debtor (turn_id, debtor_id) INCLUDE (debtor_info_locator)')
@@ -319,7 +332,8 @@ def upgrade_solver():
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id'),
+    comment='Informs the "worker" server responsible for the given customer account, that the given amount will be deposited (given) to this account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('creditor_taking',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -329,7 +343,8 @@ def upgrade_solver():
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id'),
+    comment='Informs the "worker" server responsible for the given customer account, that the given amount must be withdrawn (taken) from the account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
     op.create_table('currency_info',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -339,7 +354,8 @@ def upgrade_solver():
     sa.Column('peg_debtor_id', sa.BigInteger(), nullable=True),
     sa.Column('peg_exchange_rate', sa.FLOAT(), nullable=True),
     sa.Column('is_confirmed', sa.BOOLEAN(), nullable=False),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_info_locator')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_info_locator'),
+    comment='Represents relevant information about a given currency (aka debtor), so that the currency can participate in a given trading turn. The "solver" server will populate this table before the start of phase 2 of each turn, and will delete the records before advancing to phase 3. "Worker" servers will read from this table, so as to generate relevant buy and sell offers.'
     )
     with op.batch_alter_table('currency_info', schema=None) as batch_op:
         batch_op.create_index('idx_currency_info_confirmed_debtor_id', ['turn_id', 'debtor_id'], unique=True, postgresql_where=sa.text('is_confirmed'))
@@ -351,7 +367,8 @@ def upgrade_solver():
     sa.Column('peg_debtor_info_locator', sa.String(), nullable=True),
     sa.Column('peg_debtor_id', sa.BigInteger(), nullable=True),
     sa.Column('peg_exchange_rate', sa.FLOAT(), nullable=True),
-    sa.PrimaryKeyConstraint('turn_id', 'debtor_info_locator')
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_info_locator'),
+    comment='Represents relevant information about a given currency (aka debtor), so that the currency can participate in a given trading turn. "Worker" servers are responsible for populating this table during the phase 1 of each turn. The "solver" server will read from this table, and will delete the records before advancing to phase 2 of the turn.'
     )
     op.create_table('sell_offer',
     sa.Column('turn_id', sa.Integer(), nullable=False),
@@ -360,7 +377,8 @@ def upgrade_solver():
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
-    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id')
+    sa.PrimaryKeyConstraint('turn_id', 'creditor_id', 'debtor_id'),
+    comment='Represents a sell offer, participating in a given trading turn. "Worker" servers are responsible for populating this table during the phase 2 of each turn. The "solver" server will read from this table, and will delete the records before advancing to phase 3 of the turn.'
     )
     op.create_table('turn',
     sa.Column('turn_id', sa.Integer(), autoincrement=True, nullable=False),
@@ -380,7 +398,8 @@ def upgrade_solver():
     sa.CheckConstraint('phase < 3 OR collection_started_at IS NOT NULL'),
     sa.CheckConstraint('phase > 0 AND phase <= 4'),
     sa.CheckConstraint('phase > 2 OR phase_deadline IS NOT NULL'),
-    sa.PrimaryKeyConstraint('turn_id')
+    sa.PrimaryKeyConstraint('turn_id'),
+    comment='Represents a circular trading round, created and managed by the "solver" server. "Worker" servers will watch for changes in this table, so as to participate in the different phases of each trading round.'
     )
     with op.batch_alter_table('turn', schema=None) as batch_op:
         batch_op.create_index('idx_turn_phase', ['phase'], unique=False, postgresql_where=sa.text('phase < 4'))

@@ -470,8 +470,8 @@ def test_process_pristine_collectors(
     assert len(cas) == 4
     assert cas[0].status == 1
     assert cas[0].account_id == ""
-    assert cas[1].status == 2
-    assert cas[1].account_id == "Account127"
+    assert cas[1].status == 1
+    assert cas[1].account_id == ""
     assert cas[2].status == 1
     assert cas[2].account_id == ""
     assert cas[3].status == 0

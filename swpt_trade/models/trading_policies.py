@@ -67,6 +67,13 @@ class TradingPolicy(db.Model):
                 ),
             )
         ),
+        {
+            "comment": (
+                "Represents important information about a given customer"
+                " account. This includes things like: the account's ID, the"
+                " available amount, the customer's trading policy etc."
+            ),
+        },
     )
 
     @property
