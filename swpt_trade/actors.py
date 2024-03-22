@@ -56,6 +56,12 @@ def _on_account_update_signal(
     *args,
     **kwargs
 ) -> None:
+    cfg = current_app.config
+    is_legible_for_trade = (
+        demurrage_rate >= cfg["APP_MIN_DEMURRAGE_RATE"]
+        and commit_period >= cfg["APP_MIN_COMMIT_PERIOD_SECONDS"]
+        and transfer_note_max_bytes >= cfg["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
+    )
     procedures.process_account_update_signal(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
@@ -77,6 +83,7 @@ def _on_account_update_signal(
         last_transfer_committed_at=last_transfer_committed_at,
         ts=ts,
         ttl=ttl,
+        is_legible_for_trade=is_legible_for_trade,
     )
 
 

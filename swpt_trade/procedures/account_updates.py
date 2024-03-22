@@ -41,7 +41,8 @@ def process_account_update_signal(
         last_transfer_number: int,
         last_transfer_committed_at: datetime,
         ts: datetime,
-        ttl: int
+        ttl: int,
+        is_legible_for_trade: bool = True,
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
     if (current_ts - ts).total_seconds() > ttl:
@@ -138,7 +139,7 @@ def process_account_update_signal(
             )
         )
 
-    if account_id and debtor_info_iri:
+    if is_legible_for_trade and account_id and debtor_info_iri:
         db.session.add(
             DiscoverDebtorSignal(
                 debtor_id=debtor_id,
