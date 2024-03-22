@@ -134,8 +134,9 @@ cdef class BidProcessor:
 
         When the `confirmed` flag is `True`, this means that a
         collector account has been successfully created in this
-        currency, and the currency's debtor info document has been
-        confirmed as correct.
+        currency, currency's parameters have been verified to be
+        suitable for doing automated trades, and the currency's debtor
+        info document have been verified to be correct.
 
         Both the pegged currency and the peg currency are identified
         by a ("debtor info locator", "debtor ID") pair.

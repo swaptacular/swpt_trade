@@ -448,9 +448,10 @@ cdef extern from *:
         (expressed in base currency's tokens), and several bit-flags:
 
         * To be a "confirmed currency" means that a collector account
-          has been successfully created in this currency, and the
-          currency's debtor info document has been confirmed as
-          correct.
+          has been successfully created in this currency, currency's
+          parameters have been verified to be suitable for doing
+          automated trades, and the currency's debtor info document
+          have been verified to be correct.
 
         * To be a "tradable currency" means that the currency is both
           priceable (has a direct or indirect peg to the base
