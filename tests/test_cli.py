@@ -400,6 +400,144 @@ def test_delete_useless_trading_policies(app, db_session, current_ts):
     assert tps[0].creditor_id == 777
 
 
+def test_delete_parent_worker_accounts(
+        app,
+        db_session,
+        restore_sharding_realm,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    params = {
+        "creation_date": m.DATE0,
+        "last_change_ts": m.TS0,
+        "last_change_seqnum": 1,
+        "principal": 100,
+        "interest": 31.4,
+        "interest_rate": 5.0,
+        "last_interest_rate_change_ts": m.TS0,
+        "config_flags": 0,
+        "account_id": "Account123",
+        "last_transfer_number": 2,
+        "last_transfer_committed_at": m.TS0,
+        "demurrage_rate": -50.0,
+        "commit_period": 1000000,
+        "transfer_note_max_bytes": 500,
+        "debtor_info_iri": "https://example.com/666",
+    }
+    wa1 = m.WorkerAccount(creditor_id=666, debtor_id=1, **params)
+    wa2 = m.WorkerAccount(creditor_id=777, debtor_id=2, **params)
+    wa3 = m.WorkerAccount(creditor_id=888, debtor_id=2, **params)
+    db.session.add(wa1)
+    db.session.add(wa2)
+    db.session.add(wa3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_account"))
+
+    assert len(m.WorkerAccount.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_accounts",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    was = m.WorkerAccount.query.all()
+    assert len(was) == 1
+    assert was[0].creditor_id == 888
+
+
+def test_delete_dead_worker_accounts(app, db_session, current_ts):
+    params = {
+        "debtor_id": 666,
+        "creation_date": m.DATE0,
+        "last_change_ts": m.TS0,
+        "last_change_seqnum": 1,
+        "principal": 100,
+        "interest": 31.4,
+        "interest_rate": 5.0,
+        "last_interest_rate_change_ts": m.TS0,
+        "config_flags": 0,
+        "account_id": "Account123",
+        "last_transfer_number": 2,
+        "last_transfer_committed_at": m.TS0,
+        "demurrage_rate": -50.0,
+        "commit_period": 1000000,
+        "transfer_note_max_bytes": 500,
+        "debtor_info_iri": "https://example.com/666",
+    }
+    wa1 = m.WorkerAccount(creditor_id=666, **params)
+    wa2 = m.WorkerAccount(
+        creditor_id=777,
+        last_heartbeat_ts=current_ts - timedelta(days=100000),
+        **params
+    )
+    db.session.add(wa1)
+    db.session.add(wa2)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_account"))
+
+    assert len(m.WorkerAccount.query.all()) == 2
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_accounts",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    was = m.WorkerAccount.query.all()
+    assert len(was) == 1
+    assert was[0].creditor_id == 666
+
+
+def test_delete_parent_needed_worker_accounts(
+        app,
+        db_session,
+        restore_sharding_realm,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    nwa1 = m.NeededWorkerAccount(creditor_id=666, debtor_id=1)
+    nwa2 = m.NeededWorkerAccount(creditor_id=777, debtor_id=2)
+    nwa3 = m.NeededWorkerAccount(creditor_id=888, debtor_id=2)
+    db.session.add(nwa1)
+    db.session.add(nwa2)
+    db.session.add(nwa3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE needed_worker_account"))
+
+    assert len(m.NeededWorkerAccount.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_needed_worker_accounts",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    nwas = m.NeededWorkerAccount.query.all()
+    assert len(nwas) == 1
+    assert nwas[0].creditor_id == 888
+
+
 def test_process_pristine_collectors(
         app,
         db_session,
