@@ -100,7 +100,7 @@ def _on_account_purge_signal(
         creditor_id=creditor_id,
         creation_date=creation_date,
     )
-    if is_needed_account:
+    if is_needed_account:  # pragma: no cover
         logger = logging.getLogger(__name__)
         logger.warning(
             "Received AccountPurge message"
@@ -166,7 +166,7 @@ def _on_rejected_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_rejected_direct_transfer_signal(
+    procedures.process_rejected_agent_transfer_signal(
         coordinator_id=coordinator_id,
         coordinator_request_id=coordinator_request_id,
         status_code=status_code,
@@ -197,7 +197,7 @@ def _on_prepared_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_prepared_direct_transfer_signal(
+    procedures.process_prepared_agent_transfer_signal(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         transfer_id=transfer_id,
@@ -228,7 +228,7 @@ def _on_finalized_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_finalized_direct_transfer_signal(
+    procedures.process_finalized_agent_transfer_signal(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         transfer_id=transfer_id,
@@ -256,6 +256,7 @@ def _on_updated_ledger_signal(
         creditor_id=creditor_id,
         debtor_id=debtor_id,
         update_id=update_id,
+        account_id=account_id,
         creation_date=creation_date,
         principal=principal,
         last_transfer_number=last_transfer_number,
@@ -400,7 +401,7 @@ def _on_activate_collector_signal(
 ) -> None:
     procedures.activate_collector(
         debtor_id=debtor_id,
-        creditor_id=creditor_id,
+        collector_id=creditor_id,
         account_id=account_id,
     )
 
