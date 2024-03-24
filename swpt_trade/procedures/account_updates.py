@@ -61,7 +61,6 @@ def process_account_update_signal(
         _discard_orphaned_account(
             creditor_id, debtor_id, config_flags, negligible_amount
         )
-        return
 
     data = (
         WorkerAccount.query
@@ -139,7 +138,12 @@ def process_account_update_signal(
             )
         )
 
-    if is_legible_for_trade and account_id and debtor_info_iri:
+    if (
+            is_needed_account
+            and is_legible_for_trade
+            and account_id
+            and debtor_info_iri
+    ):
         db.session.add(
             DiscoverDebtorSignal(
                 debtor_id=debtor_id,

@@ -1073,10 +1073,10 @@ def test_process_account_update_signal(db_session, current_ts):
         ts=current_ts,
     )
     wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=124).one()
-    assert wa.debtor_info_iri is None
-    assert wa.account_id == "Account124"
-    assert wa.last_change_ts == current_ts - timedelta(hours=1)
-    assert wa.last_change_seqnum == 1
+    assert wa.debtor_info_iri == "https://example.com/666"
+    assert wa.account_id == "Account124"  # account_id should not change.
+    assert wa.last_change_ts == current_ts
+    assert wa.last_change_seqnum == 2
     assert len(DiscoverDebtorSignal.query.all()) == 1
     assert len(ActivateCollectorSignal.query.all()) == 1
     cas = ConfigureAccountSignal.query.one()
