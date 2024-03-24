@@ -262,7 +262,7 @@ def mark_requested_collector(
         .filter_by(debtor_id=debtor_id, collector_id=collector_id, status=0)
         .update(
             {
-                CollectorAccount.status: 1,
+                CollectorAccount.status: 1,  # requested account creation
                 CollectorAccount.latest_status_change_at: current_ts,
             },
             synchronize_session=False,
@@ -289,7 +289,7 @@ def activate_collector(
         .update(
             {
                 CollectorAccount.account_id: account_id,
-                CollectorAccount.status: 2,
+                CollectorAccount.status: 2,  # assigned account ID
                 CollectorAccount.latest_status_change_at: current_ts,
             },
             synchronize_session=False,
