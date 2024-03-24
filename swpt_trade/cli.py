@@ -879,6 +879,7 @@ def process_pristine_collectors(threads, wait, quit_early):
         )
 
     def process_pristine_collector(debtor_id, collector_id):
+        assert sharding_realm.match(collector_id)
         procedures.process_pristine_collector(
             debtor_id=debtor_id, collector_id=collector_id, max_delay=max_delay
         )
