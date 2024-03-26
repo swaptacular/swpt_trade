@@ -630,3 +630,77 @@ def test_process_pristine_collectors(
     assert ca_signals[1].negligible_amount == 1e30
     assert ca_signals[1].config_data == ""
     assert ca_signals[1].config_flags == 0
+
+
+def test_update_worker_turns(app, db_session, current_ts):
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=current_ts - timedelta(days=100),
+        collection_deadline=current_ts - timedelta(days=50),
+    )
+    t2 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=1,
+        phase_deadline=current_ts - timedelta(days=99.1),
+        collection_deadline=current_ts - timedelta(days=49),
+    )
+    db.session.add(t1)
+    db.session.add(t2)
+    db.session.flush()
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=1,
+        phase_deadline=current_ts - timedelta(days=100.1),
+        worker_turn_subphase=5,
+    )
+    db.session.add(wt1)
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wts = m.WorkerTurn.query.all()
+    wts.sort(key=lambda t: t.phase, reverse=True)
+    assert len(wts) == 2
+    assert wts[0].turn_id == t1.turn_id
+    assert wts[0].started_at == t1.started_at
+    assert wts[0].base_debtor_info_locator == t1.base_debtor_info_locator
+    assert wts[0].base_debtor_id == t1.base_debtor_id
+    assert wts[0].max_distance_to_base == t1.max_distance_to_base
+    assert wts[0].min_trade_amount == t1.min_trade_amount
+    assert wts[0].phase == t1.phase
+    assert wts[0].phase_deadline == t1.phase_deadline
+    assert wts[0].collection_started_at == t1.collection_started_at
+    assert wts[0].collection_deadline == t1.collection_deadline
+    assert wts[0].worker_turn_subphase == 0
+    assert wts[1].turn_id == t2.turn_id
+    assert wts[1].started_at == t2.started_at
+    assert wts[1].base_debtor_info_locator == t2.base_debtor_info_locator
+    assert wts[1].base_debtor_id == t2.base_debtor_id
+    assert wts[1].max_distance_to_base == t2.max_distance_to_base
+    assert wts[1].min_trade_amount == t2.min_trade_amount
+    assert wts[1].phase == t2.phase
+    assert wts[1].phase_deadline == t2.phase_deadline
+    assert wts[1].collection_started_at == t2.collection_started_at
+    assert wts[1].collection_deadline == t2.collection_deadline
+    assert wts[1].worker_turn_subphase == 0

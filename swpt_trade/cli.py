@@ -674,6 +674,52 @@ def roll_turns(period, period_offset, check_interval, quit_early):
             time.sleep(wait_seconds)
 
 
+@swpt_trade.command("roll_worker_turns")
+@with_appcontext
+@click.option(
+    "-w",
+    "--wait",
+    type=float,
+    help=(
+        "Poll the solver's database for new or progressed turns every"
+        " FLOAT seconds. If not specified, the value of the"
+        " APP_ROLL_WORKER_TURNS_WAIT environment variable will be used,"
+        " defaulting to 60 seconds if empty."
+    ),
+)
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def roll_worker_turns(wait, quit_early):
+    """Run a process which synchronizes worker server's turn states
+    with solver server's turn states.
+    """
+
+    wait_seconds = (
+        wait
+        if wait is not None
+        else current_app.config["APP_ROLL_WORKER_TURNS_WAIT"]
+    )
+    logger = logging.getLogger(__name__)
+    logger.info("Started rolling worker turns.")
+
+    while True:
+        for unfinished_turn in procedures.get_unfinished_turns():
+            procedures.update_or_create_worker_turn(unfinished_turn)
+
+        for worker_turn in procedures.get_pending_worker_turns():
+            # TODO: Implement worker turn participation logic.
+            pass
+
+        if quit_early:
+            break
+        if wait_seconds > 0.0:  # pragma: no cover
+            time.sleep(wait_seconds)
+
+
 @swpt_trade.command("scan_debtor_info_documents")
 @with_appcontext
 @click.option("-d", "--days", type=float, help="The number of days.")

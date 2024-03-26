@@ -166,6 +166,15 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
 
 
 @atomic
+def get_unfinished_turns() -> List[Turn]:
+    return (
+        Turn.query
+        .filter(Turn.phase < 4)
+        .all()
+    )
+
+
+@atomic
 def get_pristine_collectors(
         *,
         hash_mask: int,
