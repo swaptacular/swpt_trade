@@ -1,3 +1,4 @@
+import pytest
 import sqlalchemy
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock
@@ -692,7 +693,6 @@ def test_update_worker_turns(app, db_session, current_ts):
     assert wts[0].phase_deadline == t1.phase_deadline
     assert wts[0].collection_started_at == t1.collection_started_at
     assert wts[0].collection_deadline == t1.collection_deadline
-    assert wts[0].worker_turn_subphase == 0
     assert wts[1].turn_id == t2.turn_id
     assert wts[1].started_at == t2.started_at
     assert wts[1].base_debtor_info_locator == t2.base_debtor_info_locator
@@ -703,4 +703,142 @@ def test_update_worker_turns(app, db_session, current_ts):
     assert wts[1].phase_deadline == t2.phase_deadline
     assert wts[1].collection_started_at == t2.collection_started_at
     assert wts[1].collection_deadline == t2.collection_deadline
-    assert wts[1].worker_turn_subphase == 0
+
+
+@pytest.mark.parametrize("populated_confirmed_debtors", [True, False])
+@pytest.mark.parametrize("populated_debtor_infos", [True, False])
+def test_run_phase1_subphase0(
+        app,
+        db_session,
+        current_ts,
+        populated_debtor_infos,
+        populated_confirmed_debtors,
+):
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=1,
+        phase_deadline=current_ts + timedelta(days=100),
+        collection_deadline=None,
+    )
+    db.session.add(t1)
+    db.session.flush()
+
+    if populated_confirmed_debtors:
+        db.session.add(
+            m.ConfirmedDebtor(
+                turn_id=t1.turn_id,
+                debtor_id=666,
+                debtor_info_locator="https://example.com/666",
+            )
+        )
+        db.session.add(
+            m.ConfirmedDebtor(
+                turn_id=t1.turn_id,
+                debtor_id=777,
+                debtor_info_locator="https://example.com/777",
+            )
+        )
+
+    if populated_debtor_infos:
+        db.session.add(
+            m.DebtorInfo(
+                turn_id=t1.turn_id,
+                debtor_info_locator="https://example.com/666",
+                debtor_id=666,
+            )
+        )
+        db.session.add(
+            m.DebtorInfo(
+                turn_id=t1.turn_id,
+                debtor_info_locator="https://example.com/777",
+                debtor_id=777,
+                peg_debtor_info_locator="https://example.com/666",
+                peg_debtor_id=666,
+                peg_exchange_rate=2.0,
+            )
+        )
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=1,
+        phase_deadline=current_ts + timedelta(days=100),
+        worker_turn_subphase=0,
+    )
+    db.session.add(wt1)
+    db.session.add(
+        m.DebtorInfoDocument(
+            debtor_info_locator="https://example.com/777",
+            debtor_id=777,
+            peg_debtor_info_locator="https://example.com/666",
+            peg_debtor_id=666,
+            peg_exchange_rate=2.0,
+        )
+    )
+    db.session.add(
+        m.DebtorInfoDocument(
+            debtor_info_locator="https://example.com/666",
+            debtor_id=666,
+        )
+    )
+    db.session.add(
+        m.DebtorLocatorClaim(
+            debtor_info_locator="https://example.com/666",
+            debtor_id=666,
+            latest_locator_fetch_at=current_ts,
+        )
+    )
+    db.session.add(
+        m.DebtorLocatorClaim(
+            debtor_info_locator="https://example.com/777",
+            debtor_id=777,
+            latest_locator_fetch_at=current_ts,
+        )
+    )
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    assert len(m.DebtorInfoDocument.query.all()) == 2
+    assert len(m.DebtorLocatorClaim.query.all()) == 2
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wt = m.WorkerTurn.query.one()
+    assert wt.turn_id == t1.turn_id
+    assert wt.phase == t1.phase
+    assert wt.worker_turn_subphase == 10
+    assert len(m.DebtorInfoDocument.query.all()) == 2
+    dis = m.DebtorInfo.query.all()
+    dis.sort(key=lambda x: x.debtor_info_locator)
+    assert len(dis) == 2
+    assert dis[0].debtor_info_locator == "https://example.com/666"
+    assert dis[0].debtor_id == 666
+    assert dis[0].peg_debtor_info_locator is None
+    assert dis[0].peg_debtor_id is None
+    assert dis[0].peg_exchange_rate is None
+    assert dis[1].debtor_info_locator == "https://example.com/777"
+    assert dis[1].debtor_id == 777
+    assert dis[1].peg_debtor_info_locator == "https://example.com/666"
+    assert dis[1].peg_debtor_id == 666
+    assert dis[1].peg_exchange_rate == 2.0
+    assert len(m.DebtorLocatorClaim.query.all()) == 2
+    cds = m.ConfirmedDebtor.query.all()
+    cds.sort(key=lambda x: x.debtor_id)
+    assert len(cds) == 2
+    assert cds[0].debtor_id == 666
+    assert cds[0].debtor_info_locator == "https://example.com/666"
+    assert cds[1].debtor_id == 777
+    assert cds[1].debtor_info_locator == "https://example.com/777"

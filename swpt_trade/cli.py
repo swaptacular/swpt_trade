@@ -23,6 +23,12 @@ from swpt_trade.extensions import db
 from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
 from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
+from swpt_trade.run_turn_subphases import (
+    run_phase1_subphase0,
+    run_phase2_subphase0,
+    run_phase2_subphase5,
+    run_phase3_subphase0,
+)
 
 # TODO: Implement a CLI command which extracts trading policies from
 # the "swpt_creditors" microservice via its admin Web API, and loads
@@ -711,8 +717,23 @@ def roll_worker_turns(wait, quit_early):
             procedures.update_or_create_worker_turn(unfinished_turn)
 
         for worker_turn in procedures.get_pending_worker_turns():
-            # TODO: Implement worker turn participation logic.
-            pass
+            phase = worker_turn.phase
+            subphase = worker_turn.worker_turn_subphase
+            assert 1 <= phase <= 3
+            assert 0 <= subphase < 10
+
+            if phase == 1 and subphase == 0:
+                run_phase1_subphase0(worker_turn.turn_id)
+            elif phase == 2 and subphase == 0:
+                run_phase2_subphase0(worker_turn)
+            elif phase == 2 and subphase == 5:
+                run_phase2_subphase5(worker_turn)
+            elif phase == 3 and subphase == 0:
+                run_phase3_subphase0(worker_turn)
+            else:  # pragma: no cover
+                raise RuntimeError(
+                    f"Invalid subphase for worker turn {worker_turn.turn_id}."
+                )
 
         if quit_early:
             break
