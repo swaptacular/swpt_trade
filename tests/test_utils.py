@@ -7,6 +7,7 @@ from swpt_trade.utils import (
     calc_hash,
     i16_to_u16,
     u16_to_i16,
+    contain_principal_overflow,
 )
 
 
@@ -86,11 +87,14 @@ def test_can_start_new_turn():
 
 
 def test_batched():
+    assert list(batched('', 3)) == []
     assert list(batched('ABCDEFG', 3)) == [
         tuple("ABC"),
         tuple("DEF"),
         tuple("G"),
     ]
+    assert list(batched('', 3)) == []
+
     with pytest.raises(ValueError):
         list(batched('ABCDEFG', 0))
 
@@ -123,3 +127,13 @@ def test_u16_to_i16():
         u16_to_i16(-1)
     with pytest.raises(ValueError):
         u16_to_i16(0x10000)
+
+
+def test_contain_principal_overflow():
+    assert contain_principal_overflow(0) == 0
+    assert contain_principal_overflow(1) == 1
+    assert contain_principal_overflow(-1) == -1
+    assert contain_principal_overflow(-1 << 63 + 1) == (-1 << 63) + 1
+    assert contain_principal_overflow(-1 << 63) == (-1 << 63) + 1
+    assert contain_principal_overflow((1 << 63) - 1) == (1 << 63) - 1
+    assert contain_principal_overflow(1 << 63) == (1 << 63) - 1

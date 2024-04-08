@@ -43,6 +43,7 @@ CREDITOR_ID_SHARDED_MESSAGE_TYPES = SMP_MESSAGE_TYPES | set([
     "UpdatedPolicy",
     "UpdatedFlags",
     "ActivateCollector",
+    "CandidateOffer",
 ])
 DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
     "DiscoverDebtor",

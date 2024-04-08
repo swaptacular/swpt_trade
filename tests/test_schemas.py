@@ -466,6 +466,54 @@ def test_activate_collector_message():
                    for m in e.messages.values())
 
 
+def test_candidate_offer_message():
+    s = schemas.CandidateOfferMessageSchema()
+
+    data = s.loads("""{
+    "type": "CandidateOffer",
+    "turn_id": 3,
+    "debtor_id": 666,
+    "creditor_id": 123,
+    "amount": -10000,
+    "last_transfer_number": 678,
+    "account_creation_date": "2024-03-11",
+    "ts": "2022-01-01T00:00:00Z",
+    "unknown": "ignored"
+    }""")
+
+    assert data['type'] == 'CandidateOffer'
+    assert type(data['debtor_id']) is int
+    assert data['debtor_id'] == 666
+    assert type(data['creditor_id']) is int
+    assert data['creditor_id'] == 123
+    assert type(data['amount']) is int
+    assert data['amount'] == -10000
+    assert type(data['last_transfer_number']) is int
+    assert data['last_transfer_number'] == 678
+    assert data['account_creation_date'] == date(2024, 3, 11)
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+    assert "unknown" not in data
+
+    with pytest.raises(ValidationError, match='Invalid type.'):
+        data = s.loads("""{
+        "type": "WrongType",
+        "turn_id": 3,
+        "debtor_id": 666,
+        "creditor_id": 123,
+        "amount": -10000,
+        "last_transfer_number": 678,
+        "account_creation_date": "2024-03-11",
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == len(data)
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+
 def test_coin_info_document():
     s = schemas.CoinInfoDocumentSchema()
 

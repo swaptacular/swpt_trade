@@ -5,6 +5,8 @@ from itertools import islice
 
 RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
 DATETIME0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # 2024-01-01 is Monday.
+MIN_INT64 = -1 << 63
+MAX_INT64 = (1 << 63) - 1
 
 
 def parse_timedelta(s: str) -> timedelta:
@@ -100,3 +102,11 @@ def u16_to_i16(value: int) -> int:
     if value <= 0x7fff:
         return value
     return value - 0x10000
+
+
+def contain_principal_overflow(value: int) -> int:
+    if value <= MIN_INT64:
+        return -MAX_INT64
+    if value > MAX_INT64:
+        return MAX_INT64
+    return value

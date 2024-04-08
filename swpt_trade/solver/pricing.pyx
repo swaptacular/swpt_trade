@@ -19,6 +19,7 @@ cdef class CandidateOffer:
     cdef readonly i64 amount
     cdef readonly i64 debtor_id
     cdef readonly i64 creditor_id
+    cdef readonly CandidateOfferAuxData aux_data
 
     The `amount` field can be negative (the trader wants to sell), or
     positive (the trader wants to buy). The amount can not be zero.

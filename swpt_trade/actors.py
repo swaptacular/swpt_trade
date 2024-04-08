@@ -406,6 +406,21 @@ def _on_activate_collector_signal(
     )
 
 
+def _on_candidate_offer_signal(
+    turn_id: int,
+    debtor_id: int,
+    creditor_id: int,
+    amount: int,
+    account_creation_date: date,
+    last_transfer_number: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: Add a real implementation.
+    _LOGGER.warning("Ignored candidate offer signal.")
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -454,6 +469,10 @@ _MESSAGE_TYPES = {
     "ActivateCollector": (
         schemas.ActivateCollectorMessageSchema(),
         _on_activate_collector_signal,
+    ),
+    "CandidateOffer": (
+        schemas.CandidateOfferMessageSchema(),
+        _on_candidate_offer_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),

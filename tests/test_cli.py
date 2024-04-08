@@ -1,6 +1,6 @@
 import pytest
 import sqlalchemy
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from unittest.mock import Mock
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
@@ -708,12 +708,17 @@ def test_update_worker_turns(app, db_session, current_ts):
 @pytest.mark.parametrize("populated_confirmed_debtors", [True, False])
 @pytest.mark.parametrize("populated_debtor_infos", [True, False])
 def test_run_phase1_subphase0(
+        mocker,
         app,
         db_session,
         current_ts,
         populated_debtor_infos,
         populated_confirmed_debtors,
 ):
+    mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.BID_COUNTER_THRESHOLD", new=1)
+
     t1 = m.Turn(
         base_debtor_info_locator="https://example.com/666",
         base_debtor_id=666,
@@ -842,3 +847,129 @@ def test_run_phase1_subphase0(
     assert cds[0].debtor_info_locator == "https://example.com/666"
     assert cds[1].debtor_id == 777
     assert cds[1].debtor_info_locator == "https://example.com/777"
+
+
+def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
+    mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.BID_COUNTER_THRESHOLD", new=1)
+
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(days=100),
+        collection_deadline=current_ts + timedelta(days=200),
+    )
+    db.session.add(t1)
+    db.session.flush()
+    db.session.add(
+        m.CurrencyInfo(
+            turn_id=t1.turn_id,
+            debtor_info_locator="https://example.com/666",
+            debtor_id=666,
+            is_confirmed=True,
+        )
+    )
+    db.session.add(
+        m.CurrencyInfo(
+            turn_id=t1.turn_id,
+            debtor_info_locator="https://example.com/777",
+            debtor_id=777,
+            peg_debtor_info_locator="https://example.com/666",
+            peg_debtor_id=666,
+            peg_exchange_rate=1.0,
+            is_confirmed=True,
+        )
+    )
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(days=100),
+        collection_deadline=current_ts + timedelta(days=200),
+        worker_turn_subphase=0,
+    )
+    db.session.add(wt1)
+    db.session.add(
+        m.TradingPolicy(
+            creditor_id=123,
+            debtor_id=666,
+            account_id="Account666-123",
+            creation_date=date(2024, 4, 8),
+            principal=0,
+            last_transfer_number=567,
+            policy_name="conservative",
+            min_principal=200000,
+            max_principal=300000,
+        )
+    )
+    db.session.add(
+        m.TradingPolicy(
+            creditor_id=123,
+            debtor_id=777,
+            account_id="Account777-123",
+            creation_date=date(2024, 4, 9),
+            principal=150000,
+            last_transfer_number=789,
+            policy_name="unknown",
+            min_principal=0,
+            max_principal=50000,
+            peg_debtor_id=666,
+            peg_exchange_rate=1.0,
+        )
+    )
+    db.session.add(
+        m.TradingPolicy(
+            creditor_id=124,
+            debtor_id=777,
+            account_id="Account777-124",
+            creation_date=date(2024, 4, 10),
+            principal=150000,
+            last_transfer_number=890,
+            policy_name="conservative",
+            min_principal=0,
+            max_principal=300000,
+        )
+    )
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    assert len(m.CandidateOfferSignal.query.all()) == 0
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wt = m.WorkerTurn.query.one()
+    assert wt.turn_id == t1.turn_id
+    assert wt.phase == t1.phase
+    assert wt.worker_turn_subphase == 5
+    cas = m.CandidateOfferSignal.query.all()
+    cas.sort(key=lambda x: x.debtor_id)
+    assert len(cas) == 2
+    assert cas[0].turn_id == t1.turn_id
+    assert cas[0].debtor_id == 666
+    assert cas[0].creditor_id == 123
+    assert cas[0].amount == 200000
+    assert cas[0].account_creation_date == date(2024, 4, 8)
+    assert cas[0].last_transfer_number == 567
+    assert cas[0].inserted_at >= current_ts
+    assert cas[1].turn_id == t1.turn_id
+    assert cas[1].debtor_id == 777
+    assert cas[1].creditor_id == 123
+    assert cas[1].amount == -100000
+    assert cas[1].account_creation_date == date(2024, 4, 9)
+    assert cas[1].last_transfer_number == 789
+    assert cas[1].inserted_at >= current_ts

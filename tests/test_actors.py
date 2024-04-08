@@ -194,6 +194,18 @@ def test_on_activate_collector_signal(db_session, actors):
     )
 
 
+def test_on_candidate_offer_signal(db_session, actors):
+    actors._on_candidate_offer_signal(
+        turn_id=5,
+        debtor_id=D_ID,
+        creditor_id=m.ROOT_CREDITOR_ID,
+        amount=10000,
+        account_creation_date=date(2024, 3, 10),
+        last_transfer_number=1234,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
 def test_consumer(db_session, app, actors, restore_sharding_realm):
     consumer = actors.SmpConsumer()
 

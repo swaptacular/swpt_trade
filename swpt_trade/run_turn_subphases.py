@@ -1,24 +1,33 @@
 import logging
+import math
 from typing import TypeVar, Callable
 from datetime import datetime, timezone
+from itertools import groupby
 from sqlalchemy import select, insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import null
+from sqlalchemy.sql.expression import null, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
+from swpt_trade.solver import CandidateOfferAuxData, BidProcessor
 from swpt_trade.models import (
     DebtorInfoDocument,
     DebtorLocatorClaim,
     DebtorInfo,
     ConfirmedDebtor,
     WorkerTurn,
+    CurrencyInfo,
+    TradingPolicy,
+    WorkerAccount,
+    CandidateOfferSignal,
 )
-from swpt_trade.utils import batched
+from swpt_trade.utils import batched, contain_principal_overflow
 
 
 INSERT_BATCH_SIZE = 50000
 SELECT_BATCH_SIZE = 50000
+BID_COUNTER_THRESHOLD = 100000
+DELETION_FLAG = WorkerAccount.CONFIG_SCHEDULED_FOR_DELETION_FLAG
 
 
 T = TypeVar("T")
@@ -136,7 +145,141 @@ def _populate_confirmed_debtors(w_conn, s_conn, turn_id):
             s_conn.commit()
 
 
-def run_phase2_subphase0(worker_turn: WorkerTurn) -> None:
+@atomic
+def run_phase2_subphase0(turn_id: int) -> None:
+    worker_turn = (
+        WorkerTurn.query
+        .filter_by(
+            turn_id=turn_id,
+            phase=2,
+            worker_turn_subphase=0,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if worker_turn:
+        if worker_turn.phase_deadline > datetime.now(tz=timezone.utc):
+            bp = BidProcessor(
+                worker_turn.base_debtor_info_locator,
+                worker_turn.base_debtor_id,
+                worker_turn.max_distance_to_base,
+                worker_turn.min_trade_amount,
+            )
+            _load_currencies(bp, turn_id)
+            _generate_candidate_offers(bp, turn_id)
+            _schedule_currencies_to_be_confirmed(bp)
+
+        worker_turn.worker_turn_subphase = 5
+
+
+def _load_currencies(bp: BidProcessor, turn_id: int) -> None:
+    with db.engines["solver"].connect() as s_conn:
+        with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+                select(
+                    CurrencyInfo.is_confirmed,
+                    CurrencyInfo.debtor_info_locator,
+                    CurrencyInfo.debtor_id,
+                    CurrencyInfo.peg_debtor_info_locator,
+                    CurrencyInfo.peg_debtor_id,
+                    CurrencyInfo.peg_exchange_rate,
+                )
+                .where(CurrencyInfo.turn_id == turn_id)
+        ) as result:
+            for row in result:
+                if row[3] is None or row[4] is None or row[5] is None:
+                    bp.register_currency(row[0], row[1], row[2])
+                else:
+                    bp.register_currency(*row)
+
+
+def _generate_candidate_offers(bp, turn_id):
+    current_ts = datetime.now(tz=timezone.utc)
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    bid_counter = 0
+
+    with db.engine.connect() as w_conn:
+        with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+                select(
+                    TradingPolicy.creditor_id,
+                    TradingPolicy.debtor_id,
+                    TradingPolicy.creation_date,
+                    TradingPolicy.principal,
+                    TradingPolicy.last_transfer_number,
+                    TradingPolicy.min_principal,
+                    TradingPolicy.max_principal,
+                    TradingPolicy.peg_debtor_id,
+                    TradingPolicy.peg_exchange_rate,
+                )
+                .where(
+                    and_(
+                        TradingPolicy.account_id != "",
+                        TradingPolicy.config_flags.op("&")(DELETION_FLAG) == 0,
+                        TradingPolicy.policy_name != null(),
+                    )
+                )
+                .order_by(TradingPolicy.creditor_id)
+        ) as result:
+            for creditor_id, rows in groupby(result, lambda r: r.creditor_id):
+                if sharding_realm.match(creditor_id):
+                    for row in rows:
+                        assert row.creditor_id == creditor_id
+
+                        if amount := _calc_bid_amount(row):
+                            rate = row.peg_exchange_rate
+                            aux_data = CandidateOfferAuxData(
+                                creation_date=row.creation_date,
+                                last_transfer_number=row.last_transfer_number,
+                            )
+                            bp.register_bid(
+                                creditor_id,
+                                row.debtor_id,
+                                amount,
+                                row.peg_debtor_id or 0,
+                                math.nan if rate is None else rate,
+                                aux_data,
+                            )
+                            bid_counter += 1
+
+                    # Process the registered bids when they become too
+                    # many, so that they do not use up the available
+                    # memory.
+                    if bid_counter >= BID_COUNTER_THRESHOLD:
+                        _process_bids(bp, turn_id, current_ts)
+                        bid_counter = 0
+
+            _process_bids(bp, turn_id, current_ts)
+
+
+def _calc_bid_amount(row) -> int:
+    if row.principal < row.min_principal:  # buy
+        return contain_principal_overflow(row.min_principal - row.principal)
+    elif row.principal > row.max_principal:  # sell
+        return contain_principal_overflow(row.max_principal - row.principal)
+    else:  # do nothing
+        return 0
+
+
+def _process_bids(bp: BidProcessor, turn_id: int, ts: datetime) -> None:
+    for candidate_offers in batched(bp.analyze_bids(), INSERT_BATCH_SIZE):
+        db.session.execute(
+            insert(CandidateOfferSignal).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "turn_id": turn_id,
+                    "amount": o.amount,
+                    "debtor_id": o.debtor_id,
+                    "creditor_id": o.creditor_id,
+                    "account_creation_date": o.aux_data.creation_date,
+                    "last_transfer_number": o.aux_data.last_transfer_number,
+                    "inserted_at": ts,
+                } for o in candidate_offers
+            ],
+        )
+
+
+def _schedule_currencies_to_be_confirmed(bp: BidProcessor) -> None:
     # TODO: implement
     pass
 

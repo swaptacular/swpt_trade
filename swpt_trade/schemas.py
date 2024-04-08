@@ -131,6 +131,32 @@ class ActivateCollectorMessageSchema(ValidateTypeMixin, Schema):
     ts = fields.DateTime(required=True)
 
 
+class CandidateOfferMessageSchema(ValidateTypeMixin, Schema):
+    """``CandidateOffer`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    turn_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    amount = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    last_transfer_number = fields.Integer(
+        required=True, validate=validate.Range(min=0, max=MAX_INT64)
+    )
+    account_creation_date = fields.Date(required=True)
+    ts = fields.DateTime(required=True)
+
+
 class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):
     """``UpdatedLedger`` message schema."""
 

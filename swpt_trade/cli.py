@@ -725,7 +725,7 @@ def roll_worker_turns(wait, quit_early):
             if phase == 1 and subphase == 0:
                 run_phase1_subphase0(worker_turn.turn_id)
             elif phase == 2 and subphase == 0:
-                run_phase2_subphase0(worker_turn)
+                run_phase2_subphase0(worker_turn.turn_id)
             elif phase == 2 and subphase == 5:
                 run_phase2_subphase5(worker_turn)
             elif phase == 3 and subphase == 0:

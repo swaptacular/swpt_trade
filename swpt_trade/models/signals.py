@@ -307,3 +307,39 @@ class ActivateCollectorSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_FLUSH_ACTIVATE_COLLECTOR_BURST_COUNT"]
+
+
+class CandidateOfferSignal(Signal):
+    """Represent a candidate offer generated for a given trading turn.
+
+    The `amount` field can be negative (the trader wants to sell), or
+    positive (the trader wants to buy). The amount can not be zero.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("CandidateOffer")
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        creditor_id = fields.Integer()
+        amount = fields.Integer()
+        account_creation_date = fields.Date()
+        last_transfer_number = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    turn_id = db.Column(db.SmallInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    amount = db.Column(db.BigInteger, nullable=False)
+    account_creation_date = db.Column(db.DATE, nullable=False)
+    last_transfer_number = db.Column(db.BigInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.creditor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_CANDIDATE_OFFER_BURST_COUNT"]

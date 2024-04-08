@@ -132,7 +132,8 @@ case $1 in
         ;;
     flush_configure_accounts | flush_prepare_transfers | flush_finalize_transfers \
         | flush_fetch_debtor_infos | flush_store_documents | flush_discover_debtors \
-        | flush_confirm_debtors | flush_activate_collectors | flush_all)
+        | flush_confirm_debtors | flush_activate_collectors | flush_candidate_offers \
+        | flush_all)
 
         flush_configure_accounts=ConfigureAccountSignal
         flush_prepare_transfers=PrepareTransferSignal
@@ -142,6 +143,7 @@ case $1 in
         flush_discover_debtors=DiscoverDebtorSignal
         flush_confirm_debtors=ConfirmDebtorSignal
         flush_activate_collectors=ActivateCollectorSignal
+        flush_candidate_offers=CandidateOfferSignal
         flush_all=
 
         # For example: if `$1` is "flush_configure_accounts",
