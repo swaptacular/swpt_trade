@@ -223,25 +223,23 @@ def _generate_candidate_offers(bp, turn_id):
                 if sharding_realm.match(creditor_id):
                     for row in rows:
                         assert row.creditor_id == creditor_id
+                        rate = row.peg_exchange_rate
 
-                        if amount := _calc_bid_amount(row):
-                            rate = row.peg_exchange_rate
-                            aux_data = CandidateOfferAuxData(
+                        bp.register_bid(
+                            creditor_id,
+                            row.debtor_id,
+                            _calc_bid_amount(row),
+                            row.peg_debtor_id or 0,
+                            math.nan if rate is None else rate,
+                            CandidateOfferAuxData(
                                 creation_date=row.creation_date,
                                 last_transfer_number=row.last_transfer_number,
-                            )
-                            bp.register_bid(
-                                creditor_id,
-                                row.debtor_id,
-                                amount,
-                                row.peg_debtor_id or 0,
-                                math.nan if rate is None else rate,
-                                aux_data,
-                            )
-                            bid_counter += 1
+                            ),
+                        )
+                        bid_counter += 1
 
                     # Process the registered bids when they become too
-                    # many, so that they do not use up the available
+                    # many, so that they can not use up the available
                     # memory.
                     if bid_counter >= BID_COUNTER_THRESHOLD:
                         _process_bids(bp, turn_id, current_ts)

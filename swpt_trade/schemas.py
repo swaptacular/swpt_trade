@@ -148,13 +148,18 @@ class CandidateOfferMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     amount = fields.Integer(
-        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+        required=True, validate=validate.Range(min=-MAX_INT64, max=MAX_INT64)
     )
     last_transfer_number = fields.Integer(
         required=True, validate=validate.Range(min=0, max=MAX_INT64)
     )
     account_creation_date = fields.Date(required=True)
     ts = fields.DateTime(required=True)
+
+    @validates("amount")
+    def validate_amount(self, value):
+        if value == 0:
+            raise ValidationError("Amount can not be zero.")
 
 
 class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):

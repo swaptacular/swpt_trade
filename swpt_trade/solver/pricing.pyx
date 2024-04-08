@@ -105,6 +105,10 @@ cdef class BidProcessor:
         distance max_distance_to_base=DEFAULT_MAX_DISTANCE_TO_BASE,
         i64 min_trade_amount=DEFAULT_MIN_TRADE_AMOUNT,
     ):
+        assert base_debtor_id != 0
+        assert max_distance_to_base > 0
+        assert min_trade_amount > 0
+
         self.base_debtor_info_locator = base_debtor_info_locator
         self.base_debtor_id = base_debtor_id
         self.max_distance_to_base = max_distance_to_base

@@ -313,7 +313,8 @@ class CandidateOfferSignal(Signal):
     """Represent a candidate offer generated for a given trading turn.
 
     The `amount` field can be negative (the trader wants to sell), or
-    positive (the trader wants to buy). The amount can not be zero.
+    positive (the trader wants to buy). The amount can not be zero,
+    nor MIN_INT64.
     """
     exchange_name = TO_TRADE_EXCHANGE
 

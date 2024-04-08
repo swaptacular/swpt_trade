@@ -474,7 +474,7 @@ def test_candidate_offer_message():
     "turn_id": 3,
     "debtor_id": 666,
     "creditor_id": 123,
-    "amount": -10000,
+    "amount": -9223372036854775807,
     "last_transfer_number": 678,
     "account_creation_date": "2024-03-11",
     "ts": "2022-01-01T00:00:00Z",
@@ -487,7 +487,7 @@ def test_candidate_offer_message():
     assert type(data['creditor_id']) is int
     assert data['creditor_id'] == 123
     assert type(data['amount']) is int
-    assert data['amount'] == -10000
+    assert data['amount'] == -9223372036854775807
     assert type(data['last_transfer_number']) is int
     assert data['last_transfer_number'] == 678
     assert data['account_creation_date'] == date(2024, 3, 11)
@@ -500,7 +500,31 @@ def test_candidate_offer_message():
         "turn_id": 3,
         "debtor_id": 666,
         "creditor_id": 123,
-        "amount": -10000,
+        "amount": -9223372036854775807,
+        "last_transfer_number": 678,
+        "account_creation_date": "2024-03-11",
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Must be greater than'):
+        data = s.loads("""{
+        "type": "CandidateOffer",
+        "turn_id": 3,
+        "debtor_id": 666,
+        "creditor_id": 123,
+        "amount": -9223372036854775808,
+        "last_transfer_number": 678,
+        "account_creation_date": "2024-03-11",
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Amount can not be zero'):
+        data = s.loads("""{
+        "type": "CandidateOffer",
+        "turn_id": 3,
+        "debtor_id": 666,
+        "creditor_id": 123,
+        "amount": 0,
         "last_transfer_number": 678,
         "account_creation_date": "2024-03-11",
         "ts": "2022-01-01T00:00:00Z"
