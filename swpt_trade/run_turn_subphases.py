@@ -255,15 +255,15 @@ def _calc_bid_amount(row) -> int:
             row.is_scheduled_for_deletion
             or not row.has_account_id
             or not row.wants_to_trade
+            or row.max_principal < row.min_principal
             or row.min_principal <= row.principal <= row.max_principal
     ):
-        # do nothing
         return 0
     if row.principal < row.min_principal:
-        # buy
+        # Return a positive number (buy).
         return contain_principal_overflow(row.min_principal - row.principal)
     else:
-        # sell
+        # Return a negative number (sell).
         assert row.principal > row.max_principal
         return contain_principal_overflow(row.max_principal - row.principal)
 
