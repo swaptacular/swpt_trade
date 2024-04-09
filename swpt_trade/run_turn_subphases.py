@@ -259,13 +259,14 @@ def _calc_bid_amount(row) -> int:
             or row.min_principal <= row.principal <= row.max_principal
     ):
         return 0
+
     if row.principal < row.min_principal:
         # Return a positive number (buy).
         return contain_principal_overflow(row.min_principal - row.principal)
-    else:
-        # Return a negative number (sell).
-        assert row.principal > row.max_principal
-        return contain_principal_overflow(row.max_principal - row.principal)
+
+    # Return a negative number (sell).
+    assert row.principal > row.max_principal
+    return contain_principal_overflow(row.max_principal - row.principal)
 
 
 def _process_bids(bp: BidProcessor, turn_id: int, ts: datetime) -> None:
