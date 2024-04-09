@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from itertools import groupby
 from sqlalchemy import select, insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import null, and_
+from sqlalchemy.sql.expression import null
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
@@ -209,13 +209,15 @@ def _generate_candidate_offers(bp, turn_id):
                     TradingPolicy.max_principal,
                     TradingPolicy.peg_debtor_id,
                     TradingPolicy.peg_exchange_rate,
-                )
-                .where(
-                    and_(
-                        TradingPolicy.account_id != "",
-                        TradingPolicy.config_flags.op("&")(DELETION_FLAG) == 0,
-                        TradingPolicy.policy_name != null(),
-                    )
+                    (
+                        TradingPolicy.account_id != ""
+                    ).label("has_account_id"),
+                    (
+                        TradingPolicy.config_flags.op("&")(DELETION_FLAG) != 0
+                    ).label("is_scheduled_for_deletion"),
+                    (
+                        TradingPolicy.policy_name != null()
+                    ).label("wants_to_trade"),
                 )
                 .order_by(TradingPolicy.creditor_id)
         ) as result:
@@ -249,12 +251,21 @@ def _generate_candidate_offers(bp, turn_id):
 
 
 def _calc_bid_amount(row) -> int:
-    if row.principal < row.min_principal:  # buy
-        return contain_principal_overflow(row.min_principal - row.principal)
-    elif row.principal > row.max_principal:  # sell
-        return contain_principal_overflow(row.max_principal - row.principal)
-    else:  # do nothing
+    if (
+            row.is_scheduled_for_deletion
+            or not row.has_account_id
+            or not row.wants_to_trade
+            or row.min_principal <= row.principal <= row.max_principal
+    ):
+        # do nothing
         return 0
+    if row.principal < row.min_principal:
+        # buy
+        return contain_principal_overflow(row.min_principal - row.principal)
+    else:
+        # sell
+        assert row.principal > row.max_principal
+        return contain_principal_overflow(row.max_principal - row.principal)
 
 
 def _process_bids(bp: BidProcessor, turn_id: int, ts: datetime) -> None:
