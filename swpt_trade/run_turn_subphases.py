@@ -284,7 +284,8 @@ def _process_bids(bp: BidProcessor, turn_id: int, ts: datetime) -> None:
                     "account_creation_date": o.aux_data.creation_date,
                     "last_transfer_number": o.aux_data.last_transfer_number,
                     "inserted_at": ts,
-                } for o in candidate_offers
+                }
+                for o in candidate_offers
             ],
         )
 
