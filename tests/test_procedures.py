@@ -18,6 +18,7 @@ from swpt_trade.models import (
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
+    RecentlyNeededCollector,
     TS0,
     DATE0,
 )
@@ -1115,3 +1116,17 @@ def test_process_account_update_signal(db_session, current_ts):
     assert len(ConfigureAccountSignal.query.all()) == 1
     assert len(ActivateCollectorSignal.query.all()) == 2
     assert len(DiscoverDebtorSignal.query.all()) == 2
+
+
+def test_mark_as_recently_needed_collector(db_session, current_ts):
+    assert len(RecentlyNeededCollector.query.all()) == 0
+    assert p.is_recently_needed_collector(666) is False
+    assert p.is_recently_needed_collector(777) is False
+    assert len(RecentlyNeededCollector.query.all()) == 0
+    p.mark_as_recently_needed_collector(666)
+    assert p.is_recently_needed_collector(666) is True
+    assert p.is_recently_needed_collector(777) is False
+    rncs = RecentlyNeededCollector.query.all()
+    assert len(rncs) == 1
+    assert rncs[0].debtor_id == 666
+    assert rncs[0].needed_at >= current_ts

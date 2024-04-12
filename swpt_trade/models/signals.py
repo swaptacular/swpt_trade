@@ -344,3 +344,28 @@ class CandidateOfferSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_FLUSH_CANDIDATE_OFFER_BURST_COUNT"]
+
+
+class NeededCollectorSignal(Signal):
+    """Call for the creation of a collector account for a given
+    currency.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("NeededCollector")
+        debtor_id = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.debtor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_NEEDED_COLLECTOR_BURST_COUNT"]

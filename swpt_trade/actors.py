@@ -421,6 +421,26 @@ def _on_candidate_offer_signal(
     _LOGGER.warning("Ignored candidate offer signal.")
 
 
+def _on_needed_collector_signal(
+    debtor_id: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # NOTE: When there are more than one "worker" servers, it is quite
+    # likely that more than one signal will be received for a given
+    # debtor ID because every "worker" server may send such a signal.
+    # Here we try to detect such duplicated signals, and avoid making
+    # repetitive queries to the central database.
+    if not procedures.is_recently_needed_collector(debtor_id):
+        procedures.ensure_collector_accounts(
+            debtor_id=666,
+            min_collector_id=current_app.config["MIN_COLLECTOR_ID"],
+            max_collector_id=current_app.config["MAX_COLLECTOR_ID"],
+        )
+        procedures.mark_as_recently_needed_collector(debtor_id, ts)
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -473,6 +493,10 @@ _MESSAGE_TYPES = {
     "CandidateOffer": (
         schemas.CandidateOfferMessageSchema(),
         _on_candidate_offer_signal,
+    ),
+    "NeededCollector": (
+        schemas.NeededCollectorMessageSchema(),
+        _on_needed_collector_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),

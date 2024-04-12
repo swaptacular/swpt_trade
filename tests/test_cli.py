@@ -401,6 +401,77 @@ def test_delete_useless_trading_policies(app, db_session, current_ts):
     assert tps[0].creditor_id == 777
 
 
+def test_delete_parent_recently_needed_collectors(
+        app,
+        db_session,
+        restore_sharding_realm
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    c1 = m.RecentlyNeededCollector(debtor_id=666)
+    c2 = m.RecentlyNeededCollector(debtor_id=777)
+    c3 = m.RecentlyNeededCollector(debtor_id=888)
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE recently_needed_collector"))
+
+    assert len(m.RecentlyNeededCollector.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_recently_needed_collectors",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    records = m.RecentlyNeededCollector.query.all()
+    assert len(records) == 1
+    assert records[0].debtor_id == 888
+
+
+def test_delete_stale_recently_needed_collectors(app, db_session, current_ts):
+    c1 = m.RecentlyNeededCollector(debtor_id=666)
+    c2 = m.RecentlyNeededCollector(
+        debtor_id=777,
+        needed_at=current_ts - timedelta(days=100),
+    )
+    c3 = m.RecentlyNeededCollector(
+        debtor_id=888,
+        needed_at=current_ts - timedelta(days=1000),
+    )
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE recently_needed_collector"))
+
+    assert len(m.RecentlyNeededCollector.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_recently_needed_collectors",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    claims = m.RecentlyNeededCollector.query.all()
+    assert len(claims) == 1
+    assert claims[0].debtor_id == 666
+
+
 def test_delete_parent_worker_accounts(
         app,
         db_session,

@@ -538,6 +538,44 @@ def test_candidate_offer_message():
                    for m in e.messages.values())
 
 
+def test_needed_collector_message():
+    s = schemas.NeededCollectorMessageSchema()
+
+    data = s.loads("""{
+    "type": "NeededCollector",
+    "debtor_id": 666,
+    "ts": "2022-01-01T00:00:00Z",
+    "unknown": "ignored"
+    }""")
+
+    assert data['type'] == 'NeededCollector'
+    assert type(data['debtor_id']) is int
+    assert data['debtor_id'] == 666
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+    assert "unknown" not in data
+
+    with pytest.raises(ValidationError, match='Invalid type.'):
+        data = s.loads("""{
+        "type": "WrongType",
+        "debtor_id": 666,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Invalid debtor ID'):
+        data = s.loads("""{
+        "type": "NeededCollector",
+        "debtor_id": 0,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == len(data)
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+
 def test_coin_info_document():
     s = schemas.CoinInfoDocumentSchema()
 

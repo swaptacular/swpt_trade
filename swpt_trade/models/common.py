@@ -48,6 +48,7 @@ CREDITOR_ID_SHARDED_MESSAGE_TYPES = SMP_MESSAGE_TYPES | set([
 DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
     "DiscoverDebtor",
     "ConfirmDebtor",
+    "NeededCollector",
 ])
 IRI_SHARDED_MESSAGE_TYPES = set([
     "FetchDebtorInfo",

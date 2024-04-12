@@ -1,8 +1,10 @@
-from typing import TypeVar, Callable, List
+from typing import TypeVar, Callable, List, Optional
+from datetime import datetime, timezone
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     Turn,
     WorkerTurn,
+    RecentlyNeededCollector,
 )
 
 T = TypeVar("T")
@@ -50,3 +52,33 @@ def get_pending_worker_turns() -> List[WorkerTurn]:
         .filter(WorkerTurn.worker_turn_subphase < 10)
         .all()
     )
+
+
+@atomic
+def is_recently_needed_collector(debtor_id: int) -> bool:
+    return (
+        db.session.query(
+            RecentlyNeededCollector.query
+            .filter_by(debtor_id=debtor_id)
+            .exists()
+        )
+        .scalar()
+    )
+
+
+@atomic
+def mark_as_recently_needed_collector(
+        debtor_id: int,
+        needed_at: Optional[datetime] = None,
+) -> None:
+    if needed_at is None:
+        needed_at = datetime.now(tz=timezone.utc)
+
+    if not is_recently_needed_collector(debtor_id):
+        with db.retry_on_integrity_error():
+            db.session.add(
+                RecentlyNeededCollector(
+                    debtor_id=debtor_id,
+                    needed_at=needed_at,
+                )
+            )

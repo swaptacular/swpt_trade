@@ -881,6 +881,37 @@ def scan_needed_worker_accounts(days, quit_early):
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 
+@swpt_trade.command("scan_recently_needed_collectors")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_recently_needed_collectors(days, quit_early):
+    """Start a process that garbage collects recently needed collector
+    records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the debtor locator claims table. If the number
+    of days is not specified, the value of the environment variable
+    APP_RECENTLY_NEEDED_COLLECTORS_SCAN_DAYS is taken. If it is not
+    set, the default number of days is 7.
+    """
+    from swpt_trade.table_scanners import RecentlyNeededCollectorsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started recently needed collector records scanner.")
+    days = days or current_app.config[
+        "APP_RECENTLY_NEEDED_COLLECTORS_SCAN_DAYS"
+    ]
+    assert days > 0.0
+    scanner = RecentlyNeededCollectorsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
 @swpt_trade.command("process_pristine_collectors")
 @with_appcontext
 @click.option(

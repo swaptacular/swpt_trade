@@ -206,6 +206,13 @@ def test_on_candidate_offer_signal(db_session, actors):
     )
 
 
+def test_on_needed_collector_signal(db_session, actors):
+    actors._on_needed_collector_signal(
+        debtor_id=D_ID,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
 def test_consumer(db_session, app, actors, restore_sharding_realm):
     consumer = actors.SmpConsumer()
 
