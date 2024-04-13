@@ -198,6 +198,8 @@ class Configuration(metaclass=MetaEnvReader):
     MIN_TRADE_AMOUNT = 1000
 
     SOLVER_POSTGRES_URL = ""
+    SOLVER_CLIENT_POOL_SIZE = 0
+
     WORKER_POSTGRES_URL = ""
 
     SQLALCHEMY_ENGINE_OPTIONS: _engine_options = _engine_options(
@@ -338,10 +340,12 @@ def create_app(config_dict={}):
     app.config.from_mapping(config_dict)
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
     app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
+    solver_engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"].copy()
+    solver_engine_options["pool_size"] = app.config["SOLVER_CLIENT_POOL_SIZE"]
     app.config["SQLALCHEMY_BINDS"] = {
         "solver": {
             "url": app.config["SOLVER_POSTGRES_URL"],
-            **app.config["SQLALCHEMY_ENGINE_OPTIONS"],
+            **solver_engine_options,
         },
     }
     app.config["SHARDING_REALM"] = ShardingRealm(
