@@ -130,9 +130,15 @@ def _try_to_commit_solver_results(solver: Solver, turn_id: int) -> None:
         _write_collector_transfers(solver, turn_id)
         _write_givings(solver, turn_id)
 
-        CurrencyInfo.query.filter_by(turn_id=turn_id).delete()
-        SellOffer.query.filter_by(turn_id=turn_id).delete()
-        BuyOffer.query.filter_by(turn_id=turn_id).delete()
+        CurrencyInfo.query.filter_by(turn_id=turn_id).delete(
+            synchronize_session=False
+        )
+        SellOffer.query.filter_by(turn_id=turn_id).delete(
+            synchronize_session=False
+        )
+        BuyOffer.query.filter_by(turn_id=turn_id).delete(
+            synchronize_session=False
+        )
 
         turn.phase = 3
         turn.phase_deadline = None

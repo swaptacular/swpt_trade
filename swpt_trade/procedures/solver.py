@@ -125,8 +125,12 @@ def try_to_advance_turn_to_phase2(
                 .where(DebtorInfo.turn_id == turn_id),
             )
         )
-        DebtorInfo.query.filter_by(turn_id=turn_id).delete()
-        ConfirmedDebtor.query.filter_by(turn_id=turn_id).delete()
+        DebtorInfo.query.filter_by(turn_id=turn_id).delete(
+            synchronize_session=False
+        )
+        ConfirmedDebtor.query.filter_by(turn_id=turn_id).delete(
+            synchronize_session=False
+        )
 
         turn.phase = 2
         turn.phase_deadline = current_ts + phase2_duration

@@ -299,7 +299,7 @@ def _copy_active_collectors(bp: BidProcessor) -> None:
         db.session.execute(
             text("LOCK TABLE active_collector IN SHARE ROW EXCLUSIVE MODE")
         )
-        ActiveCollector.query.delete()
+        ActiveCollector.query.delete(synchronize_session=False)
 
         with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
