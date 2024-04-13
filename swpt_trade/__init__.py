@@ -198,7 +198,7 @@ class Configuration(metaclass=MetaEnvReader):
     MIN_TRADE_AMOUNT = 1000
 
     SOLVER_POSTGRES_URL = ""
-    SOLVER_CLIENT_POOL_SIZE = 0
+    SOLVER_CLIENT_POOL_SIZE: int = None
 
     WORKER_POSTGRES_URL = ""
 
@@ -340,8 +340,12 @@ def create_app(config_dict={}):
     app.config.from_mapping(config_dict)
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
     app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
+
     solver_engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"].copy()
-    solver_engine_options["pool_size"] = app.config["SOLVER_CLIENT_POOL_SIZE"]
+    solver_client_pool_size = app.config["SOLVER_CLIENT_POOL_SIZE"]
+    if solver_client_pool_size is not None:
+        solver_engine_options["pool_size"] = solver_client_pool_size
+
     app.config["SQLALCHEMY_BINDS"] = {
         "solver": {
             "url": app.config["SOLVER_POSTGRES_URL"],
