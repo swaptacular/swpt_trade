@@ -304,6 +304,12 @@ cdef class BidProcessor:
         for debtor_id in self.to_be_confirmed:
             yield debtor_id
 
+    def remove_currency_to_be_confirmed(self, debtor_id: i64):
+        """Remove a currency from the maintained set of non-confirmed,
+        on-sale currencies.
+        """
+        self.to_be_confirmed.erase(debtor_id)
+
     cdef Key128 _calc_key128(self, str uri):
         m = hashlib.sha256()
         m.update(uri.encode('utf8'))

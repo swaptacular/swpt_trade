@@ -393,3 +393,15 @@ def test_bp_candidate_offers():
 
     l = sorted(list(bp.currencies_to_be_confirmed()))
     assert l == [104, 105, 107]
+
+    bp.remove_currency_to_be_confirmed(104)
+    l = sorted(list(bp.currencies_to_be_confirmed()))
+    assert l == [105, 107]
+    bp.remove_currency_to_be_confirmed(104)
+    bp.remove_currency_to_be_confirmed(105)
+    bp.remove_currency_to_be_confirmed(105)
+    l = sorted(list(bp.currencies_to_be_confirmed()))
+    assert l == [107]
+    bp.remove_currency_to_be_confirmed(107)
+    bp.remove_currency_to_be_confirmed(107)
+    assert len(list(bp.currencies_to_be_confirmed())) == 0

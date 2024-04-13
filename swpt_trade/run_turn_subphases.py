@@ -3,7 +3,7 @@ import math
 from typing import TypeVar, Callable
 from datetime import datetime, timezone
 from itertools import groupby
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import null
 from flask import current_app
@@ -20,6 +20,9 @@ from swpt_trade.models import (
     TradingPolicy,
     WorkerAccount,
     CandidateOfferSignal,
+    NeededCollectorSignal,
+    CollectorAccount,
+    ActiveCollector,
 )
 from swpt_trade.utils import batched, contain_principal_overflow
 
@@ -167,7 +170,8 @@ def run_phase2_subphase0(turn_id: int) -> None:
             )
             _load_currencies(bp, turn_id)
             _generate_candidate_offers(bp, turn_id)
-            _schedule_currencies_to_be_confirmed(bp)
+            _copy_active_collectors(bp)
+            _insert_needed_collector_signals(bp)
 
         worker_turn.worker_turn_subphase = 5
 
@@ -290,9 +294,61 @@ def _process_bids(bp: BidProcessor, turn_id: int, ts: datetime) -> None:
         )
 
 
-def _schedule_currencies_to_be_confirmed(bp: BidProcessor) -> None:
-    # TODO: implement
-    pass
+def _copy_active_collectors(bp: BidProcessor) -> None:
+    with db.engines["solver"].connect() as s_conn:
+        db.session.execute(
+            text("LOCK TABLE active_collector IN SHARE ROW EXCLUSIVE MODE")
+        )
+        ActiveCollector.query.delete()
+
+        with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+                select(
+                    CollectorAccount.debtor_id,
+                    CollectorAccount.collector_id,
+                    CollectorAccount.account_id,
+                    CollectorAccount.status
+                )
+                .where(CollectorAccount.status < 3)
+        ) as result:
+            for rows in batched(result, INSERT_BATCH_SIZE):
+                dicts_to_insert = [
+                    {
+                        "debtor_id": row.debtor_id,
+                        "collector_id": row.collector_id,
+                        "account_id": row.account_id,
+                    }
+                    for row in rows if row.status == 2
+                ]
+                if dicts_to_insert:
+                    db.session.execute(
+                        insert(ActiveCollector).execution_options(
+                            insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                        ),
+                        dicts_to_insert,
+                    )
+
+                for row in rows:
+                    bp.remove_currency_to_be_confirmed(row.debtor_id)
+
+
+def _insert_needed_collector_signals(bp: BidProcessor) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+
+    for debtor_ids in batched(
+            bp.currencies_to_be_confirmed(), INSERT_BATCH_SIZE
+    ):
+        db.session.execute(
+            insert(NeededCollectorSignal).execution_options(
+                insertmanyvalues_page_size=INSERT_BATCH_SIZE
+            ),
+            [
+                {
+                    "debtor_id": debtor_id,
+                    "inserted_at": current_ts,
+                }
+                for debtor_id in debtor_ids
+            ],
+        )
 
 
 def run_phase2_subphase5(worker_turn: WorkerTurn) -> None:

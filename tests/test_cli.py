@@ -920,7 +920,13 @@ def test_run_phase1_subphase0(
     assert cds[1].debtor_info_locator == "https://example.com/777"
 
 
-def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
+@pytest.mark.parametrize("has_active_collectors", [True, False])
+def test_run_phase2_subphase0(
+        mocker,
+        app,
+        db_session, current_ts,
+        has_active_collectors,
+):
     mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
     mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
     mocker.patch("swpt_trade.run_turn_subphases.BID_COUNTER_THRESHOLD", new=1)
@@ -955,6 +961,25 @@ def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
             is_confirmed=True,
         )
     )
+    db.session.add(
+        m.CurrencyInfo(
+            turn_id=t1.turn_id,
+            debtor_info_locator="https://example.com/888",
+            debtor_id=888,
+            peg_debtor_info_locator="https://example.com/666",
+            peg_debtor_id=666,
+            peg_exchange_rate=1.0,
+            is_confirmed=False,
+        )
+    )
+    db.session.add(
+        m.CollectorAccount(
+            debtor_id=999,
+            collector_id=0x0000010000000000,
+            account_id="TestCollectorAccountId",
+            status=2,
+        )
+    )
 
     wt1 = m.WorkerTurn(
         turn_id=t1.turn_id,
@@ -969,6 +994,14 @@ def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
         worker_turn_subphase=0,
     )
     db.session.add(wt1)
+    if has_active_collectors:
+        db.session.add(
+            m.ActiveCollector(
+                debtor_id=999,
+                collector_id=0x0000010000000000,
+                account_id="TestCollectorAccountId",
+            )
+        )
     db.session.add(
         m.TradingPolicy(
             creditor_id=123,
@@ -1010,10 +1043,26 @@ def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
             max_principal=300000,
         )
     )
+    db.session.add(
+        m.TradingPolicy(
+            creditor_id=124,
+            debtor_id=888,
+            account_id="Account888-124",
+            creation_date=date(2024, 4, 11),
+            principal=1000000,
+            last_transfer_number=901,
+            policy_name="conservative",
+            min_principal=0,
+            max_principal=0,
+            peg_debtor_id=666,
+            peg_exchange_rate=1.0,
+        )
+    )
     db.session.commit()
 
     assert len(m.WorkerTurn.query.all()) == 1
     assert len(m.CandidateOfferSignal.query.all()) == 0
+    assert len(m.NeededCollectorSignal.query.all()) == 0
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
@@ -1044,3 +1093,11 @@ def test_run_phase2_subphase0(mocker, app, db_session, current_ts):
     assert cas[1].account_creation_date == date(2024, 4, 9)
     assert cas[1].last_transfer_number == 789
     assert cas[1].inserted_at >= current_ts
+    ncs = m.NeededCollectorSignal.query.all()
+    assert len(ncs) == 1
+    assert ncs[0].debtor_id == 888
+    acs = m.ActiveCollector.query.all()
+    assert len(acs) == 1
+    assert acs[0].debtor_id == 999
+    assert acs[0].collector_id == 0x0000010000000000
+    assert acs[0].account_id == "TestCollectorAccountId"
