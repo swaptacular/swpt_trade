@@ -5,6 +5,13 @@ from .common import get_now_utc, calc_i64_column_hash
 
 
 class CollectorAccount(db.Model):
+    # NOTE: The `status` column is not be part of the primary key, but
+    # it probably is a good idea to include it in the primary key
+    # index to allow index-only scans. Because SQLAlchemy does not
+    # support this yet (2024-01-19), the migration file should be
+    # edited so as not to create a "normal" index, but create a
+    # "covering" index instead.
+
     __bind_key__ = "solver"
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     collector_id = db.Column(db.BigInteger, primary_key=True)
@@ -123,13 +130,6 @@ class ConfirmedDebtor(db.Model):
     __bind_key__ = "solver"
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-
-    # NOTE: The `debtor_info_locator` column is not be part of the
-    # primary key, but should be included in the primary key index to
-    # allow index-only scans. Because SQLAlchemy does not support this
-    # yet (2024-01-19), the migration file should be edited so as not
-    # to create a "normal" index, but create a "covering" index
-    # instead.
     debtor_info_locator = db.Column(db.String, nullable=False)
     __table_args__ = (
         {

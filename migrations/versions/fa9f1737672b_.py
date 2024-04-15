@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 3184f1789ce3
+Revision ID: fa9f1737672b
 Revises: 
-Create Date: 2024-03-22 19:34:16.549928
+Create Date: 2024-04-15 17:14:28.938724
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3184f1789ce3'
+revision = 'fa9f1737672b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -36,6 +36,24 @@ def upgrade_():
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('signal_id')
+    )
+    op.create_table('active_collector',
+    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('collector_id', sa.BigInteger(), nullable=False),
+    sa.Column('account_id', sa.String(), nullable=False),
+    sa.CheckConstraint("account_id != ''"),
+    sa.PrimaryKeyConstraint('debtor_id', 'collector_id'),
+    comment='Represents an active Swaptacular account which can be used to collect and dispatch transfers. Each "Worker" servers will maintain its own copy of this table (that is: no rows-sharding) by periodically copying the relevant records from the solver\'s "collector_account" table. "Worker" servers will use this local copy so as to avoid querying the central database too often.'
+    )
+    op.create_table('candidate_offer_signal',
+    sa.Column('turn_id', sa.SmallInteger(), nullable=False),
+    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('creditor_id', sa.BigInteger(), nullable=False),
+    sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('account_creation_date', sa.DATE(), nullable=False),
+    sa.Column('last_transfer_number', sa.BigInteger(), nullable=False),
+    sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'creditor_id')
     )
     op.create_table('configure_account_signal',
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
@@ -133,6 +151,12 @@ def upgrade_():
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('creditor_id', 'signal_id')
     )
+    op.create_table('needed_collector_signal',
+    sa.Column('signal_id', sa.BigInteger(), autoincrement=True, nullable=False),
+    sa.Column('debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint('signal_id')
+    )
     op.create_table('needed_worker_account',
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
@@ -150,6 +174,13 @@ def upgrade_():
     sa.Column('max_commit_delay', sa.Integer(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('creditor_id', 'coordinator_request_id')
+    )
+    op.create_table('recently_needed_collector',
+    sa.Column('debtor_id', sa.BigInteger(), autoincrement=False, nullable=False),
+    sa.Column('needed_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.CheckConstraint('debtor_id != 0'),
+    sa.PrimaryKeyConstraint('debtor_id'),
+    comment='Indicates that the creation of a collector account for the currency with the given debtor ID has been recently requested. This information is used to prevent "worker" servers from making repetitive queries to the central database.'
     )
     op.create_table('store_document_signal',
     sa.Column('signal_id', sa.BigInteger(), autoincrement=True, nullable=False),
@@ -217,16 +248,48 @@ def upgrade_():
     sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
     comment='Represents an existing Swaptacular account, managed by a  "worker" server. The account is used to collect and dispatch transfers.'
     )
+    op.create_table('worker_turn',
+    sa.Column('turn_id', sa.Integer(), autoincrement=False, nullable=False),
+    sa.Column('started_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('base_debtor_info_locator', sa.String(), nullable=False),
+    sa.Column('base_debtor_id', sa.BigInteger(), nullable=False),
+    sa.Column('max_distance_to_base', sa.SmallInteger(), nullable=False),
+    sa.Column('min_trade_amount', sa.BigInteger(), nullable=False),
+    sa.Column('phase', sa.SmallInteger(), nullable=False),
+    sa.Column('phase_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('collection_started_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('collection_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('worker_turn_subphase', sa.SmallInteger(), nullable=False, comment='The worker may divide the processing of each phase to one more sub-phases. The initial sub-phase is always `0`, and the final sub-phase is always `10`. Sequential sub-phases do not need to be (and normally will not be) represented by sequential numbers. This gives the freedom to add sub-phases if necessary.'),
+    sa.CheckConstraint('base_debtor_id != 0'),
+    sa.CheckConstraint('max_distance_to_base > 0'),
+    sa.CheckConstraint('min_trade_amount > 0'),
+    sa.CheckConstraint('phase < 2 OR collection_deadline IS NOT NULL'),
+    sa.CheckConstraint('phase < 3 OR collection_started_at IS NOT NULL'),
+    sa.CheckConstraint('phase > 0 AND phase <= 3'),
+    sa.CheckConstraint('phase > 2 OR phase_deadline IS NOT NULL'),
+    sa.CheckConstraint('worker_turn_subphase >= 0 AND worker_turn_subphase <= 10'),
+    sa.PrimaryKeyConstraint('turn_id'),
+    comment='Represents a circular trading round in which a "worker" server participates. "Worker" servers will watch for new and changed rows in the solver\'s `turn` table, and will copy them off.'
+    )
+    with op.batch_alter_table('worker_turn', schema=None) as batch_op:
+        batch_op.create_index('idx_worker_turn_subphase', ['worker_turn_subphase'], unique=False, postgresql_where=sa.text('worker_turn_subphase < 10'))
+
     # ### end Alembic commands ###
 
 
 def downgrade_():
     # ### commands auto generated by Alembic - please adjust! ###
+    with op.batch_alter_table('worker_turn', schema=None) as batch_op:
+        batch_op.drop_index('idx_worker_turn_subphase', postgresql_where=sa.text('worker_turn_subphase < 10'))
+
+    op.drop_table('worker_turn')
     op.drop_table('worker_account')
     op.drop_table('trading_policy')
     op.drop_table('store_document_signal')
+    op.drop_table('recently_needed_collector')
     op.drop_table('prepare_transfer_signal')
     op.drop_table('needed_worker_account')
+    op.drop_table('needed_collector_signal')
     op.drop_table('finalize_transfer_signal')
     op.drop_table('fetch_debtor_info_signal')
     op.drop_table('discover_debtor_signal')
@@ -241,6 +304,8 @@ def downgrade_():
     op.drop_table('debtor_info_document')
     op.drop_table('confirm_debtor_signal')
     op.drop_table('configure_account_signal')
+    op.drop_table('candidate_offer_signal')
+    op.drop_table('active_collector')
     op.drop_table('activate_collector_signal')
     # ### end Alembic commands ###
 
@@ -264,9 +329,12 @@ def upgrade_solver():
     sa.Column('status', sa.SmallInteger(), nullable=False, comment="Collector account's status: 0) pristine; 1) account creation has been requested; 2) the account has been created, and an account ID has been assigned to it; 3) disabled."),
     sa.Column('latest_status_change_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('status >= 0 AND status <= 3'),
-    sa.PrimaryKeyConstraint('debtor_id', 'collector_id'),
     comment='Represents a planned or existing Swaptacular account, which should be used to collect and dispatch transfers. "Worker" servers will watch for new (pristine) records inserted in this table, and will try to create and use all the accounts catalogued in this table.'
     )
+    # Create a "covering" index instead of a "normal" index.
+    op.execute('CREATE UNIQUE INDEX idx_collector_account_pk ON collector_account (debtor_id, collector_id) INCLUDE (status)')
+    op.execute('ALTER TABLE collector_account ADD CONSTRAINT collector_account_pkey PRIMARY KEY USING INDEX idx_collector_account_pk')
+
     with op.batch_alter_table('collector_account', schema=None) as batch_op:
         batch_op.create_index('idx_collector_account_creation_request', ['status'], unique=False, postgresql_where=sa.text('status = 0'))
 
@@ -318,12 +386,9 @@ def upgrade_solver():
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_info_locator', sa.String(), nullable=False),
+    sa.PrimaryKeyConstraint('turn_id', 'debtor_id'),
     comment='Represents the fact that a given currency (aka debtor) is verified (confirmed), so that this currency can be traded during the given trading turn. "Worker" servers are responsible for populating this table during the phase 1 of each turn. The "solver" server will read from this table, and will delete the records before advancing to phase 2 of the turn.'
     )
-    # Create a "covering" index instead of a "normal" index.
-    op.execute('CREATE UNIQUE INDEX idx_confirmed_debtor_pk ON confirmed_debtor (turn_id, debtor_id) INCLUDE (debtor_info_locator)')
-    op.execute('ALTER TABLE confirmed_debtor ADD CONSTRAINT confirmed_debtor_pkey PRIMARY KEY USING INDEX idx_confirmed_debtor_pk')
-
     op.create_table('creditor_giving',
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),

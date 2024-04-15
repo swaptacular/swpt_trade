@@ -104,6 +104,30 @@ def test_try_to_advance_turn_to_phase2(db_session):
         min_trade_amount=5000,
     )
     db_session.add(turn)
+    db_session.add(
+        CollectorAccount(
+            debtor_id=102,
+            collector_id=0x0000010000000000,
+            account_id="TestCollectorAccount0",
+            status=2,
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=102,
+            collector_id=0x0000010000000001,
+            account_id="TestCollectorAccount1",
+            status=2,
+        )
+    )
+    db_session.add(
+        CollectorAccount(
+            debtor_id=123456,
+            collector_id=0x0000010000000001,
+            account_id="TestCollectorAccount3",
+            status=2,
+        )
+    )
     db_session.flush()
     db_session.commit()
     turn_id = turn.turn_id
