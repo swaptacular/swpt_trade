@@ -91,7 +91,9 @@ def try_to_advance_turn_to_phase2(
         .one_or_none()
     )
     if turn and turn.phase == 1:
-        confirmed_debtor = (
+        active_debtor = (
+            # These are debtors that are confirmed, for which there
+            # are at least one active (status == 2) collector account.
             select(ConfirmedDebtor)
             .distinct()
             .join(
@@ -102,7 +104,7 @@ def try_to_advance_turn_to_phase2(
                 ),
             )
             .where(ConfirmedDebtor.turn_id == turn_id)
-            .subquery(name="cd")
+            .subquery(name="ad")
         )
         db.session.execute(
             insert(CurrencyInfo).from_select(
@@ -123,16 +125,16 @@ def try_to_advance_turn_to_phase2(
                     DebtorInfo.peg_debtor_id,
                     DebtorInfo.peg_exchange_rate,
                     (
-                        confirmed_debtor.c.turn_id != null()
+                        active_debtor.c.turn_id != null()
                     ).label("is_confirmed"),
                 )
                 .select_from(DebtorInfo)
                 .join(
-                    confirmed_debtor,
+                    active_debtor,
                     and_(
-                        confirmed_debtor.c.turn_id == DebtorInfo.turn_id,
-                        confirmed_debtor.c.debtor_id == DebtorInfo.debtor_id,
-                        confirmed_debtor.c.debtor_info_locator
+                        active_debtor.c.turn_id == DebtorInfo.turn_id,
+                        active_debtor.c.debtor_id == DebtorInfo.debtor_id,
+                        active_debtor.c.debtor_info_locator
                         == DebtorInfo.debtor_info_locator,
                     ),
                     isouter=True,
