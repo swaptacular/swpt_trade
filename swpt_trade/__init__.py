@@ -200,7 +200,10 @@ class Configuration(metaclass=MetaEnvReader):
     SOLVER_POSTGRES_URL = ""
     SOLVER_CLIENT_POOL_SIZE: int = None
 
-    WORKER_POSTGRES_URL = ""
+    # The default value for `WORKER_POSTGRES_URL` is a random valid
+    # connection string. This allows solver processes (they do not use
+    # a worker database) to do not specify any value.
+    WORKER_POSTGRES_URL = "postgresql+psycopg://localhost/postgres"
 
     SQLALCHEMY_ENGINE_OPTIONS: _engine_options = _engine_options(
         '{"pool_size": 0}'

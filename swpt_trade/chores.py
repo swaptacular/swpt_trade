@@ -25,8 +25,10 @@ def _on_do_something(
 _LOGGER = logging.getLogger(__name__)
 
 _MESSAGE_TYPES = {
-    "DoSomething": (
-        schemas.DoDoSomethingMessageSchema(),
+    # NOTE: This is just an example. `FetchDebtorInfo` is not a chore
+    # message and must not be processed here.
+    "FetchDebtorInfo": (
+        schemas.FetchDebtorInfoMessageSchema(),
         _on_do_something,
     ),
 }
