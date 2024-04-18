@@ -252,6 +252,7 @@ class Configuration(metaclass=MetaEnvReader):
     )
 
     APP_ENABLE_CORS = False
+    APP_VERIFY_SSL_CERTS = True
     APP_MIN_DEMURRAGE_RATE = -50.0
     APP_MIN_COMMIT_PERIOD_SECONDS = 30 * 24 * 60 * 60  # 30 days
     APP_MIN_TRANSFER_NOTE_MAX_BYTES = 100

@@ -434,7 +434,7 @@ def _on_needed_collector_signal(
     # repetitive queries to the central database.
     if not procedures.is_recently_needed_collector(debtor_id):
         procedures.ensure_collector_accounts(
-            debtor_id=666,
+            debtor_id=debtor_id,
             min_collector_id=current_app.config["MIN_COLLECTOR_ID"],
             max_collector_id=current_app.config["MAX_COLLECTOR_ID"],
         )

@@ -276,6 +276,7 @@ async def _gather_https_request_results(
         connector=aiohttp.TCPConnector(
             limit=max_connections,
             ttl_dns_cache=3600,
+            verify_ssl=current_app.config["APP_VERIFY_SSL_CERTS"],
         ),
         timeout=aiohttp.ClientTimeout(total=timeout),
     ) as client:
