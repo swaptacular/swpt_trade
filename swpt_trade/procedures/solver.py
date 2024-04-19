@@ -196,6 +196,15 @@ def get_unfinished_turns() -> List[Turn]:
 
 
 @atomic
+def get_turns_by_ids(turn_ids: List[int]) -> List[Turn]:
+    return (
+        Turn.query
+        .filter(Turn.turn_id.in_(turn_ids))
+        .all()
+    )
+
+
+@atomic
 def get_pristine_collectors(
         *,
         hash_mask: int,

@@ -38,6 +38,11 @@ class WorkerTurn(db.Model):
             and_(worker_turn_subphase >= 0, worker_turn_subphase <= 10)
         ),
         db.Index(
+            "idx_worker_turn_phase",
+            phase,
+            postgresql_where=phase < 3,
+        ),
+        db.Index(
             "idx_worker_turn_subphase",
             worker_turn_subphase,
             postgresql_where=worker_turn_subphase < 10,

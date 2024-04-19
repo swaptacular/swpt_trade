@@ -22,13 +22,6 @@ from swpt_trade.utils import u16_to_i16
 from swpt_trade.extensions import db
 from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
-from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
-from swpt_trade.run_turn_subphases import (
-    run_phase1_subphase0,
-    run_phase2_subphase0,
-    run_phase2_subphase5,
-    run_phase3_subphase0,
-)
 
 # TODO: Implement a CLI command which extracts trading policies from
 # the "swpt_creditors" microservice via its admin Web API, and loads
@@ -632,6 +625,7 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     MAX_DISTANCE_TO_BASE, MIN_TRADE_AMOUNT.
     """
     from swpt_trade.utils import parse_timedelta
+    from swpt_trade.solve_turn import try_to_advance_turn_to_phase3
 
     c = current_app.config
     period = parse_timedelta(period or c["TURN_PERIOD"])
@@ -703,6 +697,13 @@ def roll_worker_turns(wait, quit_early):
     """Run a process which synchronizes worker server's turn states
     with solver server's turn states.
     """
+    from swpt_trade.models import Turn
+    from swpt_trade.run_turn_subphases import (
+        run_phase1_subphase0,
+        run_phase2_subphase0,
+        run_phase2_subphase5,
+        run_phase3_subphase0,
+    )
 
     wait_seconds = (
         wait
@@ -713,8 +714,27 @@ def roll_worker_turns(wait, quit_early):
     logger.info("Started rolling worker turns.")
 
     while True:
+        unfinished_turn_ids = set()
+
         for unfinished_turn in procedures.get_unfinished_turns():
             procedures.update_or_create_worker_turn(unfinished_turn)
+            unfinished_turn_ids.add(unfinished_turn.turn_id)
+
+        overlooked_turn_ids = [
+            # These are the IDs of worker turns which are not finished
+            # yet, but their corresponding solver turns have been
+            # finished already.
+            #
+            # NOTE: This can happen in the rare case when, for the
+            # given turn, the worker has not been assigned to
+            # participate in any transfers, and the solver finished
+            # the turn without the worker even noticing.
+            turn_id
+            for turn_id in procedures.get_unfinished_worker_turn_ids()
+            if turn_id not in unfinished_turn_ids
+        ]
+        for finished_turn in procedures.get_turns_by_ids(overlooked_turn_ids):
+            procedures.update_or_create_worker_turn(finished_turn)
 
         for worker_turn in procedures.get_pending_worker_turns():
             phase = worker_turn.phase

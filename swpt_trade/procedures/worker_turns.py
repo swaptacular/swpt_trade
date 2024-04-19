@@ -1,5 +1,6 @@
 from typing import TypeVar, Callable, List, Optional
 from datetime import datetime, timezone
+from sqlalchemy import select
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     Turn,
@@ -14,7 +15,13 @@ atomic: Callable[[T], T] = db.atomic
 @atomic
 def update_or_create_worker_turn(turn: Turn) -> None:
     phase = turn.phase
-    assert phase < 4
+    phase_deadline = turn.phase_deadline
+
+    if phase == 4:
+        # From the worker's point of view, solver's turn phase 4 is no
+        # different than solver's turn phase 3.
+        phase = 3
+        phase_deadline = None
 
     worker_turn = (
         WorkerTurn.query
@@ -32,17 +39,29 @@ def update_or_create_worker_turn(turn: Turn) -> None:
                     max_distance_to_base=turn.max_distance_to_base,
                     min_trade_amount=turn.min_trade_amount,
                     phase=phase,
-                    phase_deadline=turn.phase_deadline,
+                    phase_deadline=phase_deadline,
                     collection_started_at=turn.collection_started_at,
                     collection_deadline=turn.collection_deadline,
                 )
             )
     elif worker_turn.phase < phase:
         worker_turn.phase = phase
-        worker_turn.phase_deadline = turn.phase_deadline
+        worker_turn.phase_deadline = phase_deadline
         worker_turn.collection_started_at = turn.collection_started_at
         worker_turn.collection_deadline = turn.collection_deadline
         worker_turn.worker_turn_subphase = 0
+
+
+@atomic
+def get_unfinished_worker_turn_ids() -> List[int]:
+    return (
+        db.session.execute(
+            select(WorkerTurn.turn_id)
+            .filter(WorkerTurn.phase < 3)
+        )
+        .scalars()
+        .all()
+    )
 
 
 @atomic
