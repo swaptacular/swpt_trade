@@ -23,11 +23,12 @@ from swpt_trade.extensions import db
 from swpt_trade import procedures
 from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
 
-# TODO: Implement a CLI command which extracts trading policies from
-# the "swpt_creditors" microservice via its admin Web API, and loads
-# them into the "trading policies" table. This CLI command is intended
-# to be run only once at the beginning, to synchronize the
-# swpt_trade's database with the swpt_creditors's database.
+# TODO: Consider implementing a CLI command which extracts trading
+# policies from the "swpt_creditors" microservice via its admin Web
+# API, and loads them into the "trading policies" table. This CLI
+# command is intended to be run only once at the beginning, to
+# synchronize the swpt_trade's database with the swpt_creditors's
+# database.
 
 
 @click.group("swpt_trade")
