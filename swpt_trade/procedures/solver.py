@@ -360,29 +360,37 @@ def ensure_collector_accounts(
     collector IDs, avoiding the creation of unneeded collector
     accounts.
     """
-    existing_acconts = (
+    accounts = (
         CollectorAccount.query
         .filter_by(debtor_id=debtor_id)
         .options(load_only(CollectorAccount.status))
         .all()
     )
+    number_of_alive_accounts = sum(
+        1 for account in accounts if account.status != 3
+    )
 
     def collector_ids_iter() -> Iterable[int]:
+        number_of_dead_accounts = len(accounts) - number_of_alive_accounts
+        final_number_of_accounts = number_of_dead_accounts + number_of_accounts
         ids_total_count = 1 + max_collector_id - min_collector_id
-        if ids_total_count < 2 * (len(existing_acconts) + number_of_accounts):
+
+        # NOTE: Because we rely on being able to efficiently pick
+        # random IDs between `min_collector_id` and
+        # `max_collector_id`, we can not utilize the range of
+        # available IDs at 100%. Here we ensure a 1/4 safety margin.
+        if final_number_of_accounts > ids_total_count * 3 // 4:
             raise RuntimeError(
                 "The number of available collector IDs is not big enough."
             )
+
         rgen = Random(debtor_id)
         while True:
             yield rgen.randint(min_collector_id, max_collector_id)
 
-    number_of_alive_accounts = sum(
-        1 for account in existing_acconts if account.status != 3
-    )
     if number_of_alive_accounts < number_of_accounts:
         with db.retry_on_integrity_error():
-            existing_ids = set(x.collector_id for x in existing_acconts)
+            existing_ids = set(x.collector_id for x in accounts)
 
             for collector_id in collector_ids_iter():
                 if collector_id not in existing_ids:
