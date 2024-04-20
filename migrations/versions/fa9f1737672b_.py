@@ -259,7 +259,7 @@ def upgrade_():
     sa.Column('phase_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_started_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('collection_deadline', sa.TIMESTAMP(timezone=True), nullable=True),
-    sa.Column('worker_turn_subphase', sa.SmallInteger(), nullable=False, comment='The worker may divide the processing of each phase to one more sub-phases. The initial sub-phase is always `0`, and the final sub-phase is always `10`. Sequential sub-phases do not need to be (and normally will not be) represented by sequential numbers. This gives the freedom to add sub-phases if necessary.'),
+    sa.Column('worker_turn_subphase', sa.SmallInteger(), nullable=False, comment='The worker may divide the processing of each phase to one or more sub-phases. The initial sub-phase is always `0`, and the final sub-phase is always `10`. Sequential sub-phases do not need to be (and normally will not be) represented by sequential numbers. This gives the freedom to add sub-phases if necessary.'),
     sa.CheckConstraint('base_debtor_id != 0'),
     sa.CheckConstraint('max_distance_to_base > 0'),
     sa.CheckConstraint('min_trade_amount > 0'),

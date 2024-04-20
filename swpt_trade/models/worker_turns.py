@@ -19,7 +19,7 @@ class WorkerTurn(db.Model):
         nullable=False,
         default=0,
         comment=(
-            "The worker may divide the processing of each phase to one more"
+            "The worker may divide the processing of each phase to one or more"
             " sub-phases. The initial sub-phase is always `0`, and the final"
             " sub-phase is always `10`. Sequential sub-phases do not need to"
             " be (and normally will not be) represented by sequential"
