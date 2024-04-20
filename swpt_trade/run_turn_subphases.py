@@ -351,11 +351,11 @@ def _insert_needed_collector_signals(bp: BidProcessor) -> None:
         )
 
 
-def run_phase2_subphase5(worker_turn: WorkerTurn) -> None:
+def run_phase2_subphase5(turn_id: int) -> None:
     # TODO: implement
     pass
 
 
-def run_phase3_subphase0(worker_turn: WorkerTurn) -> None:
+def run_phase3_subphase0(turn_id: int) -> None:
     # TODO: implement
     pass
