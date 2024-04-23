@@ -986,7 +986,7 @@ def process_pristine_collectors(threads, wait, quit_early):
     )
     max_count = current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_MAX_COUNT"]
     max_delay = timedelta(
-        days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
+        days=current_app.config["APP_EXTREME_MESSAGE_DELAY_DAYS"]
     )
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)

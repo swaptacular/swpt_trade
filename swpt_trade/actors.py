@@ -386,7 +386,7 @@ def _on_confirm_debtor_signal(
         debtor_info_locator=debtor_info_locator,
         ts=ts,
         max_message_delay=timedelta(
-            days=current_app.config["APP_INTRANET_EXTREME_DELAY_DAYS"]
+            days=current_app.config["APP_EXTREME_MESSAGE_DELAY_DAYS"]
         ),
     )
 
