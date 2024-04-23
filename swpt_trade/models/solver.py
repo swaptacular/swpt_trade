@@ -46,6 +46,12 @@ class CollectorAccount(db.Model):
     #    accounts. (Note that for each traded currency at least one
     #    collector account will be created automatically when needed.)
 
+    # TODO: Consider implementing some logic that detects and
+    #       eventually deletes `CollectorAccount` rows which are stuck
+    #       at `status==1` for quite a long time. This could happen if
+    #       the issued `ConfigureAccount` SMP message has been lost.
+    #       (Which must never happen under normal circumstances.)
+
     __bind_key__ = "solver"
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     collector_id = db.Column(db.BigInteger, primary_key=True)
