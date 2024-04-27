@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .common import get_now_utc
 from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 
@@ -56,3 +57,84 @@ class WorkerTurn(db.Model):
             ),
         },
     )
+
+
+# NOTE: This sequence is used to generate `coordinator_request_id`s
+# for the issued `PrepareTransfer` SMP messages.
+cr_seq = db.Sequence(
+    "coordinator_request_id_seq", metadata=db.Model.metadata
+)
+
+
+class AccountLock(db.Model):
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, nullable=False)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    has_been_released = db.Column(db.BOOLEAN, nullable=False, default=False)
+    initiated_at = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+    )
+    coordinator_request_id = db.Column(
+        db.BigInteger, nullable=False, server_default=cr_seq.next_value()
+    )
+    transfer_id = db.Column(db.BigInteger)
+    amount = db.Column(
+        db.BigInteger,
+        comment=(
+            "The amount that is guaranteed to be available up until the"
+            " transfer deadline has been reached. This is calculated by"
+            " reducing the `locked_amount` in accordance with the stated"
+            " `demurrage_rate`."
+        ),
+    )
+    deadline = db.Column(db.TIMESTAMP(timezone=True))
+    finalized_at = db.Column(db.TIMESTAMP(timezone=True))
+    status_code = db.Column(db.String)
+    account_creation_date = db.Column(db.DATE)
+    account_last_transfer_number = db.Column(db.BigInteger)
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (
+        db.CheckConstraint(amount >= 0),
+        db.CheckConstraint(
+            or_(
+                and_(
+                    transfer_id == null(),
+                    amount == null(),
+                    deadline == null(),
+                    finalized_at == null(),
+                ),
+                and_(
+                    transfer_id != null(),
+                    amount != null(),
+                    deadline != null(),
+                    or_(finalized_at != null(), status_code == null()),
+                ),
+            )
+        ),
+        db.CheckConstraint(
+            or_(
+                and_(
+                    account_creation_date == null(),
+                    account_last_transfer_number == null(),
+                ),
+                and_(
+                    account_creation_date != null(),
+                    account_last_transfer_number != null(),
+                ),
+            )
+        ),
+        db.ForeignKeyConstraint(["turn_id"], ["worker_turn.turn_id"]),
+        db.Index("idx_lock_account_turn_id", turn_id),
+        {
+            "comment": (
+                "Represents an attempt to arrange the participation of a"
+                " given account in a given trading turn. Normally, this"
+                " includes sending a `PrepareTransfer` SMP message."
+            ),
+        },
+    )
+
+    @property
+    def is_self_lock(self):  # pragma: no cover
+        return self.creditor_id == self.collector_id

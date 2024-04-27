@@ -54,9 +54,10 @@ def db_session(app):
         "TRUNCATE TABLE trading_policy",
         "TRUNCATE TABLE worker_account",
         "TRUNCATE TABLE needed_worker_account",
-        "TRUNCATE TABLE worker_turn",
+        "TRUNCATE TABLE account_lock",
         "TRUNCATE TABLE recently_needed_collector",
         "TRUNCATE TABLE active_collector",
+        "DELETE FROM worker_turn",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
 
