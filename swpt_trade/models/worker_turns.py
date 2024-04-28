@@ -59,8 +59,12 @@ class WorkerTurn(db.Model):
     )
 
 
-# NOTE: This sequence is used to generate `coordinator_request_id`s
-# for the issued `PrepareTransfer` SMP messages.
+# This sequence is used to generate `coordinator_request_id`s for the
+# issued `PrepareTransfer` SMP messages.
+#
+# NOTE:
+# `op.execute(CreateSequence(Sequence('coordinator_request_id_seq')))`
+# should be manually added to the generated migration file.
 cr_seq = db.Sequence(
     "coordinator_request_id_seq", metadata=db.Model.metadata
 )
@@ -73,7 +77,10 @@ class AccountLock(db.Model):
     collector_id = db.Column(db.BigInteger, nullable=False)
     has_been_released = db.Column(db.BOOLEAN, nullable=False, default=False)
     initiated_at = db.Column(
-        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+        db.TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_now_utc,
+        comment="The timestamp of the sent `PrepareTransfer` SMP message.",
     )
     coordinator_request_id = db.Column(
         db.BigInteger, nullable=False, server_default=cr_seq.next_value()
@@ -83,12 +90,11 @@ class AccountLock(db.Model):
         db.BigInteger,
         comment=(
             "The amount that is guaranteed to be available up until the"
-            " transfer deadline has been reached. This is calculated by"
+            " `collection_deadline` has been reached. This is calculated by"
             " reducing the `locked_amount` in accordance with the stated"
             " `demurrage_rate`."
         ),
     )
-    deadline = db.Column(db.TIMESTAMP(timezone=True))
     finalized_at = db.Column(db.TIMESTAMP(timezone=True))
     status_code = db.Column(db.String)
     account_creation_date = db.Column(db.DATE)
@@ -101,13 +107,11 @@ class AccountLock(db.Model):
                 and_(
                     transfer_id == null(),
                     amount == null(),
-                    deadline == null(),
                     finalized_at == null(),
                 ),
                 and_(
                     transfer_id != null(),
                     amount != null(),
-                    deadline != null(),
                     or_(finalized_at != null(), status_code == null()),
                 ),
             )

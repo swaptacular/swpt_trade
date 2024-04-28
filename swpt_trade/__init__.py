@@ -190,7 +190,7 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_CHECK_INTERVAL = "1m"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
-    TURN_MAX_COMMIT_PERIOD = "14d"
+    TURN_MAX_COMMIT_PERIOD = "28d"
 
     BASE_DEBTOR_INFO_LOCATOR: str = None
     BASE_DEBTOR_ID: _parse_debtor_id = None

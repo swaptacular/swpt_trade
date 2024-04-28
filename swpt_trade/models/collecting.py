@@ -48,6 +48,16 @@ class WorkerAccount(db.Model):
     last_heartbeat_ts = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
+    worst_interest_rate = db.Column(
+        db.REAL,
+        comment=(
+            "The lowest interest rate observed for some period of time on"
+            " this account. When calculating the amounts to transfer, this"
+            " value can be used instead of the current interest rate, so as"
+            " to safeguard against disadvantageous past fluctuations in the"
+            " the interest rate."
+        ),
+    )
     __table_args__ = (
         db.CheckConstraint(interest_rate >= -100.0),
         db.CheckConstraint(transfer_note_max_bytes >= 0),
