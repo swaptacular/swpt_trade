@@ -169,7 +169,7 @@ def test_try_to_advance_turn_to_phase2(db_session):
     p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
-        max_commit_interval=timedelta(days=30),
+        turn_max_commit_interval=timedelta(days=30),
     )
 
     currencies = db_session.query(CurrencyInfo).all()
@@ -205,12 +205,12 @@ def test_try_to_advance_turn_to_phase2(db_session):
     p.try_to_advance_turn_to_phase2(
         turn_id=-1,
         phase2_duration=timedelta(hours=1),
-        max_commit_interval=timedelta(days=30),
+        turn_max_commit_interval=timedelta(days=30),
     )
     p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
-        max_commit_interval=timedelta(days=30),
+        turn_max_commit_interval=timedelta(days=30),
     )
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
@@ -995,9 +995,26 @@ def test_process_account_update_signal(db_session, current_ts):
     nwa3 = NeededWorkerAccount(debtor_id=666, creditor_id=125)
     db_session.add(nwa1)
     db_session.add(wa1)
+    db_session.add(
+        InterestRateChange(
+            creditor_id=123,
+            debtor_id=666,
+            change_ts=TS0,
+            interest_rate=0.0,
+        )
+    )
     db_session.add(wa2)
+    db_session.add(
+        InterestRateChange(
+            creditor_id=124,
+            debtor_id=666,
+            change_ts=TS0,
+            interest_rate=15.0,
+        )
+    )
     db_session.add(nwa3)
     db_session.commit()
+    assert len(InterestRateChange.query.all()) == 2
 
     params = {
         "debtor_id": 666,
@@ -1036,11 +1053,22 @@ def test_process_account_update_signal(db_session, current_ts):
     assert len(ActivateCollectorSignal.query.all()) == 0
     assert len(ConfigureAccountSignal.query.all()) == 0
     ircs = InterestRateChange.query.all()
-    assert len(ircs) == 1
+    ircs.sort(key=lambda t: (
+        t.creditor_id, t.debtor_id, t.change_ts, t.interest_rate
+    ))
+    assert len(ircs) == 3
     assert ircs[0].creditor_id == 123
     assert ircs[0].debtor_id == 666
-    assert ircs[0].change_ts == TS0 + timedelta(days=10)
-    assert ircs[0].interest_rate == 5.0
+    assert ircs[0].change_ts == TS0
+    assert ircs[0].interest_rate == 0.0
+    assert ircs[1].creditor_id == 123
+    assert ircs[1].debtor_id == 666
+    assert ircs[1].change_ts == TS0 + timedelta(days=10)
+    assert ircs[1].interest_rate == 5.0
+    assert ircs[2].creditor_id == 124
+    assert ircs[2].debtor_id == 666
+    assert ircs[2].change_ts == TS0
+    assert ircs[2].interest_rate == 15.0
 
     # Expired TTL:
     p.process_account_update_signal(
@@ -1059,7 +1087,7 @@ def test_process_account_update_signal(db_session, current_ts):
     assert len(DiscoverDebtorSignal.query.all()) == 0
     assert len(ActivateCollectorSignal.query.all()) == 0
     assert len(ConfigureAccountSignal.query.all()) == 0
-    assert len(InterestRateChange.query.all()) == 1
+    assert len(InterestRateChange.query.all()) == 3
 
     # Successful update of existing WorkerAccount:
     p.process_account_update_signal(
@@ -1084,17 +1112,7 @@ def test_process_account_update_signal(db_session, current_ts):
     assert acs.creditor_id == 123
     assert acs.account_id == "Account123"
     assert len(ConfigureAccountSignal.query.all()) == 0
-    ircs = InterestRateChange.query.all()
-    ircs.sort(key=lambda t: t.interest_rate)
-    assert len(ircs) == 2
-    assert ircs[0].creditor_id == 123
-    assert ircs[0].debtor_id == 666
-    assert ircs[0].change_ts == TS0
-    assert ircs[0].interest_rate == 0.0
-    assert ircs[1].creditor_id == 123
-    assert ircs[1].debtor_id == 666
-    assert ircs[1].change_ts == TS0 + timedelta(days=10)
-    assert ircs[1].interest_rate == 5.0
+    assert len(InterestRateChange.query.all()) == 3
 
     # Receiving AccountUpdate message for account that is not needed:
     p.process_account_update_signal(
@@ -1119,7 +1137,9 @@ def test_process_account_update_signal(db_session, current_ts):
     assert cas.config_data == ""
     assert cas.config_flags & WorkerAccount.CONFIG_SCHEDULED_FOR_DELETION_FLAG
     ircs = InterestRateChange.query.all()
-    ircs.sort(key=lambda t: t.interest_rate)
+    ircs.sort(key=lambda t: (
+        t.creditor_id, t.debtor_id, t.change_ts, t.interest_rate
+    ))
     assert len(ircs) == 3
     assert ircs[0].creditor_id == 123
     assert ircs[0].debtor_id == 666
@@ -1131,8 +1151,8 @@ def test_process_account_update_signal(db_session, current_ts):
     assert ircs[1].interest_rate == 5.0
     assert ircs[2].creditor_id == 124
     assert ircs[2].debtor_id == 666
-    assert ircs[2].change_ts == TS0
-    assert ircs[2].interest_rate == 15.0
+    assert ircs[2].change_ts == TS0 + timedelta(days=10)
+    assert ircs[2].interest_rate == 5.0
 
     # Receiving AccountUpdate message for the first time for a needed account:
     p.process_account_update_signal(
@@ -1162,7 +1182,27 @@ def test_process_account_update_signal(db_session, current_ts):
     assert len(ConfigureAccountSignal.query.all()) == 1
     assert len(ActivateCollectorSignal.query.all()) == 2
     assert len(DiscoverDebtorSignal.query.all()) == 2
-    assert len(InterestRateChange.query.all()) == 3
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda t: (
+        t.creditor_id, t.debtor_id, t.change_ts, t.interest_rate
+    ))
+    assert len(ircs) == 4
+    assert ircs[0].creditor_id == 123
+    assert ircs[0].debtor_id == 666
+    assert ircs[0].change_ts == TS0
+    assert ircs[0].interest_rate == 0.0
+    assert ircs[1].creditor_id == 123
+    assert ircs[1].debtor_id == 666
+    assert ircs[1].change_ts == TS0 + timedelta(days=10)
+    assert ircs[1].interest_rate == 5.0
+    assert ircs[2].creditor_id == 124
+    assert ircs[2].debtor_id == 666
+    assert ircs[2].change_ts == TS0 + timedelta(days=10)
+    assert ircs[2].interest_rate == 5.0
+    assert ircs[3].creditor_id == 125
+    assert ircs[3].debtor_id == 666
+    assert ircs[3].change_ts == TS0 + timedelta(days=10)
+    assert ircs[3].interest_rate == 5.0
 
 
 def test_mark_as_recently_needed_collector(db_session, current_ts):

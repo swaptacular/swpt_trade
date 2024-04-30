@@ -84,6 +84,7 @@ def _on_account_update_signal(
         ts=ts,
         ttl=ttl,
         is_legible_for_trade=is_legible_for_trade,
+        turn_max_commit_interval=cfg["TURN_MAX_COMMIT_INTERVAL"],
     )
 
 

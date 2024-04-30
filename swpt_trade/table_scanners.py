@@ -4,7 +4,6 @@ from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
 from sqlalchemy.sql.expression import tuple_, and_, or_, null
 from swpt_trade.extensions import db
-from swpt_trade.utils import parse_timedelta
 from swpt_trade.models import (
     DebtorInfoDocument,
     DebtorLocatorClaim,
@@ -442,9 +441,7 @@ class InterestRateChangeScanner(TableScanner):
 
     def __init__(self):
         super().__init__()
-        cfg = current_app.config
-        self.sharding_realm = cfg["SHARDING_REALM"]
-        self.max_commit_interval = cfg["TURN_MAX_COMMIT_INTERVAL"]
+        self.sharding_realm = current_app.config["SHARDING_REALM"]
 
     @property
     def blocks_per_query(self) -> int:
@@ -465,8 +462,6 @@ class InterestRateChangeScanner(TableScanner):
         if current_app.config["DELETE_PARENT_SHARD_RECORDS"]:
             self._delete_parent_shard_records(rows, current_ts)
 
-        self._delete_stale_records(rows, current_ts)
-
     def _delete_parent_shard_records(self, rows, current_ts):
         c = self.table.c
         c_creditor_id = c.creditor_id
@@ -484,33 +479,6 @@ class InterestRateChangeScanner(TableScanner):
             (row[c_creditor_id], row[c_debtor_id], row[c_change_ts])
             for row in rows
             if belongs_to_parent_shard(row)
-        ]
-        if pks_to_delete:
-            to_delete = (
-                InterestRateChange.query.filter(self.pk.in_(pks_to_delete))
-                .with_for_update(skip_locked=True)
-                .all()
-            )
-
-            for interest_rate_change in to_delete:
-                db.session.delete(interest_rate_change)
-
-            db.session.commit()
-
-    def _delete_stale_records(self, rows, current_ts):
-        c = self.table.c
-        c_creditor_id = c.creditor_id
-        c_debtor_id = c.debtor_id
-        c_change_ts = c.change_ts
-        cutoff_ts = current_ts - self.max_commit_interval
-
-        def is_stale(row) -> bool:
-            return row[c_change_ts] < cutoff_ts
-
-        pks_to_delete = [
-            (row[c_creditor_id], row[c_debtor_id], row[c_change_ts])
-            for row in rows
-            if is_stale(row)
         ]
         if pks_to_delete:
             to_delete = (

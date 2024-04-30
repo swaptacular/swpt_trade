@@ -1,5 +1,6 @@
+import math
 from typing import TypeVar, Callable, Optional
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from swpt_pythonlib.utils import Seqnum
 from sqlalchemy.orm import load_only
 from swpt_trade.extensions import db
@@ -44,16 +45,25 @@ def process_account_update_signal(
         ts: datetime,
         ttl: int,
         is_legible_for_trade: bool = True,
+        turn_max_commit_interval: timedelta = timedelta(days=100000),
 ) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    cutoff_ts = current_ts - turn_max_commit_interval
+
     def store_this_interest_rate():
-        store_interest_rate_change(
+        if store_interest_rate_change(
             creditor_id=creditor_id,
             debtor_id=debtor_id,
             change_ts=last_interest_rate_change_ts,
             interest_rate=interest_rate,
-        )
+        ):
+            try_to_compact_interest_rate_changes(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                cutoff_ts=cutoff_ts,
+                max_number_of_changes=turn_max_commit_interval.days + 30,
+            )
 
-    current_ts = datetime.now(tz=timezone.utc)
     if (current_ts - ts).total_seconds() > ttl:
         store_this_interest_rate()
         return
@@ -121,14 +131,6 @@ def process_account_update_signal(
             store_this_interest_rate()
             return
 
-        if data.interest_rate != interest_rate:
-            store_interest_rate_change(
-                creditor_id=creditor_id,
-                debtor_id=debtor_id,
-                change_ts=data.last_interest_rate_change_ts,
-                interest_rate=data.interest_rate,
-            )
-
         must_activate_collector = account_id != "" and data.account_id == ""
         has_new_debtor_info_iri = debtor_info_iri != data.debtor_info_iri
 
@@ -171,6 +173,8 @@ def process_account_update_signal(
             )
         )
 
+    store_this_interest_rate()
+
 
 @atomic
 def store_interest_rate_change(
@@ -179,8 +183,8 @@ def store_interest_rate_change(
         debtor_id: int,
         change_ts: datetime,
         interest_rate: float,
-) -> None:
-    is_already_stored = (
+) -> bool:
+    should_be_added = not (
         db.session.query(
             InterestRateChange.query
             .filter_by(
@@ -192,7 +196,7 @@ def store_interest_rate_change(
         )
         .scalar()
     )
-    if not is_already_stored:
+    if should_be_added:
         with db.retry_on_integrity_error():
             db.session.add(
                 InterestRateChange(
@@ -202,6 +206,36 @@ def store_interest_rate_change(
                     interest_rate=interest_rate,
                 )
             )
+
+    return should_be_added
+
+
+@atomic
+def try_to_compact_interest_rate_changes(
+        *,
+        creditor_id: int,
+        debtor_id: int,
+        cutoff_ts: datetime,
+        max_number_of_changes: int,
+) -> None:
+    changes = (
+        InterestRateChange.query
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
+        .order_by(InterestRateChange.change_ts.desc())
+        .all()
+    )
+    min_interest_rate: float = math.inf
+
+    for n, change in enumerate(changes):
+        interest_rate = change.interest_rate
+
+        if interest_rate < min_interest_rate and n < max_number_of_changes:
+            min_interest_rate = interest_rate
+        else:
+            db.session.delete(change)
+
+        if change.change_ts < cutoff_ts:
+            min_interest_rate = -100.0  # Remaining changes will be deleted.
 
 
 @atomic
