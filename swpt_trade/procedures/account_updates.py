@@ -5,6 +5,7 @@ from sqlalchemy.orm import load_only
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     NeededWorkerAccount,
+    InterestRateChange,
     WorkerAccount,
     ConfigureAccountSignal,
     ActivateCollectorSignal,
@@ -44,8 +45,17 @@ def process_account_update_signal(
         ttl: int,
         is_legible_for_trade: bool = True,
 ) -> None:
+    def store_this_interest_rate():
+        store_interest_rate_change(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            change_ts=last_interest_rate_change_ts,
+            interest_rate=interest_rate,
+        )
+
     current_ts = datetime.now(tz=timezone.utc)
     if (current_ts - ts).total_seconds() > ttl:
+        store_this_interest_rate()
         return
 
     is_needed_account = (
@@ -108,7 +118,16 @@ def process_account_update_signal(
             creation_date, last_change_ts, Seqnum(last_change_seqnum)
         )
         if this_event <= prev_event:
+            store_this_interest_rate()
             return
+
+        if data.interest_rate != interest_rate:
+            store_interest_rate_change(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                change_ts=data.last_interest_rate_change_ts,
+                interest_rate=data.interest_rate,
+            )
 
         must_activate_collector = account_id != "" and data.account_id == ""
         has_new_debtor_info_iri = debtor_info_iri != data.debtor_info_iri
@@ -151,6 +170,38 @@ def process_account_update_signal(
                 force_locator_refetch=has_new_debtor_info_iri,
             )
         )
+
+
+@atomic
+def store_interest_rate_change(
+        *,
+        creditor_id: int,
+        debtor_id: int,
+        change_ts: datetime,
+        interest_rate: float,
+) -> None:
+    is_already_stored = (
+        db.session.query(
+            InterestRateChange.query
+            .filter_by(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                change_ts=change_ts,
+            )
+            .exists()
+        )
+        .scalar()
+    )
+    if not is_already_stored:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                InterestRateChange(
+                    creditor_id=creditor_id,
+                    debtor_id=debtor_id,
+                    change_ts=change_ts,
+                    interest_rate=interest_rate,
+                )
+            )
 
 
 @atomic

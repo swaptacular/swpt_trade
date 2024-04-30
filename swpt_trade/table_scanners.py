@@ -2,13 +2,15 @@ from typing import TypeVar, Callable
 from datetime import datetime, timedelta, timezone
 from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
-from sqlalchemy.sql.expression import tuple_
+from sqlalchemy.sql.expression import tuple_, and_, or_, null
 from swpt_trade.extensions import db
+from swpt_trade.utils import parse_timedelta
 from swpt_trade.models import (
     DebtorInfoDocument,
     DebtorLocatorClaim,
     TradingPolicy,
     WorkerAccount,
+    InterestRateChange,
     NeededWorkerAccount,
     RecentlyNeededCollector,
     DATE0,
@@ -102,6 +104,7 @@ class DebtorInfoDocumentScanner(TableScanner):
         if pks_to_delete:
             to_delete = (
                 DebtorInfoDocument.query.filter(self.pk.in_(pks_to_delete))
+                .filter(DebtorInfoDocument.fetched_at < cutoff_ts)
                 .with_for_update(skip_locked=True)
                 .all()
             )
@@ -202,8 +205,23 @@ class DebtorLocatorClaimScanner(TableScanner):
             row[c_debtor_id] for row in rows if is_stale(row)
         ]
         if pks_to_delete:
+            locator_fetch_at = DebtorLocatorClaim.latest_locator_fetch_at
+            discovery_fetch_at = DebtorLocatorClaim.latest_discovery_fetch_at
+
             to_delete = (
                 DebtorLocatorClaim.query.filter(self.pk.in_(pks_to_delete))
+                .filter(
+                    or_(
+                        and_(
+                            locator_fetch_at != null(),
+                            locator_fetch_at < first_cutoff_ts,
+                        ),
+                        and_(
+                            locator_fetch_at == null(),
+                            discovery_fetch_at < second_cutoff_ts,
+                        ),
+                    )
+                )
                 .with_for_update(skip_locked=True)
                 .all()
             )
@@ -411,6 +429,102 @@ class WorkerAccountsScanner(TableScanner):
             db.session.commit()
 
 
+class InterestRateChangeScanner(TableScanner):
+    """Garbage collects interest rage changes."""
+
+    table = InterestRateChange.__table__
+    pk = tuple_(table.c.creditor_id, table.c.debtor_id, table.c.change_ts)
+    columns = [
+        InterestRateChange.creditor_id,
+        InterestRateChange.debtor_id,
+        InterestRateChange.change_ts,
+    ]
+
+    def __init__(self):
+        super().__init__()
+        cfg = current_app.config
+        self.sharding_realm = cfg["SHARDING_REALM"]
+        self.max_commit_interval = cfg["TURN_MAX_COMMIT_INTERVAL"]
+
+    @property
+    def blocks_per_query(self) -> int:
+        return current_app.config[
+            "APP_INTEREST_RATE_CHANGES_SCAN_BLOCKS_PER_QUERY"
+        ]
+
+    @property
+    def target_beat_duration(self) -> int:
+        return current_app.config[
+            "APP_INTEREST_RATE_CHANGES_SCAN_BEAT_MILLISECS"
+        ]
+
+    @atomic
+    def process_rows(self, rows):
+        current_ts = datetime.now(tz=timezone.utc)
+
+        if current_app.config["DELETE_PARENT_SHARD_RECORDS"]:
+            self._delete_parent_shard_records(rows, current_ts)
+
+        self._delete_stale_records(rows, current_ts)
+
+    def _delete_parent_shard_records(self, rows, current_ts):
+        c = self.table.c
+        c_creditor_id = c.creditor_id
+        c_debtor_id = c.debtor_id
+        c_change_ts = c.change_ts
+
+        def belongs_to_parent_shard(row) -> bool:
+            creditor_id = row[c_creditor_id]
+            return (
+                not self.sharding_realm.match(creditor_id)
+                and self.sharding_realm.match(creditor_id, match_parent=True)
+            )
+
+        pks_to_delete = [
+            (row[c_creditor_id], row[c_debtor_id], row[c_change_ts])
+            for row in rows
+            if belongs_to_parent_shard(row)
+        ]
+        if pks_to_delete:
+            to_delete = (
+                InterestRateChange.query.filter(self.pk.in_(pks_to_delete))
+                .with_for_update(skip_locked=True)
+                .all()
+            )
+
+            for interest_rate_change in to_delete:
+                db.session.delete(interest_rate_change)
+
+            db.session.commit()
+
+    def _delete_stale_records(self, rows, current_ts):
+        c = self.table.c
+        c_creditor_id = c.creditor_id
+        c_debtor_id = c.debtor_id
+        c_change_ts = c.change_ts
+        cutoff_ts = current_ts - self.max_commit_interval
+
+        def is_stale(row) -> bool:
+            return row[c_change_ts] < cutoff_ts
+
+        pks_to_delete = [
+            (row[c_creditor_id], row[c_debtor_id], row[c_change_ts])
+            for row in rows
+            if is_stale(row)
+        ]
+        if pks_to_delete:
+            to_delete = (
+                InterestRateChange.query.filter(self.pk.in_(pks_to_delete))
+                .with_for_update(skip_locked=True)
+                .all()
+            )
+
+            for interest_rate_change in to_delete:
+                db.session.delete(interest_rate_change)
+
+            db.session.commit()
+
+
 class NeededWorkerAccountsScanner(TableScanner):
     """Garbage collects parent shard's needed worker accounts."""
 
@@ -551,6 +665,7 @@ class RecentlyNeededCollectorsScanner(TableScanner):
             to_delete = (
                 RecentlyNeededCollector.query
                 .filter(self.pk.in_(pks_to_delete))
+                .filter(RecentlyNeededCollector.needed_at < cutoff_ts)
                 .with_for_update(skip_locked=True)
                 .all()
             )

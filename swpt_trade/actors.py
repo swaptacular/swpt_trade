@@ -59,7 +59,7 @@ def _on_account_update_signal(
     cfg = current_app.config
     is_legible_for_trade = (
         demurrage_rate >= cfg["APP_MIN_DEMURRAGE_RATE"]
-        and commit_period >= cfg["APP_MIN_COMMIT_PERIOD_SECONDS"]
+        and commit_period >= cfg["TURN_MAX_COMMIT_INTERVAL"].total_seconds()
         and transfer_note_max_bytes >= cfg["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
     )
     procedures.process_account_update_signal(

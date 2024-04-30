@@ -574,6 +574,93 @@ def test_delete_dead_worker_accounts(app, db_session, current_ts):
     assert was[0].creditor_id == 666
 
 
+def test_delete_parent_interest_rate_changes(
+        app,
+        db_session,
+        current_ts,
+        restore_sharding_realm,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    c1 = m.InterestRateChange(
+        creditor_id=666, debtor_id=1, change_ts=current_ts, interest_rate=10.0
+    )
+    c2 = m.InterestRateChange(
+        creditor_id=777, debtor_id=2, change_ts=current_ts, interest_rate=5.0
+    )
+    c3 = m.InterestRateChange(
+        creditor_id=888, debtor_id=2, change_ts=current_ts, interest_rate=0.0
+    )
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE interest_rate_change"))
+
+    assert len(m.InterestRateChange.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_interest_rate_changes",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    changes = m.InterestRateChange.query.all()
+    assert len(changes) == 1
+    assert changes[0].creditor_id == 888
+
+
+def test_delete_stale_interest_rate_changes(app, db_session, current_ts):
+    c1 = m.InterestRateChange(
+        creditor_id=666,
+        debtor_id=1,
+        change_ts=current_ts - timedelta(days=1),
+        interest_rate=10.0,
+    )
+    c2 = m.InterestRateChange(
+        creditor_id=777,
+        debtor_id=2,
+        change_ts=current_ts - timedelta(days=100),
+        interest_rate=5.0,
+    )
+    c3 = m.InterestRateChange(
+        creditor_id=888,
+        debtor_id=2,
+        change_ts=current_ts - timedelta(days=100),
+        interest_rate=0.0,
+    )
+    db.session.add(c1)
+    db.session.add(c2)
+    db.session.add(c3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE interest_rate_change"))
+
+    assert len(m.InterestRateChange.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_interest_rate_changes",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    changes = m.InterestRateChange.query.all()
+    assert len(changes) == 1
+    assert changes[0].creditor_id == 666
+
+
 def test_delete_parent_needed_worker_accounts(
         app,
         db_session,

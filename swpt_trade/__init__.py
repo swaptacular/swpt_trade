@@ -10,6 +10,7 @@ from typing import List
 from flask_cors import CORS
 from ast import literal_eval
 from swpt_pythonlib.utils import u64_to_i64, ShardingRealm
+from .utils import parse_timedelta
 
 
 def _engine_options(s: str) -> dict:
@@ -190,7 +191,7 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_CHECK_INTERVAL = "1m"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
-    TURN_MAX_COMMIT_PERIOD = "28d"
+    TURN_MAX_COMMIT_PERIOD = "30d"
 
     BASE_DEBTOR_INFO_LOCATOR: str = None
     BASE_DEBTOR_ID: _parse_debtor_id = None
@@ -254,7 +255,6 @@ class Configuration(metaclass=MetaEnvReader):
     APP_ENABLE_CORS = False
     APP_VERIFY_SSL_CERTS = True
     APP_MIN_DEMURRAGE_RATE = -50.0
-    APP_MIN_COMMIT_PERIOD_SECONDS = 30 * 24 * 60 * 60  # 30 days
     APP_MIN_TRANSFER_NOTE_MAX_BYTES = 100
     APP_ROLL_WORKER_TURNS_WAIT = 60.0
     APP_PROCESS_PRISTINE_COLLECTORS_WAIT = 60.0
@@ -275,6 +275,9 @@ class Configuration(metaclass=MetaEnvReader):
     APP_WORKER_ACCOUNTS_SCAN_DAYS = 7.0
     APP_WORKER_ACCOUNTS_SCAN_BLOCKS_PER_QUERY = 40
     APP_WORKER_ACCOUNTS_SCAN_BEAT_MILLISECS = 100
+    APP_INTEREST_RATE_CHANGES_SCAN_DAYS = 7
+    APP_INTEREST_RATE_CHANGES_SCAN_BLOCKS_PER_QUERY = 40
+    APP_INTEREST_RATE_CHANGES_SCAN_BEAT_MILLISECS = 100
     APP_NEEDED_WORKER_ACCOUNTS_SCAN_DAYS = 7.0
     APP_NEEDED_WORKER_ACCOUNTS_SCAN_BLOCKS_PER_QUERY = 40
     APP_NEEDED_WORKER_ACCOUNTS_SCAN_BEAT_MILLISECS = 100
@@ -344,6 +347,9 @@ def create_app(config_dict={}):
     app.config.from_mapping(config_dict)
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
     app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
+    app.config["TURN_MAX_COMMIT_INTERVAL"] = parse_timedelta(
+        app.config["TURN_MAX_COMMIT_PERIOD"]
+    )
 
     solver_engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"].copy()
     solver_client_pool_size = app.config["SOLVER_CLIENT_POOL_SIZE"]
