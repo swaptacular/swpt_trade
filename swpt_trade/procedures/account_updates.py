@@ -235,7 +235,8 @@ def try_to_compact_interest_rate_changes(
             db.session.delete(change)
 
         if change.change_ts < cutoff_ts:
-            min_interest_rate = -100.0  # Remaining changes will be deleted.
+            # This means that the remaining changes should be deleted.
+            min_interest_rate = -100.0
 
 
 @atomic
