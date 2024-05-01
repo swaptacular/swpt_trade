@@ -169,7 +169,7 @@ def test_try_to_advance_turn_to_phase2(db_session):
     p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
-        turn_max_commit_interval=timedelta(days=30),
+        max_commit_period=timedelta(days=30),
     )
 
     currencies = db_session.query(CurrencyInfo).all()
@@ -205,12 +205,12 @@ def test_try_to_advance_turn_to_phase2(db_session):
     p.try_to_advance_turn_to_phase2(
         turn_id=-1,
         phase2_duration=timedelta(hours=1),
-        turn_max_commit_interval=timedelta(days=30),
+        max_commit_period=timedelta(days=30),
     )
     p.try_to_advance_turn_to_phase2(
         turn_id=turn_id,
         phase2_duration=timedelta(hours=1),
-        turn_max_commit_interval=timedelta(days=30),
+        max_commit_period=timedelta(days=30),
     )
     all_turns = Turn.query.all()
     assert len(all_turns) == 1
@@ -1217,3 +1217,134 @@ def test_mark_as_recently_needed_collector(db_session, current_ts):
     assert len(rncs) == 1
     assert rncs[0].debtor_id == 666
     assert rncs[0].needed_at >= current_ts
+
+
+def test_try_to_compact_interest_rate_changes(db_session, current_ts):
+    assert len(InterestRateChange.query.all()) == 0
+    assert p.store_interest_rate_change(
+        creditor_id=123,
+        debtor_id=666,
+        change_ts=current_ts,
+        interest_rate=10.0,
+    )
+    assert len(InterestRateChange.query.all()) == 1
+    assert not p.store_interest_rate_change(
+        creditor_id=123,
+        debtor_id=666,
+        change_ts=current_ts,
+        interest_rate=10.0,
+    )
+    assert len(InterestRateChange.query.all()) == 1
+
+    assert p.store_interest_rate_change(
+        creditor_id=124,
+        debtor_id=777,
+        change_ts=current_ts - timedelta(hours=1),
+        interest_rate=5.0,
+    )
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda r: (r.creditor_id, r.debtor_id, r.change_ts))
+    assert ircs[0].creditor_id == 123
+    assert ircs[0].debtor_id == 666
+    assert ircs[0].change_ts == current_ts
+    assert ircs[0].interest_rate == 10.0
+    assert ircs[1].creditor_id == 124
+    assert ircs[1].debtor_id == 777
+    assert ircs[1].change_ts == current_ts - timedelta(hours=1)
+    assert ircs[1].interest_rate == 5.0
+
+    p.compact_interest_rate_changes(
+        creditor_id=123,
+        debtor_id=666,
+        cutoff_ts=current_ts - timedelta(days=100),
+        max_number_of_changes=100,
+    )
+    assert len(InterestRateChange.query.all()) == 2
+
+    p.compact_interest_rate_changes(
+        creditor_id=124,
+        debtor_id=777,
+        cutoff_ts=current_ts - timedelta(days=100),
+        max_number_of_changes=1,
+    )
+    assert len(InterestRateChange.query.all()) == 2
+
+    assert p.store_interest_rate_change(
+        creditor_id=124,
+        debtor_id=777,
+        change_ts=current_ts,
+        interest_rate=4.0,
+    )
+    assert len(InterestRateChange.query.all()) == 3
+
+    p.compact_interest_rate_changes(
+        creditor_id=124,
+        debtor_id=777,
+        cutoff_ts=current_ts - timedelta(days=100),
+        max_number_of_changes=1,
+    )
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda r: (r.creditor_id, r.debtor_id, r.change_ts))
+    assert len(ircs) == 2
+    assert ircs[0].creditor_id == 123
+    assert ircs[0].debtor_id == 666
+    assert ircs[0].change_ts == current_ts
+    assert ircs[0].interest_rate == 10.0
+    assert ircs[1].creditor_id == 124
+    assert ircs[1].debtor_id == 777
+    assert ircs[1].change_ts == current_ts
+    assert ircs[1].interest_rate == 4.0
+
+    p.compact_interest_rate_changes(
+        creditor_id=123,
+        debtor_id=666,
+        cutoff_ts=current_ts - timedelta(days=100),
+        max_number_of_changes=0,
+    )
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda r: (r.creditor_id, r.debtor_id, r.change_ts))
+    assert len(ircs) == 1
+    assert ircs[0].creditor_id == 124
+    assert ircs[0].debtor_id == 777
+    assert ircs[0].change_ts == current_ts
+    assert ircs[0].interest_rate == 4.0
+
+    assert p.store_interest_rate_change(
+        creditor_id=124,
+        debtor_id=777,
+        change_ts=current_ts - timedelta(hours=12),
+        interest_rate=-2.0,
+    )
+    assert len(InterestRateChange.query.all()) == 2
+
+    p.compact_interest_rate_changes(
+        creditor_id=124,
+        debtor_id=777,
+        cutoff_ts=current_ts - timedelta(days=100),
+        max_number_of_changes=2,
+    )
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda r: (r.creditor_id, r.debtor_id, r.change_ts))
+    assert len(ircs) == 2
+    assert ircs[0].creditor_id == 124
+    assert ircs[0].debtor_id == 777
+    assert ircs[0].change_ts == current_ts - timedelta(hours=12)
+    assert ircs[0].interest_rate == -2.0
+    assert ircs[1].creditor_id == 124
+    assert ircs[1].debtor_id == 777
+    assert ircs[1].change_ts == current_ts
+    assert ircs[1].interest_rate == 4.0
+
+    p.compact_interest_rate_changes(
+        creditor_id=124,
+        debtor_id=777,
+        cutoff_ts=current_ts + timedelta(hours=1),
+        max_number_of_changes=2,
+    )
+    ircs = InterestRateChange.query.all()
+    ircs.sort(key=lambda r: (r.creditor_id, r.debtor_id, r.change_ts))
+    assert len(ircs) == 1
+    assert ircs[0].creditor_id == 124
+    assert ircs[0].debtor_id == 777
+    assert ircs[0].change_ts == current_ts
+    assert ircs[0].interest_rate == 4.0

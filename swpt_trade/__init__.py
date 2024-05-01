@@ -191,7 +191,7 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_CHECK_INTERVAL = "1m"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
-    TURN_MAX_COMMIT_PERIOD = "30d"
+    TURN_MAX_COMMIT_PERIOD: parse_timedelta = "30d"
 
     BASE_DEBTOR_INFO_LOCATOR: str = None
     BASE_DEBTOR_ID: _parse_debtor_id = None
@@ -347,9 +347,6 @@ def create_app(config_dict={}):
     app.config.from_mapping(config_dict)
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
     app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
-    app.config["TURN_MAX_COMMIT_INTERVAL"] = parse_timedelta(
-        app.config["TURN_MAX_COMMIT_PERIOD"]
-    )
 
     solver_engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"].copy()
     solver_client_pool_size = app.config["SOLVER_CLIENT_POOL_SIZE"]

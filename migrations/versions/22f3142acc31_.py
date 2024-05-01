@@ -38,8 +38,11 @@ def upgrade_():
     sa.Column('change_ts', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('interest_rate', sa.REAL(), nullable=False),
     sa.CheckConstraint('interest_rate >= -100.0'),
-    sa.PrimaryKeyConstraint('creditor_id', 'debtor_id', 'change_ts')
     )
+    # Create a "covering" index instead of a "normal" index.
+    op.execute('CREATE UNIQUE INDEX idx_interest_rate_change_pk ON interest_rate_change (creditor_id, debtor_id, change_ts) INCLUDE (interest_rate)')
+    op.execute('ALTER TABLE interest_rate_change ADD CONSTRAINT interest_rate_change_pkey PRIMARY KEY USING INDEX idx_interest_rate_change_pk')
+
     op.create_table('account_lock',
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),

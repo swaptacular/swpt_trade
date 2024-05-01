@@ -45,27 +45,27 @@ def process_account_update_signal(
         ts: datetime,
         ttl: int,
         is_legible_for_trade: bool = True,
-        turn_max_commit_interval: timedelta = timedelta(days=100000),
+        turn_max_commit_period: timedelta = timedelta(days=100000),
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
-    cutoff_ts = current_ts - turn_max_commit_interval
 
-    def store_this_interest_rate():
-        if store_interest_rate_change(
+    # We should not miss any changes in the interest rate. For this
+    # reason, interest rates in old messages, and even in messages
+    # with expired TTLs should be archived.
+    if store_interest_rate_change(
+        creditor_id=creditor_id,
+        debtor_id=debtor_id,
+        change_ts=last_interest_rate_change_ts,
+        interest_rate=interest_rate,
+    ):
+        compact_interest_rate_changes(
             creditor_id=creditor_id,
             debtor_id=debtor_id,
-            change_ts=last_interest_rate_change_ts,
-            interest_rate=interest_rate,
-        ):
-            try_to_compact_interest_rate_changes(
-                creditor_id=creditor_id,
-                debtor_id=debtor_id,
-                cutoff_ts=cutoff_ts,
-                max_number_of_changes=turn_max_commit_interval.days + 30,
-            )
+            cutoff_ts=current_ts - turn_max_commit_period,
+            max_number_of_changes=turn_max_commit_period.days + 30,
+        )
 
     if (current_ts - ts).total_seconds() > ttl:
-        store_this_interest_rate()
         return
 
     is_needed_account = (
@@ -128,7 +128,6 @@ def process_account_update_signal(
             creation_date, last_change_ts, Seqnum(last_change_seqnum)
         )
         if this_event <= prev_event:
-            store_this_interest_rate()
             return
 
         must_activate_collector = account_id != "" and data.account_id == ""
@@ -173,8 +172,6 @@ def process_account_update_signal(
             )
         )
 
-    store_this_interest_rate()
-
 
 @atomic
 def store_interest_rate_change(
@@ -211,32 +208,39 @@ def store_interest_rate_change(
 
 
 @atomic
-def try_to_compact_interest_rate_changes(
+def compact_interest_rate_changes(
         *,
         creditor_id: int,
         debtor_id: int,
         cutoff_ts: datetime,
         max_number_of_changes: int,
 ) -> None:
+    """Remove redundant `InterestRateChange` rows.
+
+    Because we are only interested in the lowest of the recent
+    interest rates. Here we remove all rows that are either not recent
+    enough, or have been superseded by a newer row which sets a lower
+    interest rate.
+    """
     changes = (
         InterestRateChange.query
         .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .order_by(InterestRateChange.change_ts.desc())
         .all()
     )
-    min_interest_rate: float = math.inf
+    lowest_interest_rate: float = math.inf
 
     for n, change in enumerate(changes):
         interest_rate = change.interest_rate
 
-        if interest_rate < min_interest_rate and n < max_number_of_changes:
-            min_interest_rate = interest_rate
+        if interest_rate < lowest_interest_rate and n < max_number_of_changes:
+            lowest_interest_rate = interest_rate
         else:
             db.session.delete(change)
 
         if change.change_ts < cutoff_ts:
-            # This means that the remaining changes should be deleted.
-            min_interest_rate = -100.0
+            # This means that all the remaining changes should be deleted.
+            lowest_interest_rate = -100.0
 
 
 @atomic

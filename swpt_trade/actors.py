@@ -57,10 +57,10 @@ def _on_account_update_signal(
     **kwargs
 ) -> None:
     cfg = current_app.config
-    turn_max_commit_interval = cfg["TURN_MAX_COMMIT_INTERVAL"]
+    turn_max_commit_period = cfg["TURN_MAX_COMMIT_PERIOD"]
     is_legible_for_trade = (
         demurrage_rate >= cfg["APP_MIN_DEMURRAGE_RATE"]
-        and commit_period >= turn_max_commit_interval.total_seconds()
+        and commit_period >= turn_max_commit_period.total_seconds()
         and transfer_note_max_bytes >= cfg["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
     )
     procedures.process_account_update_signal(
@@ -85,7 +85,7 @@ def _on_account_update_signal(
         ts=ts,
         ttl=ttl,
         is_legible_for_trade=is_legible_for_trade,
-        turn_max_commit_interval=turn_max_commit_interval,
+        turn_max_commit_period=turn_max_commit_period,
     )
 
 

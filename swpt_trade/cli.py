@@ -636,7 +636,7 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     )
     phase1_duration = parse_timedelta(c["TURN_PHASE1_DURATION"])
     phase2_duration = parse_timedelta(c["TURN_PHASE2_DURATION"])
-    turn_max_commit_interval = c["TURN_MAX_COMMIT_INTERVAL"]
+    max_commit_period = c["TURN_MAX_COMMIT_PERIOD"]
 
     logger = logging.getLogger(__name__)
     logger.info("Started rolling turns.")
@@ -659,7 +659,7 @@ def roll_turns(period, period_offset, check_interval, quit_early):
                 procedures.try_to_advance_turn_to_phase2(
                     turn_id=turn.turn_id,
                     phase2_duration=phase2_duration,
-                    turn_max_commit_interval=turn_max_commit_interval,
+                    max_commit_period=max_commit_period,
                 )
             elif phase == 2 and turn.phase_deadline < check_began_at:
                 try_to_advance_turn_to_phase3(turn)
@@ -698,7 +698,6 @@ def roll_worker_turns(wait, quit_early):
     """Run a process which synchronizes worker server's turn states
     with solver server's turn states.
     """
-    from swpt_trade.models import Turn
     from swpt_trade.run_turn_subphases import (
         run_phase1_subphase0,
         run_phase2_subphase0,

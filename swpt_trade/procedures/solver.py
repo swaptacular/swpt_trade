@@ -82,7 +82,7 @@ def try_to_advance_turn_to_phase2(
         *,
         turn_id: int,
         phase2_duration: timedelta,
-        turn_max_commit_interval: timedelta,
+        max_commit_period: timedelta,
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
     turn = (
@@ -151,7 +151,7 @@ def try_to_advance_turn_to_phase2(
 
         turn.phase = 2
         turn.phase_deadline = current_ts + phase2_duration
-        turn.collection_deadline = current_ts + turn_max_commit_interval
+        turn.collection_deadline = current_ts + max_commit_period
 
 
 @atomic
