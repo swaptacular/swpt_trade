@@ -220,7 +220,7 @@ def compact_interest_rate_changes(
     Because we are only interested in the lowest of the recent
     interest rates. Here we remove all rows that are either not recent
     enough, or have been superseded by a newer row which sets a lower
-    interest rate.
+    (or the same) interest rate.
     """
     changes = (
         InterestRateChange.query
