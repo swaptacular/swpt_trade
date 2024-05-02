@@ -269,7 +269,6 @@ def process_account_purge_signal(
         .one_or_none()
     )
     if worker_account:
-        # TODO: Consider deleting related records in other tables as well.
         db.session.delete(worker_account)
 
     return is_needed_account
