@@ -59,8 +59,8 @@ def process_account_update_signal(
         .scalar()
     )
     if is_needed_account:
-        # We should not miss any changes in the interest rate. For
-        # this reason, interest rates in old messages, and even in
+        # NOTE: We should not miss any changes in the interest rate.
+        # For this reason, interest rates in old messages, and even in
         # messages with expired TTLs should be archived.
         if store_interest_rate_change(
             creditor_id=creditor_id,
