@@ -26,16 +26,13 @@ class CollectorAccount(db.Model):
     #    superfluous collector accounts should be transferred to other
     #    accounts.
     #
-    # 4. After some period of time, the `NeededWorkerAccount` records
-    #    corresponding to the superfluous collector accounts should be
-    #    deleted. (This will result in the eventual automatic removal
-    #    of their related `WorkerAccount` records.)
+    # 4. After some period of time, `NeededWorkerAccount` and
+    #    `InterestRateChange` records corresponding to the superfluous
+    #    collector accounts should be deleted. (This will result in
+    #    the eventual automatic removal of their related
+    #    `WorkerAccount` records.)
     #
-    # 5. After some period of time, the `InterestRateChange` records
-    #    corresponding to the superfluous collector accounts should be
-    #    deleted.
-    #
-    # 6. After some period of time, the `CollectorAccount` records for
+    # 5. After some period of time, the `CollectorAccount` records for
     #    the superfluous collector accounts (they've had their
     #    "status"es set to "3" already) should be deleted.
 

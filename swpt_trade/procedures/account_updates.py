@@ -49,25 +49,6 @@ def process_account_update_signal(
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
 
-    # We should not miss any changes in the interest rate. For this
-    # reason, interest rates in old messages, and even in messages
-    # with expired TTLs should be archived.
-    if store_interest_rate_change(
-        creditor_id=creditor_id,
-        debtor_id=debtor_id,
-        change_ts=last_interest_rate_change_ts,
-        interest_rate=interest_rate,
-    ):
-        compact_interest_rate_changes(
-            creditor_id=creditor_id,
-            debtor_id=debtor_id,
-            cutoff_ts=current_ts - interest_rate_history_period,
-            max_number_of_changes=interest_rate_history_period.days + 30,
-        )
-
-    if (current_ts - ts).total_seconds() > ttl:
-        return
-
     is_needed_account = (
         db.session.query(
             NeededWorkerAccount.query
@@ -77,10 +58,31 @@ def process_account_update_signal(
         )
         .scalar()
     )
+    if is_needed_account:
+        # We should not miss any changes in the interest rate. For
+        # this reason, interest rates in old messages, and even in
+        # messages with expired TTLs should be archived.
+        if store_interest_rate_change(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            change_ts=last_interest_rate_change_ts,
+            interest_rate=interest_rate,
+        ):
+            compact_interest_rate_changes(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                cutoff_ts=current_ts - interest_rate_history_period,
+                max_number_of_changes=interest_rate_history_period.days + 30,
+            )
+
+    if (current_ts - ts).total_seconds() > ttl:
+        return
+
     if not is_needed_account:
         _discard_orphaned_account(
             creditor_id, debtor_id, config_flags, negligible_amount
         )
+        return
 
     data = (
         WorkerAccount.query

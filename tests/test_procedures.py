@@ -1123,10 +1123,10 @@ def test_process_account_update_signal(db_session, current_ts):
         ts=current_ts,
     )
     wa = WorkerAccount.query.filter_by(debtor_id=666, creditor_id=124).one()
-    assert wa.debtor_info_iri == "https://example.com/666"
-    assert wa.account_id == "Account124"  # account_id should not change.
-    assert wa.last_change_ts == current_ts
-    assert wa.last_change_seqnum == 2
+    assert wa.debtor_info_iri is None
+    assert wa.account_id == "Account124"
+    assert wa.last_change_ts == current_ts - timedelta(hours=1)
+    assert wa.last_change_seqnum == 1
     assert len(DiscoverDebtorSignal.query.all()) == 1
     assert len(ActivateCollectorSignal.query.all()) == 1
     cas = ConfigureAccountSignal.query.one()
@@ -1151,8 +1151,8 @@ def test_process_account_update_signal(db_session, current_ts):
     assert ircs[1].interest_rate == 5.0
     assert ircs[2].creditor_id == 124
     assert ircs[2].debtor_id == 666
-    assert ircs[2].change_ts == TS0 + timedelta(days=10)
-    assert ircs[2].interest_rate == 5.0
+    assert ircs[2].change_ts == TS0
+    assert ircs[2].interest_rate == 15.0
 
     # Receiving AccountUpdate message for the first time for a needed account:
     p.process_account_update_signal(
@@ -1197,8 +1197,8 @@ def test_process_account_update_signal(db_session, current_ts):
     assert ircs[1].interest_rate == 5.0
     assert ircs[2].creditor_id == 124
     assert ircs[2].debtor_id == 666
-    assert ircs[2].change_ts == TS0 + timedelta(days=10)
-    assert ircs[2].interest_rate == 5.0
+    assert ircs[2].change_ts == TS0
+    assert ircs[2].interest_rate == 15.0
     assert ircs[3].creditor_id == 125
     assert ircs[3].debtor_id == 666
     assert ircs[3].change_ts == TS0 + timedelta(days=10)
