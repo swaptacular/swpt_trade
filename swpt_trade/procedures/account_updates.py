@@ -224,7 +224,7 @@ def compact_interest_rate_changes(
 ) -> None:
     """Remove redundant `InterestRateChange` rows.
 
-    Because we are only interested in the lowest of the recent
+    Because we are only interested in the lowest among the most recent
     interest rates. Here we remove all rows that are either not recent
     enough, or have been superseded by a newer row which sets a lower
     (or the same) interest rate.
