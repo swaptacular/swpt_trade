@@ -76,13 +76,12 @@ def process_account_update_signal(
             )
 
     if (current_ts - ts).total_seconds() > ttl:
-        return
+        return  # expired TTL
 
     if not is_needed_account:
-        _discard_orphaned_account(
+        _discard_unneeded_account(
             creditor_id, debtor_id, config_flags, negligible_amount
         )
-        return
 
     data = (
         WorkerAccount.query
@@ -91,6 +90,12 @@ def process_account_update_signal(
         .one_or_none()
     )
     if data is None:
+        if not is_needed_account:
+            # NOTE: Normally, this should never happen. Creating
+            # `WorkerAccount` records for unneeded accounts is a
+            # potential DoS attack vector.
+            return
+
         with db.retry_on_integrity_error():
             db.session.add(
                 WorkerAccount(
@@ -130,7 +135,7 @@ def process_account_update_signal(
             creation_date, last_change_ts, Seqnum(last_change_seqnum)
         )
         if this_event <= prev_event:
-            return
+            return  # old message
 
         must_activate_collector = account_id != "" and data.account_id == ""
         has_new_debtor_info_iri = debtor_info_iri != data.debtor_info_iri
@@ -276,7 +281,7 @@ def process_account_purge_signal(
     return is_needed_account
 
 
-def _discard_orphaned_account(
+def _discard_unneeded_account(
     creditor_id: int,
     debtor_id: int,
     config_flags: int,
