@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 22f3142acc31
+Revision ID: dd43afb82b70
 Revises: 01a7c27aad49
-Create Date: 2024-04-30 17:58:27.243782
+Create Date: 2024-05-02 16:10:46.337159
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '22f3142acc31'
+revision = 'dd43afb82b70'
 down_revision = '01a7c27aad49'
 branch_labels = None
 depends_on = None
@@ -38,6 +38,7 @@ def upgrade_():
     sa.Column('change_ts', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('interest_rate', sa.REAL(), nullable=False),
     sa.CheckConstraint('interest_rate >= -100.0'),
+    comment='Indicates a change in the interest rate on a given collector account. The history of recent interest rate changes is needed in order to correctly determine the due interest on traded amounts.'
     )
     # Create a "covering" index instead of a "normal" index.
     op.execute('CREATE UNIQUE INDEX idx_interest_rate_change_pk ON interest_rate_change (creditor_id, debtor_id, change_ts) INCLUDE (interest_rate)')

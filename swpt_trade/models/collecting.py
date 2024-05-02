@@ -80,6 +80,14 @@ class InterestRateChange(db.Model):
     interest_rate = db.Column(db.REAL, nullable=False)
     __table_args__ = (
         db.CheckConstraint(interest_rate >= -100.0),
+        {
+            "comment": (
+                "Indicates a change in the interest rate on a given collector"
+                " account. The history of recent interest rate changes is"
+                " needed in order to correctly determine the due interest"
+                " on traded amounts."
+            ),
+        },
     )
 
 
