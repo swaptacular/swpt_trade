@@ -191,7 +191,6 @@ class Configuration(metaclass=MetaEnvReader):
     TURN_CHECK_INTERVAL = "1m"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
-    TURN_MAX_COMMIT_PERIOD: parse_timedelta = "30d"
 
     BASE_DEBTOR_INFO_LOCATOR: str = None
     BASE_DEBTOR_ID: _parse_debtor_id = None
@@ -254,6 +253,8 @@ class Configuration(metaclass=MetaEnvReader):
 
     APP_ENABLE_CORS = False
     APP_VERIFY_SSL_CERTS = True
+    APP_TURN_MAX_COMMIT_PERIOD: parse_timedelta = "30d"
+    APP_INTEREST_RATE_HISTORY_PERIOD: parse_timedelta = "30d"
     APP_MIN_DEMURRAGE_RATE = -50.0
     APP_MIN_TRANSFER_NOTE_MAX_BYTES = 100
     APP_ROLL_WORKER_TURNS_WAIT = 60.0
@@ -327,6 +328,14 @@ def _check_config_sanity(c):  # pragma: nocover
             "The configured value for APP_LOCATOR_CLAIM_EXPIRY_DAYS is"
             " too small compared to the configured value for"
             " APP_DEBTOR_INFO_EXPIRY_DAYS. Choose more appropriate"
+            " configuration values."
+        )
+
+    if c["APP_INTEREST_RATE_HISTORY_PERIOD"] < c["APP_TURN_MAX_COMMIT_PERIOD"]:
+        raise RuntimeError(
+            "The configured value for APP_INTEREST_RATE_HISTORY_PERIOD is"
+            " smaller than the configured value for"
+            " APP_TURN_MAX_COMMIT_PERIOD. Choose more appropriate"
             " configuration values."
         )
 

@@ -45,7 +45,7 @@ def process_account_update_signal(
         ts: datetime,
         ttl: int,
         is_legible_for_trade: bool = True,
-        turn_max_commit_period: timedelta = timedelta(days=100000),
+        interest_rate_history_period: timedelta = timedelta(days=100000),
 ) -> None:
     current_ts = datetime.now(tz=timezone.utc)
 
@@ -61,8 +61,8 @@ def process_account_update_signal(
         compact_interest_rate_changes(
             creditor_id=creditor_id,
             debtor_id=debtor_id,
-            cutoff_ts=current_ts - turn_max_commit_period,
-            max_number_of_changes=turn_max_commit_period.days + 30,
+            cutoff_ts=current_ts - interest_rate_history_period,
+            max_number_of_changes=interest_rate_history_period.days + 30,
         )
 
     if (current_ts - ts).total_seconds() > ttl:

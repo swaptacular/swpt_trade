@@ -616,10 +616,8 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     Every turn consists of several phases. When one phase is
     completed, the turn advances to the next phase. The durations of
     phases 1 and 2 are controlled by the environment variables
-    TURN_PHASE1_DURATION and TURN_PHASE2_DURATION. The maximum
-    duration of the commit period is controlled by the
-    TURN_MAX_COMMIT_PERIOD environment variable. (Note that time units
-    can also be included in values of these variables.)
+    TURN_PHASE1_DURATION and TURN_PHASE2_DURATION. (Note that time
+    units can also be included in values of these variables.)
 
     Another important environment variables which control the way
     trading turns work are: BASE_DEBTOR_INFO_LOCATOR, BASE_DEBTOR_ID,
@@ -636,7 +634,7 @@ def roll_turns(period, period_offset, check_interval, quit_early):
     )
     phase1_duration = parse_timedelta(c["TURN_PHASE1_DURATION"])
     phase2_duration = parse_timedelta(c["TURN_PHASE2_DURATION"])
-    max_commit_period = c["TURN_MAX_COMMIT_PERIOD"]
+    max_commit_period = c["APP_TURN_MAX_COMMIT_PERIOD"]
 
     logger = logging.getLogger(__name__)
     logger.info("Started rolling turns.")
