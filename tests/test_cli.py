@@ -472,6 +472,74 @@ def test_delete_stale_recently_needed_collectors(app, db_session, current_ts):
     assert claims[0].debtor_id == 666
 
 
+def test_delete_parent_account_locks(
+        app,
+        db_session,
+        current_ts,
+        restore_sharding_realm
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    wt = m.WorkerTurn(
+        turn_id=1,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=10,
+    )
+    db.session.add(wt)
+    db.session.flush()
+
+    al1 = m.AccountLock(
+        creditor_id=666,
+        debtor_id=123,
+        turn_id=1,
+        collector_id=789,
+    )
+    al2 = m.AccountLock(
+        creditor_id=777,
+        debtor_id=123,
+        turn_id=1,
+        collector_id=789,
+    )
+    al3 = m.AccountLock(
+        creditor_id=888,
+        debtor_id=124,
+        turn_id=1,
+        collector_id=789,
+    )
+    db.session.add(al1)
+    db.session.add(al2)
+    db.session.add(al3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE account_lock"))
+
+    assert len(m.AccountLock.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_account_locks",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    records = m.AccountLock.query.all()
+    assert len(records) == 1
+    assert records[0].creditor_id == 888
+
+
 def test_delete_parent_worker_accounts(
         app,
         db_session,

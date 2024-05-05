@@ -126,7 +126,8 @@ case $1 in
         ;;
     process_pristine_collectors | consume_messages | consume_chore_messages \
         | scan_debtor_info_documents | scan_debtor_locator_claims \
-        | scan_trading_policies | scan_worker_accounts | scan_interest_rate_changes \
+        | scan_trading_policies | scan_worker_accounts \
+        | scan_interest_rate_changes | scan_account_locks \
         | scan_needed_worker_accounts | scan_recently_needed_collectors \
         | roll_turns | roll_worker_turns | fetch_debtor_infos)
         exec flask swpt_trade "$@"
