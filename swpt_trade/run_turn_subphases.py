@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from itertools import groupby
 from sqlalchemy import select, insert, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import null
+from sqlalchemy.sql.expression import null, false, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
@@ -23,6 +23,9 @@ from swpt_trade.models import (
     NeededCollectorSignal,
     CollectorAccount,
     ActiveCollector,
+    AccountLock,
+    SellOffer,
+    BuyOffer,
 )
 from swpt_trade.utils import batched, contain_principal_overflow
 
@@ -351,11 +354,135 @@ def _insert_needed_collector_signals(bp: BidProcessor) -> None:
         )
 
 
+@atomic
 def run_phase2_subphase5(turn_id: int) -> None:
-    # TODO: implement
-    pass
+    worker_turn = (
+        WorkerTurn.query
+        .filter_by(
+            turn_id=turn_id,
+            phase=2,
+            worker_turn_subphase=5,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if worker_turn:
+        if worker_turn.phase_deadline > datetime.now(tz=timezone.utc):
+            with (
+                    db.engine.connect() as w_conn,
+                    db.engines["solver"].connect() as s_conn,
+            ):
+                _populate_sell_offers(w_conn, s_conn, turn_id)
+                _populate_buy_offers(w_conn, s_conn, turn_id)
+
+        worker_turn.worker_turn_subphase = 10
 
 
+def _populate_sell_offers(w_conn, s_conn, turn_id):
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+
+    with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                AccountLock.creditor_id,
+                AccountLock.debtor_id,
+                AccountLock.amount,
+                AccountLock.collector_id,
+            )
+            .where(
+                and_(
+                    AccountLock.turn_id == turn_id,
+                    AccountLock.has_been_released == false(),
+                    AccountLock.transfer_id != null(),
+                    AccountLock.finalized_at == null(),
+                    AccountLock.amount < 0,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": row.creditor_id,
+                    "debtor_id": row.debtor_id,
+                    "amount": -row.amount,
+                    "collector_id": row.collector_id,
+                }
+                for row in rows
+                if sharding_realm.match(row.creditor_id)
+            ]
+            if dicts_to_insert:
+                try:
+                    s_conn.execute(
+                        insert(SellOffer).execution_options(
+                            insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                        ),
+                        dicts_to_insert,
+                    )
+                except IntegrityError:
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "An attempt has been made to insert an already"
+                        " existing sell offer row for turn %d.",
+                        turn_id,
+                    )
+                    s_conn.rollback()
+                    break
+        else:
+            s_conn.commit()
+
+
+def _populate_buy_offers(w_conn, s_conn, turn_id):
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+
+    with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                AccountLock.creditor_id,
+                AccountLock.debtor_id,
+                AccountLock.amount,
+            )
+            .where(
+                and_(
+                    AccountLock.turn_id == turn_id,
+                    AccountLock.has_been_released == false(),
+                    AccountLock.transfer_id != null(),
+                    AccountLock.finalized_at == null(),
+                    AccountLock.amount > 0,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": row.creditor_id,
+                    "debtor_id": row.debtor_id,
+                    "amount": row.amount,
+                }
+                for row in rows
+                if sharding_realm.match(row.creditor_id)
+            ]
+            if dicts_to_insert:
+                try:
+                    s_conn.execute(
+                        insert(BuyOffer).execution_options(
+                            insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                        ),
+                        dicts_to_insert,
+                    )
+                except IntegrityError:
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "An attempt has been made to insert an already"
+                        " existing buy offer row for turn %d.",
+                        turn_id,
+                    )
+                    s_conn.rollback()
+                    break
+        else:
+            s_conn.commit()
+
+
+@atomic
 def run_phase3_subphase0(turn_id: int) -> None:
     # TODO: implement
     pass

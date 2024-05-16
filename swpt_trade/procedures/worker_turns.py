@@ -158,13 +158,26 @@ def process_candidate_offer_signal(
     except IndexError:
         return
 
-    max_locked_amount = contain_principal_overflow(int(
-        amount * math.exp(
-            calc_k(demurrage_rate)
-            * (worker_turn.collection_deadline - current_ts).total_seconds()
+    if amount > 0:
+        # a buy offer
+        min_locked_amount = 0
+        max_locked_amount = 0
+    else:
+        # a sell offer
+        assert amount < 0
+        assert min_trade_amount > 0
+        assert demurrage_rate > -100.0
+        k = calc_k(demurrage_rate)
+        t = (worker_turn.collection_deadline - current_ts).total_seconds()
+        worst_possible_demurrage = min(math.exp(k * t), 1.0)
+        min_locked_amount = contain_principal_overflow(
+            math.ceil(min_trade_amount / worst_possible_demurrage)
         )
-    ))
-    if max_locked_amount < min_trade_amount:
+        max_locked_amount = contain_principal_overflow(
+            math.ceil((-amount) / worst_possible_demurrage)
+        )
+
+    if max_locked_amount < min_locked_amount:
         return
 
     coordinator_request_id = db.session.scalar(cr_seq)
@@ -174,9 +187,9 @@ def process_candidate_offer_signal(
         account_lock.coordinator_request_id = coordinator_request_id
         account_lock.collector_id = collector.collector_id
         account_lock.initiated_at = current_ts
+        account_lock.amount = max(0, amount)
         account_lock.has_been_released = False
         account_lock.transfer_id = None
-        account_lock.amount = None
         account_lock.finalized_at = None
         account_lock.status_code = None
         account_lock.account_creation_date = None
@@ -188,6 +201,7 @@ def process_candidate_offer_signal(
                     creditor_id=creditor_id,
                     debtor_id=debtor_id,
                     turn_id=turn_id,
+                    amount=max(0, amount),
                     coordinator_request_id=coordinator_request_id,
                     collector_id=collector.collector_id,
                 )
@@ -199,7 +213,7 @@ def process_candidate_offer_signal(
             coordinator_request_id=coordinator_request_id,
             debtor_id=debtor_id,
             recipient=collector.account_id,
-            min_locked_amount=min_trade_amount,
+            min_locked_amount=min_locked_amount,
             max_locked_amount=max_locked_amount,
             final_interest_rate_ts=T_INFINITY,
             max_commit_delay=MAX_INT32,

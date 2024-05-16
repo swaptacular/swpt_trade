@@ -90,11 +90,14 @@ class AccountLock(db.Model):
     amount = db.Column(
         db.BigInteger,
         comment=(
-            "The amount that is guaranteed to be available up until the"
-            " `collection_deadline` has been reached. This is calculated by"
-            " reducing the `locked_amount` in accordance with the stated"
-            " `demurrage_rate`."
+            "Can be negative or zero (the trader wants to sell), or positive"
+            " (the trader wants to buy). If the value is negative, that"
+            " amount is guaranteed to be available up until the turn's"
+            " `collection_deadline` has been reached. When selling, the amount"
+            " is calculated by reducing the locked amount in accordance with"
+            " the `demurrage_rate`."
         ),
+        nullable=False,
     )
     finalized_at = db.Column(db.TIMESTAMP(timezone=True))
     status_code = db.Column(db.String)
@@ -102,17 +105,16 @@ class AccountLock(db.Model):
     account_last_transfer_number = db.Column(db.BigInteger)
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
-        db.CheckConstraint(amount >= 0),
         db.CheckConstraint(
             or_(
                 and_(
                     transfer_id == null(),
-                    amount == null(),
+                    amount >= 0,
                     finalized_at == null(),
                 ),
                 and_(
                     transfer_id != null(),
-                    amount != null(),
+                    amount != 0,
                     or_(finalized_at != null(), status_code == null()),
                 ),
             )

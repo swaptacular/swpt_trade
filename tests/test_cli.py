@@ -502,18 +502,21 @@ def test_delete_parent_account_locks(
         debtor_id=123,
         turn_id=1,
         collector_id=789,
+        amount=0,
     )
     al2 = m.AccountLock(
         creditor_id=777,
         debtor_id=123,
         turn_id=1,
         collector_id=789,
+        amount=0,
     )
     al3 = m.AccountLock(
         creditor_id=888,
         debtor_id=124,
         turn_id=1,
         collector_id=789,
+        amount=0,
     )
     db.session.add(al1)
     db.session.add(al2)
