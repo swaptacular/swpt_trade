@@ -66,14 +66,10 @@ class PrepareTransferSignal(Signal):
             attribute="creditor_id", dump_only=True
         )
         coordinator_request_id = fields.Integer()
-        min_locked_amount = fields.Integer(
-            attribute="locked_amount", dump_only=True
-        )
-        max_locked_amount = fields.Integer(
-            attribute="locked_amount", dump_only=True
-        )
+        min_locked_amount = fields.Integer()
+        max_locked_amount = fields.Integer()
         recipient = fields.String()
-        min_interest_rate = fields.Float()
+        final_interest_rate_ts = fields.DateTime()
         max_commit_delay = fields.Integer()
         inserted_at = fields.DateTime(data_key="ts")
 
@@ -83,8 +79,11 @@ class PrepareTransferSignal(Signal):
     coordinator_request_id = db.Column(db.BigInteger, primary_key=True)
     debtor_id = db.Column(db.BigInteger, nullable=False)
     recipient = db.Column(db.String, nullable=False)
-    locked_amount = db.Column(db.BigInteger, nullable=False)
-    min_interest_rate = db.Column(db.Float, nullable=False)
+    min_locked_amount = db.Column(db.BigInteger, nullable=False)
+    max_locked_amount = db.Column(db.BigInteger, nullable=False)
+    final_interest_rate_ts = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False
+    )
     max_commit_delay = db.Column(db.Integer, nullable=False)
 
     @property

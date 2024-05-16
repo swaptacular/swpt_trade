@@ -1,4 +1,5 @@
 import re
+import math
 from hashlib import md5
 from datetime import datetime, timedelta, timezone
 from itertools import islice
@@ -7,6 +8,8 @@ RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
 DATETIME0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # 2024-01-01 is Monday.
 MIN_INT64 = -1 << 63
 MAX_INT64 = (1 << 63) - 1
+SECONDS_IN_DAY = 24 * 60 * 60
+SECONDS_IN_YEAR = 365.25 * SECONDS_IN_DAY
 
 
 def parse_timedelta(s: str) -> timedelta:
@@ -110,3 +113,7 @@ def contain_principal_overflow(value: int) -> int:
     if value > MAX_INT64:
         return MAX_INT64
     return value
+
+
+def calc_k(interest_rate: float) -> float:
+    return math.log(1.0 + interest_rate / 100.0) / SECONDS_IN_YEAR

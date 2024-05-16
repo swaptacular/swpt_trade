@@ -418,8 +418,16 @@ def _on_candidate_offer_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: Add a real implementation.
-    _LOGGER.warning("Ignored candidate offer signal.")
+    procedures.process_candidate_offer_signal(
+        demurrage_rate=current_app.config["APP_MIN_DEMURRAGE_RATE"],
+        min_trade_amount=current_app.config["MIN_TRADE_AMOUNT"],
+        turn_id=turn_id,
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        amount=amount,
+        account_creation_date=account_creation_date,
+        last_transfer_number=last_transfer_number,
+    )
 
 
 def _on_needed_collector_signal(

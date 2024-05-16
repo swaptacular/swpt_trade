@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import date
 from .common import get_now_utc
 from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
@@ -142,3 +143,16 @@ class AccountLock(db.Model):
     @property
     def is_self_lock(self):  # pragma: no cover
         return self.creditor_id == self.collector_id
+
+    def is_in_force(self, current_acd: date, current_altn: int) -> bool:
+        acd = self.account_creation_date
+        altn = self.account_last_transfer_number
+
+        return not (
+            self.has_been_released
+            and (
+                (acd is None and altn is None)
+                or (acd < current_acd)
+                or (acd == current_acd and altn <= current_altn)
+            )
+        )

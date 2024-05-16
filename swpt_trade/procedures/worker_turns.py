@@ -1,11 +1,21 @@
+import random
+import math
 from typing import TypeVar, Callable, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
+from swpt_trade.utils import calc_k, contain_principal_overflow
 from swpt_trade.extensions import db
 from swpt_trade.models import (
+    MAX_INT32,
+    T_INFINITY,
+    cr_seq,
     Turn,
     WorkerTurn,
     RecentlyNeededCollector,
+    ActiveCollector,
+    AccountLock,
+    PrepareTransferSignal,
 )
 
 T = TypeVar("T")
@@ -101,3 +111,98 @@ def mark_as_recently_needed_collector(
                     needed_at=needed_at,
                 )
             )
+
+
+@atomic
+def process_candidate_offer_signal(
+        *,
+        demurrage_rate: float,
+        min_trade_amount: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+        amount: int,
+        account_creation_date: date,
+        last_transfer_number: int,
+):
+    current_ts = datetime.now(tz=timezone.utc)
+
+    worker_turn = (
+        WorkerTurn.query
+        .filter_by(turn_id=turn_id, phase=2, worker_turn_subphase=5)
+        .options(load_only(WorkerTurn.collection_deadline))
+        .with_for_update(read=True, skip_locked=True)
+        .one_or_none()
+    )
+    if not worker_turn:
+        return
+
+    account_lock = (
+        AccountLock.query
+        .filter(creditor_id=creditor_id, debtor_id=debtor_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if account_lock and account_lock.is_in_force(
+            account_creation_date, last_transfer_number
+    ):
+        return
+
+    active_collectors = (
+        ActiveCollector.query
+        .filter_by(debtor_id=debtor_id)
+        .all()
+    )
+    try:
+        collector = random.choice(active_collectors)
+    except IndexError:
+        return
+
+    max_locked_amount = contain_principal_overflow(int(
+        amount * math.exp(
+            calc_k(demurrage_rate)
+            * (worker_turn.collection_deadline - current_ts).total_seconds()
+        )
+    ))
+    if max_locked_amount < min_trade_amount:
+        return
+
+    coordinator_request_id = db.session.scalar(cr_seq)
+
+    if account_lock:
+        account_lock.turn_id = turn_id
+        account_lock.coordinator_request_id = coordinator_request_id
+        account_lock.collector_id = collector.collector_id
+        account_lock.initiated_at = current_ts
+        account_lock.has_been_released = False
+        account_lock.transfer_id = None
+        account_lock.amount = None
+        account_lock.finalized_at = None
+        account_lock.status_code = None
+        account_lock.account_creation_date = None
+        account_lock.account_last_transfer_number = None
+    else:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                AccountLock(
+                    creditor_id=creditor_id,
+                    debtor_id=debtor_id,
+                    turn_id=turn_id,
+                    coordinator_request_id=coordinator_request_id,
+                    collector_id=collector.collector_id,
+                )
+            )
+
+    db.session.add(
+        PrepareTransferSignal(
+            creditor_id=creditor_id,
+            coordinator_request_id=coordinator_request_id,
+            debtor_id=debtor_id,
+            recipient=collector.account_id,
+            min_locked_amount=min_trade_amount,
+            max_locked_amount=max_locked_amount,
+            final_interest_rate_ts=T_INFINITY,
+            max_commit_delay=MAX_INT32,
+            inserted_at=current_ts,
+        )
+    )

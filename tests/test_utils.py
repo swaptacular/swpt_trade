@@ -1,6 +1,9 @@
 import pytest
+import math
 from datetime import timedelta, datetime, timezone
 from swpt_trade.utils import (
+    SECONDS_IN_DAY,
+    SECONDS_IN_YEAR,
     parse_timedelta,
     can_start_new_turn,
     batched,
@@ -8,6 +11,7 @@ from swpt_trade.utils import (
     i16_to_u16,
     u16_to_i16,
     contain_principal_overflow,
+    calc_k,
 )
 
 
@@ -137,3 +141,14 @@ def test_contain_principal_overflow():
     assert contain_principal_overflow(-1 << 63) == (-1 << 63) + 1
     assert contain_principal_overflow((1 << 63) - 1) == (1 << 63) - 1
     assert contain_principal_overflow(1 << 63) == (1 << 63) - 1
+
+
+def test_calc_k():
+    eps = 1e-15
+    assert SECONDS_IN_DAY == 24 * 3600
+    assert 365 * SECONDS_IN_DAY < SECONDS_IN_YEAR < 366 * SECONDS_IN_DAY
+    assert abs(math.exp(calc_k(0.0) * SECONDS_IN_YEAR) - 1.0) < eps
+    assert abs(math.exp(calc_k(50.0) * SECONDS_IN_YEAR) - 1.5) < eps
+    assert abs(math.exp(calc_k(80.0) * SECONDS_IN_YEAR) - 1.8) < eps
+    assert abs(math.exp(calc_k(-50.0) * SECONDS_IN_YEAR) - 0.5) < eps
+    assert abs(math.exp(calc_k(-80.0) * SECONDS_IN_YEAR) - 0.2) < eps

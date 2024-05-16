@@ -1,4 +1,5 @@
 import pytest
+from datetime import date
 from swpt_pythonlib.utils import (
     calc_iri_routing_key,
     calc_bin_routing_key,
@@ -299,3 +300,36 @@ def test_trading_policy_is_useless(current_ts):
 
     tp.principal = 1000
     assert not tp.is_useless
+
+
+def test_account_lock_is_in_force(current_ts):
+    al = m.AccountLock(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=1,
+        collector_id=123,
+        has_been_released=True,
+        initiated_at=current_ts,
+        coordinator_request_id=456,
+        transfer_id=678,
+        amount=1000,
+        finalized_at=None,
+        status_code=None,
+        account_creation_date=date(2024, 5, 1),
+        account_last_transfer_number=321,
+    )
+    assert al.is_in_force(date(2024, 4, 1), 322)
+    assert al.is_in_force(date(2024, 5, 1), 320)
+    assert not al.is_in_force(date(2024, 5, 1), 321)
+    assert not al.is_in_force(date(2024, 5, 1), 322)
+
+    al.account_creation_date = None
+    al.account_last_transfer_number = None
+    assert not al.is_in_force(date(2024, 4, 1), 322)
+    assert not al.is_in_force(date(2024, 5, 1), 320)
+
+    al.has_been_released = False
+    assert al.is_in_force(date(2024, 4, 1), 322)
+    assert al.is_in_force(date(2024, 5, 1), 320)
+    assert al.is_in_force(date(2024, 5, 1), 321)
+    assert al.is_in_force(date(2024, 5, 1), 322)

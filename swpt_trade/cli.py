@@ -736,6 +736,7 @@ def roll_worker_turns(wait, quit_early):
             procedures.update_or_create_worker_turn(finished_turn)
 
         for worker_turn in procedures.get_pending_worker_turns():
+            current_ts = datetime.now(tz=timezone.utc)
             turn_id = worker_turn.turn_id
             phase = worker_turn.phase
             subphase = worker_turn.worker_turn_subphase
@@ -747,7 +748,16 @@ def roll_worker_turns(wait, quit_early):
             elif phase == 2 and subphase == 0:
                 run_phase2_subphase0(turn_id)
             elif phase == 2 and subphase == 5:
-                run_phase2_subphase5(turn_id)
+                phase_deadline = worker_turn.phase_deadline
+                cushion_interval = min(
+                    # We ensure that the cushion interval does not
+                    # exceed 10% of the time between the start of the
+                    # turn, and the phase deadline.
+                    current_app.config["APP_TURN_PHASE_CUSHION_PERIOD"],
+                    0.1 * (phase_deadline - worker_turn.started_at),
+                )
+                if current_ts > phase_deadline - cushion_interval:
+                    run_phase2_subphase5(turn_id)
             elif phase == 3 and subphase == 0:
                 run_phase3_subphase0(turn_id)
             else:  # pragma: no cover
