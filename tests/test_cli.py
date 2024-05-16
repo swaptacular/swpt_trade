@@ -1332,6 +1332,17 @@ def test_run_phase2_subphase5(
     )
     db.session.add(
         m.AccountLock(
+            creditor_id=123,
+            debtor_id=777,
+            turn_id=t1.turn_id,
+            collector_id=890,
+            has_been_released=False,
+            transfer_id=None,
+            amount=0,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
             creditor_id=456,
             debtor_id=777,
             turn_id=t1.turn_id,
@@ -1341,10 +1352,32 @@ def test_run_phase2_subphase5(
             amount=30000,
         )
     )
+    db.session.add(
+        m.AccountLock(
+            creditor_id=456,
+            debtor_id=666,
+            turn_id=t1.turn_id,
+            collector_id=789,
+            has_been_released=False,
+            transfer_id=None,
+            amount=50000,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
+            creditor_id=456,
+            debtor_id=888,
+            turn_id=t1.turn_id,
+            collector_id=890,
+            has_been_released=True,
+            transfer_id=2345,
+            amount=80000,
+        )
+    )
     db.session.commit()
 
     assert len(m.WorkerTurn.query.all()) == 1
-    assert len(m.AccountLock.query.all()) == 2
+    assert len(m.AccountLock.query.all()) == 5
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
@@ -1358,7 +1391,7 @@ def test_run_phase2_subphase5(
     assert wt.turn_id == t1.turn_id
     assert wt.phase == t1.phase
     assert wt.worker_turn_subphase == 10
-    assert len(m.AccountLock.query.all()) == 2
+    assert len(m.AccountLock.query.all()) == 5
 
     sos = m.SellOffer.query.all()
     sos.sort(key=lambda x: x.creditor_id)
