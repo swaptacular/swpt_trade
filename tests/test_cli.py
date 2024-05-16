@@ -1076,7 +1076,8 @@ def test_run_phase1_subphase0(
 def test_run_phase2_subphase0(
         mocker,
         app,
-        db_session, current_ts,
+        db_session,
+        current_ts,
         has_active_collectors,
 ):
     mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
@@ -1253,3 +1254,125 @@ def test_run_phase2_subphase0(
     assert acs[0].debtor_id == 999
     assert acs[0].collector_id == 0x0000010000000000
     assert acs[0].account_id == "TestCollectorAccountId"
+
+
+@pytest.mark.parametrize("has_sell_offers", [True, False])
+@pytest.mark.parametrize("has_buy_offers", [True, False])
+def test_run_phase2_subphase5(
+        mocker,
+        app,
+        db_session,
+        current_ts,
+        has_buy_offers,
+        has_sell_offers,
+):
+    mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.BID_COUNTER_THRESHOLD", new=1)
+
+    phase_deadline = current_ts + timedelta(minutes=2)
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        started_at=current_ts - timedelta(days=10000),
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=phase_deadline,
+        collection_deadline=current_ts + timedelta(days=200),
+    )
+    db.session.add(t1)
+    db.session.flush()
+
+    if has_sell_offers:
+        db.session.add(
+            m.SellOffer(
+                turn_id=t1.turn_id,
+                creditor_id=123,
+                debtor_id=666,
+                amount=10000,
+                collector_id=789,
+            )
+        )
+    if has_buy_offers:
+        db.session.add(
+            m.BuyOffer(
+                turn_id=t1.turn_id,
+                creditor_id=456,
+                debtor_id=777,
+                amount=30000,
+            )
+        )
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=2,
+        phase_deadline=phase_deadline,
+        collection_deadline=current_ts + timedelta(days=200),
+        worker_turn_subphase=5,
+    )
+    db.session.add(wt1)
+    db.session.flush()
+
+    db.session.add(
+        m.AccountLock(
+            creditor_id=123,
+            debtor_id=666,
+            turn_id=t1.turn_id,
+            collector_id=789,
+            has_been_released=False,
+            transfer_id=1234,
+            amount=-10000,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
+            creditor_id=456,
+            debtor_id=777,
+            turn_id=t1.turn_id,
+            collector_id=890,
+            has_been_released=False,
+            transfer_id=5678,
+            amount=30000,
+        )
+    )
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    assert len(m.AccountLock.query.all()) == 2
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wt = m.WorkerTurn.query.one()
+    assert wt.turn_id == t1.turn_id
+    assert wt.phase == t1.phase
+    assert wt.worker_turn_subphase == 10
+    assert len(m.AccountLock.query.all()) == 2
+
+    sos = m.SellOffer.query.all()
+    sos.sort(key=lambda x: x.creditor_id)
+    assert len(sos) == 1
+    assert sos[0].turn_id == t1.turn_id
+    assert sos[0].creditor_id == 123
+    assert sos[0].debtor_id == 666
+    assert sos[0].amount == 10000
+    assert sos[0].collector_id == 789
+
+    bos = m.BuyOffer.query.all()
+    bos.sort(key=lambda x: x.creditor_id)
+    assert len(bos) == 1
+    assert bos[0].turn_id == t1.turn_id
+    assert bos[0].creditor_id == 456
+    assert bos[0].debtor_id == 777
+    assert bos[0].amount == 30000
