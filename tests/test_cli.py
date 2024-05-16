@@ -1294,6 +1294,15 @@ def test_run_phase2_subphase5(
                 collector_id=789,
             )
         )
+        db.session.add(
+            m.SellOffer(
+                turn_id=t1.turn_id,
+                creditor_id=124,
+                debtor_id=666,
+                amount=10001,
+                collector_id=789,
+            )
+        )
     if has_buy_offers:
         db.session.add(
             m.BuyOffer(
@@ -1301,6 +1310,14 @@ def test_run_phase2_subphase5(
                 creditor_id=456,
                 debtor_id=777,
                 amount=30000,
+            )
+        )
+        db.session.add(
+            m.BuyOffer(
+                turn_id=t1.turn_id,
+                creditor_id=457,
+                debtor_id=777,
+                amount=30001,
             )
         )
 
@@ -1332,6 +1349,17 @@ def test_run_phase2_subphase5(
     )
     db.session.add(
         m.AccountLock(
+            creditor_id=124,
+            debtor_id=666,
+            turn_id=t1.turn_id,
+            collector_id=789,
+            has_been_released=False,
+            transfer_id=1235,
+            amount=-10001,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
             creditor_id=123,
             debtor_id=777,
             turn_id=t1.turn_id,
@@ -1350,6 +1378,17 @@ def test_run_phase2_subphase5(
             has_been_released=False,
             transfer_id=5678,
             amount=30000,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
+            creditor_id=457,
+            debtor_id=777,
+            turn_id=t1.turn_id,
+            collector_id=890,
+            has_been_released=False,
+            transfer_id=5679,
+            amount=30001,
         )
     )
     db.session.add(
@@ -1377,7 +1416,7 @@ def test_run_phase2_subphase5(
     db.session.commit()
 
     assert len(m.WorkerTurn.query.all()) == 1
-    assert len(m.AccountLock.query.all()) == 5
+    assert len(m.AccountLock.query.all()) == 7
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
@@ -1391,21 +1430,30 @@ def test_run_phase2_subphase5(
     assert wt.turn_id == t1.turn_id
     assert wt.phase == t1.phase
     assert wt.worker_turn_subphase == 10
-    assert len(m.AccountLock.query.all()) == 5
+    assert len(m.AccountLock.query.all()) == 7
 
     sos = m.SellOffer.query.all()
     sos.sort(key=lambda x: x.creditor_id)
-    assert len(sos) == 1
+    assert len(sos) == 2
     assert sos[0].turn_id == t1.turn_id
     assert sos[0].creditor_id == 123
     assert sos[0].debtor_id == 666
     assert sos[0].amount == 10000
     assert sos[0].collector_id == 789
+    assert sos[1].turn_id == t1.turn_id
+    assert sos[1].creditor_id == 124
+    assert sos[1].debtor_id == 666
+    assert sos[1].amount == 10001
+    assert sos[1].collector_id == 789
 
     bos = m.BuyOffer.query.all()
     bos.sort(key=lambda x: x.creditor_id)
-    assert len(bos) == 1
+    assert len(bos) == 2
     assert bos[0].turn_id == t1.turn_id
     assert bos[0].creditor_id == 456
     assert bos[0].debtor_id == 777
     assert bos[0].amount == 30000
+    assert bos[1].turn_id == t1.turn_id
+    assert bos[1].creditor_id == 457
+    assert bos[1].debtor_id == 777
+    assert bos[1].amount == 30001
