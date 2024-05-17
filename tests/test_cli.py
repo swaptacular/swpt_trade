@@ -2,6 +2,7 @@ import pytest
 import sqlalchemy
 from datetime import date, datetime, timezone, timedelta
 from unittest.mock import Mock
+from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
 from swpt_trade import models as m
@@ -1270,7 +1271,10 @@ def test_run_phase2_subphase5(
     mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
     mocker.patch("swpt_trade.run_turn_subphases.BID_COUNTER_THRESHOLD", new=1)
 
-    phase_deadline = current_ts + timedelta(minutes=2)
+    phase_deadline = (
+        current_ts
+        + current_app.config['APP_TURN_PHASE_CUSHION_PERIOD'] / 2
+    )
     t1 = m.Turn(
         base_debtor_info_locator="https://example.com/666",
         base_debtor_id=666,

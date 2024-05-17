@@ -204,6 +204,7 @@ def process_candidate_offer_signal(
                     amount=max(0, amount),
                     coordinator_request_id=coordinator_request_id,
                     collector_id=collector.collector_id,
+                    initiated_at=current_ts,
                 )
             )
 
