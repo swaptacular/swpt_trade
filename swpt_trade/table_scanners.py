@@ -2,7 +2,7 @@ from typing import TypeVar, Callable
 from datetime import datetime, timedelta, timezone
 from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
-from sqlalchemy.sql.expression import tuple_, and_, or_, null
+from sqlalchemy.sql.expression import tuple_, and_, or_, null, true
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorInfoDocument,
@@ -653,11 +653,17 @@ class AccountLocksScanner(TableScanner):
     columns = [
         AccountLock.creditor_id,
         AccountLock.debtor_id,
+        AccountLock.initiated_at,
+        AccountLock.has_been_released,
+        AccountLock.account_last_transfer_number,
     ]
 
     def __init__(self):
         super().__init__()
         self.sharding_realm = current_app.config["SHARDING_REALM"]
+        self.account_lock_max_interval = timedelta(
+            days=current_app.config["APP_ACCOUNT_LOCK_MAX_DAYS"]
+        )
 
     @property
     def blocks_per_query(self) -> int:
@@ -673,6 +679,8 @@ class AccountLocksScanner(TableScanner):
 
         if current_app.config["DELETE_PARENT_SHARD_RECORDS"]:
             self._delete_parent_shard_records(rows, current_ts)
+
+        self._delete_stale_records(rows, current_ts)
 
     def _delete_parent_shard_records(self, rows, current_ts):
         c = self.table.c
@@ -700,5 +708,50 @@ class AccountLocksScanner(TableScanner):
 
             for account_lock in to_delete:
                 db.session.delete(account_lock)
+
+            db.session.commit()
+
+    def _delete_stale_records(self, rows, current_ts):
+        c = self.table.c
+        c_creditor_id = c.creditor_id
+        c_debtor_id = c.debtor_id
+        c_initiated_at = c.initiated_at
+        c_has_been_released = c.has_been_released
+        c_account_last_transfer_number = c.account_last_transfer_number
+        cutoff_ts = current_ts - self.account_lock_max_interval
+
+        def is_stale(row) -> bool:
+            return (
+                row[c_initiated_at] < cutoff_ts
+                or (
+                    row[c_has_been_released]
+                    and row[c_account_last_transfer_number] is None
+                )
+            )
+
+        pks_to_delete = [
+            (row[c_creditor_id], row[c_debtor_id])
+            for row in rows
+            if is_stale(row)
+        ]
+        if pks_to_delete:
+            to_delete = (
+                AccountLock.query
+                .filter(self.pk.in_(pks_to_delete))
+                .filter(
+                    or_(
+                        AccountLock.initiated_at < cutoff_ts,
+                        and_(
+                            AccountLock.has_been_released == true(),
+                            AccountLock.account_last_transfer_number == null(),
+                        )
+                    )
+                )
+                .with_for_update(skip_locked=True)
+                .all()
+            )
+
+            for record in to_delete:
+                db.session.delete(record)
 
             db.session.commit()

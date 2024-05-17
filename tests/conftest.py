@@ -13,6 +13,7 @@ config_dict = {
     "TURN_PHASE2_DURATION": "0",
     "APP_ENABLE_CORS": True,
     "APP_DEBTOR_INFO_FETCH_BURST_COUNT": 1,
+    "APP_ACCOUNT_LOCK_MAX_DAYS": 365,
     "APP_SUPERUSER_SUBJECT_REGEX": "^creditors-superuser$",
     "APP_SUPERVISOR_SUBJECT_REGEX": "^creditors-supervisor$",
     "APP_CREDITOR_SUBJECT_REGEX": "^creditors:([0-9]+)$",
