@@ -4,7 +4,7 @@ from typing import TypeVar, Callable, List, Optional
 from datetime import datetime, timezone, date
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
-from swpt_trade.utils import calc_k, contain_principal_overflow
+from swpt_trade.utils import calc_k, calc_demurrage, contain_principal_overflow
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     MAX_INT32,
@@ -117,7 +117,6 @@ def mark_as_recently_needed_collector(
 def process_candidate_offer_signal(
         *,
         demurrage_rate: float,
-        min_trade_amount: int,
         turn_id: int,
         debtor_id: int,
         creditor_id: int,
@@ -139,7 +138,7 @@ def process_candidate_offer_signal(
 
     account_lock = (
         AccountLock.query
-        .filter(creditor_id=creditor_id, debtor_id=debtor_id)
+        .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
         .with_for_update()
         .one_or_none()
     )
@@ -165,20 +164,20 @@ def process_candidate_offer_signal(
     else:
         # a sell offer
         assert amount < 0
-        assert min_trade_amount > 0
         assert demurrage_rate > -100.0
-        k = calc_k(demurrage_rate)
-        t = (worker_turn.collection_deadline - current_ts).total_seconds()
-        worst_possible_demurrage = min(math.exp(k * t), 1.0)
+        worst_possible_demurrage = calc_demurrage(
+            demurrage_rate,
+            worker_turn.collection_deadline - current_ts,
+        )
         min_locked_amount = contain_principal_overflow(
-            math.ceil(min_trade_amount / worst_possible_demurrage)
+            math.ceil(worker_turn.min_trade_amount / worst_possible_demurrage)
         )
         max_locked_amount = contain_principal_overflow(
             math.ceil((-amount) / worst_possible_demurrage)
         )
 
     if max_locked_amount < min_locked_amount:
-        return
+        return  # pragma: no cover
 
     coordinator_request_id = db.session.scalar(cr_seq)
 
@@ -207,7 +206,7 @@ def process_candidate_offer_signal(
             )
             db.session.add(account_lock)
 
-    if account_lock.is_self_lock():
+    if account_lock.is_self_lock:
         # NOTE: In this case, a collector account is both the sender
         # and the recipient. This can happen if we want to trade
         # surpluses accumulated on collector accounts. Obviously, it

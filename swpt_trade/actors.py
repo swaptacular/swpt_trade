@@ -420,7 +420,6 @@ def _on_candidate_offer_signal(
 ) -> None:
     procedures.process_candidate_offer_signal(
         demurrage_rate=current_app.config["APP_MIN_DEMURRAGE_RATE"],
-        min_trade_amount=current_app.config["MIN_TRADE_AMOUNT"],
         turn_id=turn_id,
         debtor_id=debtor_id,
         creditor_id=creditor_id,

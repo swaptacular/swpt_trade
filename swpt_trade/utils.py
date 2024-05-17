@@ -117,3 +117,9 @@ def contain_principal_overflow(value: int) -> int:
 
 def calc_k(interest_rate: float) -> float:
     return math.log(1.0 + interest_rate / 100.0) / SECONDS_IN_YEAR
+
+
+def calc_demurrage(demurrage_rate: float, period: timedelta) -> float:
+    k = calc_k(demurrage_rate)
+    t = period.total_seconds()
+    return min(math.exp(k * t), 1.0)

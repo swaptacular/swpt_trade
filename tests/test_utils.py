@@ -12,6 +12,7 @@ from swpt_trade.utils import (
     u16_to_i16,
     contain_principal_overflow,
     calc_k,
+    calc_demurrage,
 )
 
 
@@ -152,3 +153,11 @@ def test_calc_k():
     assert abs(math.exp(calc_k(80.0) * SECONDS_IN_YEAR) - 1.8) < eps
     assert abs(math.exp(calc_k(-50.0) * SECONDS_IN_YEAR) - 0.5) < eps
     assert abs(math.exp(calc_k(-80.0) * SECONDS_IN_YEAR) - 0.2) < eps
+
+
+def test_calc_demurrage():
+    assert 0.94 < calc_demurrage(-50, timedelta(days=30)) < 0.95
+    assert 0.89 < calc_demurrage(-50, timedelta(days=60)) < 0.90
+    assert calc_demurrage(-50, timedelta(days=0)) == 1.0
+    assert calc_demurrage(50, timedelta(days=30)) == 1.0
+    assert calc_demurrage(-50, timedelta(days=-30)) == 1.0

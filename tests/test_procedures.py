@@ -16,12 +16,17 @@ from swpt_trade.models import (
     DiscoverDebtorSignal,
     ActivateCollectorSignal,
     ConfigureAccountSignal,
+    PrepareTransferSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
     RecentlyNeededCollector,
+    WorkerTurn,
+    AccountLock,
+    ActiveCollector,
     TS0,
     DATE0,
+    MAX_INT32,
 )
 
 
@@ -1348,3 +1353,226 @@ def test_try_to_compact_interest_rate_changes(db_session, current_ts):
     assert ircs[0].debtor_id == 777
     assert ircs[0].change_ts == current_ts
     assert ircs[0].interest_rate == 4.0
+
+
+@pytest.mark.parametrize("has_released_lock", [True, False])
+def test_process_candidate_offer_signal(
+        db_session,
+        current_ts,
+        has_released_lock,
+):
+    assert len(AccountLock.query.all()) == 0
+    assert len(PrepareTransferSignal.query.all()) == 0
+    assert len(WorkerTurn.query.all()) == 0
+
+    wt0 = WorkerTurn(
+        turn_id=0,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=5,
+    )
+    wt1 = WorkerTurn(
+        turn_id=1,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=5,
+    )
+    wt2 = WorkerTurn(
+        turn_id=2,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=5,
+    )
+    db_session.add(wt0)
+    db_session.add(wt1)
+    db_session.add(wt2)
+    db_session.add(
+        ActiveCollector(
+            debtor_id=666,
+            collector_id=999,
+            account_id="TestCollectorAccount999",
+        )
+    )
+    db_session.commit()
+
+    if has_released_lock:
+        db_session.add(
+            AccountLock(
+                creditor_id=777,
+                debtor_id=666,
+                turn_id=0,
+                collector_id=999,
+                has_been_released=True,
+                amount=80000,
+            )
+        )
+        db_session.commit()
+
+    # successful buyer lock
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=1,
+        creditor_id=777,
+        debtor_id=666,
+        amount=20000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    al = AccountLock.query.one()
+    assert al.creditor_id == 777
+    assert al.debtor_id == 666
+    assert al.turn_id == 1
+    assert al.amount == 20000
+    assert al.collector_id == 999
+    assert al.has_been_released is False
+    assert al.initiated_at >= current_ts
+    assert type(al.coordinator_request_id) is int
+    assert al.transfer_id is None
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+    pts = PrepareTransferSignal.query.one()
+    assert pts.creditor_id == 777
+    assert pts.coordinator_request_id == al.coordinator_request_id
+    assert pts.debtor_id == 666
+    assert pts.recipient == "TestCollectorAccount999"
+    assert pts.min_locked_amount == 0
+    assert pts.max_locked_amount == 0
+    assert pts.final_interest_rate_ts > current_ts + timedelta(days=1000)
+    assert pts.max_commit_delay == MAX_INT32
+
+    # already locked
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=2,
+        creditor_id=777,
+        debtor_id=666,
+        amount=30000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 1
+    al = AccountLock.query.one()
+    assert al.creditor_id == 777
+    assert al.debtor_id == 666
+    assert al.turn_id == 1
+    assert al.amount == 20000
+    assert al.collector_id == 999
+    assert al.has_been_released is False
+    assert al.initiated_at >= current_ts
+    assert type(al.coordinator_request_id) is int
+    assert al.transfer_id is None
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+    # no collectors
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=1,
+        creditor_id=777,
+        debtor_id=12345,
+        amount=30000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    assert len(AccountLock.query.all()) == 1
+    assert len(PrepareTransferSignal.query.all()) == 1
+
+    # successful seller lock
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=1,
+        creditor_id=888,
+        debtor_id=666,
+        amount=-30000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    als = AccountLock.query.all()
+    als.sort(key=lambda x: x.creditor_id)
+    assert len(als) == 2
+    assert als[0].creditor_id == 777
+    assert als[1].creditor_id == 888
+    assert als[1].debtor_id == 666
+    assert als[1].turn_id == 1
+    assert als[1].amount == 0  # not locked yet
+    assert als[1].collector_id == 999
+    assert als[1].has_been_released is False
+    assert als[1].initiated_at >= current_ts
+    assert type(als[1].coordinator_request_id) is int
+    assert als[1].coordinator_request_id != als[0].coordinator_request_id
+    assert als[1].transfer_id is None
+    assert als[1].committed_amount == 0
+    assert als[1].finalized_at is None
+    assert als[1].account_creation_date is None
+    assert als[1].account_last_transfer_number is None
+
+    ptss = PrepareTransferSignal.query.all()
+    ptss.sort(key=lambda x: x.creditor_id)
+    assert len(ptss) == 2
+    assert ptss[0].creditor_id == 777
+    assert ptss[1].creditor_id == 888
+    assert ptss[1].coordinator_request_id == als[1].coordinator_request_id
+    assert ptss[1].debtor_id == 666
+    assert ptss[1].recipient == "TestCollectorAccount999"
+    assert ptss[1].min_locked_amount > 1050
+    assert ptss[1].max_locked_amount > 31500
+    assert ptss[1].final_interest_rate_ts > current_ts + timedelta(days=1000)
+    assert ptss[1].max_commit_delay == MAX_INT32
+
+    # self-lock
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=1,
+        creditor_id=999,
+        debtor_id=666,
+        amount=-50000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 2
+    als = AccountLock.query.all()
+    als.sort(key=lambda x: x.creditor_id)
+    assert len(als) == 3
+    assert als[0].creditor_id == 777
+    assert als[1].creditor_id == 888
+    assert als[2].creditor_id == 999
+    assert als[2].debtor_id == 666
+    assert als[2].turn_id == 1
+    assert als[2].amount == -50000  # already locked
+    assert als[2].collector_id == 999
+    assert als[2].has_been_released is False
+    assert als[2].initiated_at >= current_ts
+    assert type(als[2].coordinator_request_id) is int
+    assert als[2].coordinator_request_id != als[0].coordinator_request_id
+    assert als[2].coordinator_request_id != als[1].coordinator_request_id
+    assert type(als[2].transfer_id) is int
+    assert als[2].committed_amount == 0
+    assert als[2].finalized_at is None
+    assert als[2].account_creation_date is None
+    assert als[2].account_last_transfer_number is None
