@@ -165,9 +165,9 @@ def process_candidate_offer_signal(
         # a sell offer
         assert amount < 0
         assert demurrage_rate > -100.0
+        assert worker_turn.min_trade_amount > 0
         worst_possible_demurrage = calc_demurrage(
-            demurrage_rate,
-            worker_turn.collection_deadline - current_ts,
+            demurrage_rate, worker_turn.collection_deadline - current_ts
         )
         min_locked_amount = contain_principal_overflow(
             math.ceil(worker_turn.min_trade_amount / worst_possible_demurrage)
