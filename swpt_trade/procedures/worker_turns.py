@@ -188,10 +188,10 @@ def process_candidate_offer_signal(
         account_lock.collector_id = collector.collector_id
         account_lock.initiated_at = current_ts
         account_lock.amount = max(0, amount)
+        account_lock.committed_amount = 0
         account_lock.has_been_released = False
         account_lock.transfer_id = None
         account_lock.finalized_at = None
-        account_lock.status_code = None
         account_lock.account_creation_date = None
         account_lock.account_last_transfer_number = None
     else:
@@ -201,10 +201,10 @@ def process_candidate_offer_signal(
                     creditor_id=creditor_id,
                     debtor_id=debtor_id,
                     turn_id=turn_id,
-                    amount=max(0, amount),
                     coordinator_request_id=coordinator_request_id,
                     collector_id=collector.collector_id,
                     initiated_at=current_ts,
+                    amount=max(0, amount),
                 )
             )
 

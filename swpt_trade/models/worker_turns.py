@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
-from sqlalchemy.sql.expression import null, or_, and_
+from sqlalchemy.sql.expression import null, false, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -99,24 +99,20 @@ class AccountLock(db.Model):
         ),
         nullable=False,
     )
+    committed_amount = db.Column(db.BigInteger, nullable=False, default=0)
     finalized_at = db.Column(db.TIMESTAMP(timezone=True))
-    status_code = db.Column(db.String)
     account_creation_date = db.Column(db.DATE)
     account_last_transfer_number = db.Column(db.BigInteger)
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
+        db.CheckConstraint(committed_amount >= 0),
+        db.CheckConstraint(or_(committed_amount == 0, finalized_at != null())),
+        db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
+        db.CheckConstraint(or_(amount >= 0, transfer_id != null())),
         db.CheckConstraint(
             or_(
-                and_(
-                    transfer_id == null(),
-                    amount >= 0,
-                    finalized_at == null(),
-                ),
-                and_(
-                    transfer_id != null(),
-                    amount != 0,
-                    or_(finalized_at != null(), status_code == null()),
-                ),
+                has_been_released == false(),
+                or_(transfer_id == null(), finalized_at != null()),
             )
         ),
         db.CheckConstraint(
@@ -133,6 +129,11 @@ class AccountLock(db.Model):
         ),
         db.ForeignKeyConstraint(["turn_id"], ["worker_turn.turn_id"]),
         db.Index("idx_lock_account_turn_id", turn_id),
+        db.Index(
+            "idx_lock_account_coordinator_request_id",
+            coordinator_request_id,
+            unique=True,
+        ),
         {
             "comment": (
                 "Represents an attempt to arrange the participation of a"

@@ -1415,6 +1415,7 @@ def test_run_phase2_subphase5(
             has_been_released=True,
             transfer_id=2345,
             amount=80000,
+            finalized_at=current_ts,
         )
     )
     db.session.commit()
