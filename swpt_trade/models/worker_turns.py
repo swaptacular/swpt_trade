@@ -144,7 +144,7 @@ class AccountLock(db.Model):
     )
 
     @property
-    def is_self_lock(self):  # pragma: no cover
+    def is_self_lock(self):
         return self.creditor_id == self.collector_id
 
     def is_in_force(self, current_acd: date, current_altn: int) -> bool:

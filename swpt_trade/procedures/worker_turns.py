@@ -196,28 +196,37 @@ def process_candidate_offer_signal(
         account_lock.account_last_transfer_number = None
     else:
         with db.retry_on_integrity_error():
-            db.session.add(
-                AccountLock(
-                    creditor_id=creditor_id,
-                    debtor_id=debtor_id,
-                    turn_id=turn_id,
-                    coordinator_request_id=coordinator_request_id,
-                    collector_id=collector.collector_id,
-                    initiated_at=current_ts,
-                    amount=max(0, amount),
-                )
+            account_lock = AccountLock(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                turn_id=turn_id,
+                coordinator_request_id=coordinator_request_id,
+                collector_id=collector.collector_id,
+                initiated_at=current_ts,
+                amount=max(0, amount),
             )
+            db.session.add(account_lock)
 
-    db.session.add(
-        PrepareTransferSignal(
-            creditor_id=creditor_id,
-            coordinator_request_id=coordinator_request_id,
-            debtor_id=debtor_id,
-            recipient=collector.account_id,
-            min_locked_amount=min_locked_amount,
-            max_locked_amount=max_locked_amount,
-            final_interest_rate_ts=T_INFINITY,
-            max_commit_delay=MAX_INT32,
-            inserted_at=current_ts,
+    if account_lock.is_self_lock():
+        # NOTE: In this case, a collector account is both the sender
+        # and the recipient. This can happen if we want to trade
+        # surpluses accumulated on collector accounts. Obviously, it
+        # does not make sense to attempt to prepare such a transfer.
+        # Instead, we pretend that the transfer has been successfully
+        # prepared.
+        account_lock.transfer_id = 0  # a made-up transfer ID
+        account_lock.amount = amount  # successfully locked the whole amount
+    else:
+        db.session.add(
+            PrepareTransferSignal(
+                creditor_id=creditor_id,
+                coordinator_request_id=coordinator_request_id,
+                debtor_id=debtor_id,
+                recipient=collector.account_id,
+                min_locked_amount=min_locked_amount,
+                max_locked_amount=max_locked_amount,
+                final_interest_rate_ts=T_INFINITY,
+                max_commit_delay=MAX_INT32,
+                inserted_at=current_ts,
+            )
         )
-    )
