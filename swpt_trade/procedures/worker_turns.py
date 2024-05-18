@@ -280,12 +280,21 @@ def process_rejected_account_lock_transfer(
         )
         .one_or_none()
     )
-    if lock and not lock.has_been_released:
+    if lock is None:
+        return False
+
+    if (
+            not lock.has_been_released
+            and lock.transfer_id is None
+            and lock.debtor_id == debtor_id
+            and lock.creditor_id == creditor_id
+    ):
+        # The current status is "initiated". Change it to "settled".
         lock.has_been_released = True
         lock.account_creation_date = None
         lock.account_last_transfer_number = None
 
-    return lock is not None
+    return True
 
 
 @atomic
@@ -326,11 +335,7 @@ def process_prepared_account_lock_transfer(
     except exc.NoResultFound:
         return False
 
-    if (
-            worker_turn.collection_deadline is None
-            or lock.debtor_id != debtor_id
-            or lock.creditor_id != creditor_id
-    ):
+    if lock.debtor_id != debtor_id or lock.creditor_id != creditor_id:
         # Normally, this should never happen.
         dismiss()
 
@@ -345,10 +350,8 @@ def process_prepared_account_lock_transfer(
             # If either the deadline or the demurrage rate is
             # inappropriate, change the status to "settled" and
             # dismiss the transfer.
-            if (
-                    deadline < worker_turn.collection_deadline
-                    or demurrage_rate < min_demurrage_rate
-            ):
+            min_deadline = worker_turn.collection_deadline or T_INFINITY
+            if deadline < min_deadline or demurrage_rate < min_demurrage_rate:
                 lock.finalized_at = datetime.now(tz=timezone.utc)
                 dismiss()
 
@@ -368,7 +371,6 @@ def process_prepared_account_lock_transfer(
                 if lock.commited_amount == 0:
                     dismiss()
                 else:
-                    transfer_note = ""  # TODO: generate a real note.
                     db.session.add(
                         FinalizeTransferSignal(
                             creditor_id=creditor_id,
