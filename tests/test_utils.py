@@ -4,6 +4,9 @@ from datetime import timedelta, datetime, timezone
 from swpt_trade.utils import (
     SECONDS_IN_DAY,
     SECONDS_IN_YEAR,
+    TT_BUYER,
+    TT_COLLECTOR,
+    TT_SELLER,
     parse_timedelta,
     can_start_new_turn,
     batched,
@@ -13,6 +16,8 @@ from swpt_trade.utils import (
     contain_principal_overflow,
     calc_k,
     calc_demurrage,
+    parse_transfer_note,
+    generate_transfer_note,
 )
 
 
@@ -161,3 +166,33 @@ def test_calc_demurrage():
     assert calc_demurrage(-50, timedelta(days=0)) == 1.0
     assert calc_demurrage(50, timedelta(days=30)) == 1.0
     assert calc_demurrage(-50, timedelta(days=-30)) == 1.0
+
+
+def test_parse_transfer_note():
+    assert (
+        parse_transfer_note("Trading session: a\nBuyer: b\n")
+        == (10, "Buyer", 11)
+    )
+    assert (
+        parse_transfer_note("Trading session: A\r\nBuyer: b\r\n")
+        == (10, "Buyer", 11)
+    )
+    assert (
+        parse_transfer_note("Trading session: a\r\nBuyer: B")
+        == (10, "Buyer", 11)
+    )
+    with pytest.raises(ValueError):
+        parse_transfer_note("")
+
+    assert (
+        parse_transfer_note(generate_transfer_note(123, TT_BUYER, 456))
+        == (123, TT_BUYER, 456)
+    )
+    assert (
+        parse_transfer_note(generate_transfer_note(123, TT_SELLER, 456))
+        == (123, TT_SELLER, 456)
+    )
+    assert (
+        parse_transfer_note(generate_transfer_note(123, TT_COLLECTOR, 456))
+        == (123, TT_COLLECTOR, 456)
+    )

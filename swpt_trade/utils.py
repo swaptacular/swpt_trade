@@ -1,15 +1,24 @@
 import re
 import math
+from typing import Tuple
 from hashlib import md5
 from datetime import datetime, timedelta, timezone
 from itertools import islice
 
 RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
+RE_TRANSFER_NOTE = re.compile(
+    r'^Trading session: ([0-9A-Fa-f]{1,16})\r?\n'
+    r'(Buyer|Collector|Seller): ([0-9A-Fa-f]{1,16})(?:\r?\n)?$'
+)
 DATETIME0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # 2024-01-01 is Monday.
 MIN_INT64 = -1 << 63
 MAX_INT64 = (1 << 63) - 1
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365.25 * SECONDS_IN_DAY
+
+TT_BUYER = "Buyer"
+TT_COLLECTOR = "Collector"
+TT_SELLER = "Seller"
 
 
 def parse_timedelta(s: str) -> timedelta:
@@ -123,3 +132,21 @@ def calc_demurrage(demurrage_rate: float, period: timedelta) -> float:
     k = calc_k(demurrage_rate)
     t = period.total_seconds()
     return min(math.exp(k * t), 1.0)
+
+
+def generate_transfer_note(
+        turn_id: int,
+        trader_type: str,
+        trader_id: int,
+) -> str:
+    return (
+        f"Trading session: {turn_id:016x}\n{trader_type}: {trader_id:016x}\n"
+    )
+
+
+def parse_transfer_note(s: str) -> Tuple[int, str, int]:
+    m = RE_TRANSFER_NOTE.fullmatch(s)
+    if m:
+        return int(m[1], 16), m[2], int(m[3], 16)
+
+    raise ValueError

@@ -143,6 +143,8 @@ class AccountLock(db.Model):
         },
     )
 
+    worker_turn = db.relationship("WorkerTurn")
+
     @property
     def is_self_lock(self):
         return self.creditor_id == self.collector_id

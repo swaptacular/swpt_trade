@@ -1579,7 +1579,7 @@ def test_process_candidate_offer_signal(
 
 
 @pytest.mark.parametrize("has_account_lock", [True, False])
-def test_reject_account_lock_transfer(
+def test_process_rejected_account_lock_transfer(
         db_session,
         current_ts,
         has_account_lock,
@@ -1616,13 +1616,14 @@ def test_reject_account_lock_transfer(
     else:
         coordinator_request_id = 0
 
-    p.reject_account_lock_transfer(
+    assert p.process_rejected_account_lock_transfer(
         coordinator_id=777,
         coordinator_request_id=coordinator_request_id,
         status_code="TEST",
         debtor_id=666,
         creditor_id=777,
-    )
+    ) == has_account_lock
+
     if has_account_lock:
         al = AccountLock.query.one()
         assert al.has_been_released

@@ -169,7 +169,7 @@ def _on_rejected_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.reject_account_lock_transfer(
+    procedures.process_rejected_account_lock_transfer(
         coordinator_id=coordinator_id,
         coordinator_request_id=coordinator_request_id,
         status_code=status_code,
@@ -194,22 +194,30 @@ def _on_prepared_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement!
-
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_prepared_agent_transfer_signal(
+    has_been_processed = procedures.process_prepared_account_lock_transfer(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         transfer_id=transfer_id,
         coordinator_id=coordinator_id,
         coordinator_request_id=coordinator_request_id,
         locked_amount=locked_amount,
-        recipient=recipient,
+        demurrage_rate=demurrage_rate,
+        deadline=deadline,
+        min_demurrage_rate=current_app.config["APP_MIN_DEMURRAGE_RATE"],
     )
+    if not has_been_processed:
+        procedures.dismiss_prepared_transfer(
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            transfer_id=transfer_id,
+            coordinator_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
 
 
 def _on_finalized_agent_transfer_signal(

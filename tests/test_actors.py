@@ -61,7 +61,6 @@ def test_on_account_update_signal(db_session, actors):
     )
 
 
-@pytest.mark.skip
 def test_on_prepared_agent_transfer_signal(db_session, actors):
     actors._on_prepared_agent_transfer_signal(
         debtor_id=D_ID,
@@ -73,6 +72,10 @@ def test_on_prepared_agent_transfer_signal(db_session, actors):
         locked_amount=1000,
         recipient=str(C_ID),
         prepared_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        demurrage_rate=-50,
+        deadline=datetime.now(tz=timezone.utc),
+        final_interest_rate_ts=datetime.now(tz=timezone.utc),
+        ts=datetime.now(tz=timezone.utc),
     )
 
 

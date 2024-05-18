@@ -3,12 +3,18 @@ import math
 from typing import TypeVar, Callable, List, Optional
 from datetime import datetime, timezone, date
 from sqlalchemy import select
-from sqlalchemy.orm import load_only
-from swpt_trade.utils import calc_demurrage, contain_principal_overflow
+from sqlalchemy.orm import exc, load_only, Load
+from swpt_trade.utils import (
+    calc_demurrage,
+    contain_principal_overflow,
+    generate_transfer_note,
+    TT_BUYER,
+)
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     MAX_INT32,
     T_INFINITY,
+    AGENT_TRANSFER_NOTE_FORMAT,
     cr_seq,
     Turn,
     WorkerTurn,
@@ -16,6 +22,7 @@ from swpt_trade.models import (
     ActiveCollector,
     AccountLock,
     PrepareTransferSignal,
+    FinalizeTransferSignal,
 )
 
 T = TypeVar("T")
@@ -232,17 +239,40 @@ def process_candidate_offer_signal(
 
 
 @atomic
-def reject_account_lock_transfer(
-    *,
-    coordinator_id: int,
-    coordinator_request_id: int,
-    status_code: str,
-    debtor_id: int,
-    creditor_id: int
+def dismiss_prepared_transfer(
+        *,
+        debtor_id: int,
+        creditor_id: int,
+        transfer_id: int,
+        coordinator_id: int,
+        coordinator_request_id: int,
+):
+    db.session.add(
+        FinalizeTransferSignal(
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            transfer_id=transfer_id,
+            coordinator_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+            committed_amount=0,
+            transfer_note_format="",
+            transfer_note="",
+        )
+    )
+
+
+@atomic
+def process_rejected_account_lock_transfer(
+        *,
+        coordinator_id: int,
+        coordinator_request_id: int,
+        status_code: str,
+        debtor_id: int,
+        creditor_id: int,
 ) -> bool:
     """Return `True` if a corresponding account lock has been found.
     """
-    account_lock = (
+    lock = (
         AccountLock.query
         .filter_by(
             creditor_id=coordinator_id,
@@ -250,9 +280,115 @@ def reject_account_lock_transfer(
         )
         .one_or_none()
     )
-    if account_lock and not account_lock.has_been_released:
-        account_lock.has_been_released = True
-        account_lock.account_creation_date = None
-        account_lock.account_last_transfer_number = None
+    if lock and not lock.has_been_released:
+        lock.has_been_released = True
+        lock.account_creation_date = None
+        lock.account_last_transfer_number = None
 
-    return account_lock is not None
+    return lock is not None
+
+
+@atomic
+def process_prepared_account_lock_transfer(
+        *,
+        debtor_id: int,
+        creditor_id: int,
+        transfer_id: int,
+        coordinator_id: int,
+        coordinator_request_id: int,
+        locked_amount: int,
+        demurrage_rate: float,
+        deadline: datetime,
+        min_demurrage_rate: float,
+) -> bool:
+    """Return `True` if a corresponding account lock has been found.
+    """
+    def dismiss():
+        dismiss_prepared_transfer(
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            transfer_id=transfer_id,
+            coordinator_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
+
+    query = (
+        db.session.query(AccountLock, WorkerTurn)
+        .join(AccountLock.worker_turn)
+        .filter(
+            AccountLock.creditor_id == coordinator_id,
+            AccountLock.coordinator_request_id == coordinator_request_id,
+        )
+        .options(Load(WorkerTurn).load_only(WorkerTurn.collection_deadline))
+    )
+    try:
+        lock, worker_turn = query.one()
+    except exc.NoResultFound:
+        return False
+
+    if (
+            worker_turn.collection_deadline is None
+            or lock.debtor_id != debtor_id
+            or lock.creditor_id != creditor_id
+    ):
+        # Normally, this should never happen.
+        dismiss()
+
+    else:
+        if not lock.has_been_released and lock.transfer_id is None:
+            # The current status is "initiated". Change it to "prepared".
+            assert lock.finalized_at is None
+            assert lock.committed_amount == 0
+            lock.transfer_id = transfer_id
+            lock.amount = lock.amount or (-locked_amount)
+
+            # If either the deadline or the demurrage rate is
+            # inappropriate, change the status to "settled" and
+            # dismiss the transfer.
+            if (
+                    deadline < worker_turn.collection_deadline
+                    or demurrage_rate < min_demurrage_rate
+            ):
+                lock.finalized_at = datetime.now(tz=timezone.utc)
+                dismiss()
+
+        elif not lock.has_been_released and lock.finalized_at is None:
+            # The current status is "prepared". Leave it as it is.
+            if lock.transfer_id != transfer_id:
+                dismiss()
+
+        else:
+            # The current status is "settled". Leave it as it is.
+            if lock.transfer_id != transfer_id:
+                dismiss()
+
+            elif lock.finalized_at is not None:
+                # Send the already sent "FinalizeTransfer" message
+                # again. (The "ts" field is the only difference.)
+                if lock.commited_amount == 0:
+                    dismiss()
+                else:
+                    transfer_note = ""  # TODO: generate a real note.
+                    db.session.add(
+                        FinalizeTransferSignal(
+                            creditor_id=creditor_id,
+                            debtor_id=debtor_id,
+                            transfer_id=transfer_id,
+                            coordinator_id=coordinator_id,
+                            coordinator_request_id=coordinator_request_id,
+                            committed_amount=lock.commited_amount,
+                            transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
+                            transfer_note=generate_transfer_note(
+                                lock.turn_id, TT_BUYER, lock.collector_id
+                            ),
+                        )
+                    )
+
+            else:
+                # Normally, this should never happen.
+                assert lock.transfer_id == transfer_id
+                assert lock.finalized_at is None
+                assert lock.has_been_released
+                dismiss()
+
+    return True
