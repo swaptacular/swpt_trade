@@ -117,10 +117,7 @@ class AccountLock(db.Model):
         ),
         db.CheckConstraint(
             or_(
-                and_(
-                    account_creation_date == null(),
-                    account_last_transfer_number == null(),
-                ),
+                has_been_released == false(),
                 and_(
                     account_creation_date != null(),
                     account_last_transfer_number != null(),
@@ -149,15 +146,14 @@ class AccountLock(db.Model):
     def is_self_lock(self):
         return self.creditor_id == self.collector_id
 
-    def is_in_force(self, current_acd: date, current_altn: int) -> bool:
-        acd = self.account_creation_date
-        altn = self.account_last_transfer_number
-
+    def is_in_force(self, acd: date, altn: int) -> bool:
         return not (
             self.has_been_released
             and (
-                (acd is None and altn is None)
-                or (acd < current_acd)
-                or (acd == current_acd and altn <= current_altn)
+                self.account_creation_date < acd
+                or (
+                    self.account_creation_date == acd
+                    and self.account_last_transfer_number <= altn
+                )
             )
         )

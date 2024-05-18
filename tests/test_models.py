@@ -323,11 +323,6 @@ def test_account_lock_is_in_force(current_ts):
     assert not al.is_in_force(date(2024, 5, 1), 321)
     assert not al.is_in_force(date(2024, 5, 1), 322)
 
-    al.account_creation_date = None
-    al.account_last_transfer_number = None
-    assert not al.is_in_force(date(2024, 4, 1), 322)
-    assert not al.is_in_force(date(2024, 5, 1), 320)
-
     al.has_been_released = False
     assert al.is_in_force(date(2024, 4, 1), 322)
     assert al.is_in_force(date(2024, 5, 1), 320)

@@ -1476,6 +1476,8 @@ def test_run_phase2_subphase5(
             transfer_id=2345,
             amount=80000,
             finalized_at=current_ts,
+            account_creation_date=date(2000, 1, 1),
+            account_last_transfer_number=123,
         )
     )
     db.session.commit()

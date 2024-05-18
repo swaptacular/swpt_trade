@@ -1425,6 +1425,8 @@ def test_process_candidate_offer_signal(
                 collector_id=999,
                 has_been_released=True,
                 amount=80000,
+                account_creation_date=date(2000, 1, 1),
+                account_last_transfer_number=12345,
             )
         )
         db_session.commit()
