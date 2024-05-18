@@ -289,10 +289,8 @@ def process_rejected_account_lock_transfer(
             and lock.debtor_id == debtor_id
             and lock.creditor_id == creditor_id
     ):
-        # The current status is "initiated". Change it to "settled".
-        lock.has_been_released = True
-        lock.account_creation_date = None
-        lock.account_last_transfer_number = None
+        # The current status is "initiated". Remove the account lock.
+        db.session.delete(lock)
 
     return True
 

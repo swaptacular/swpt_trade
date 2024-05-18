@@ -1624,10 +1624,4 @@ def test_process_rejected_account_lock_transfer(
         creditor_id=777,
     ) == has_account_lock
 
-    if has_account_lock:
-        al = AccountLock.query.one()
-        assert al.has_been_released
-        assert al.account_creation_date is None
-        assert al.account_last_transfer_number is None
-    else:
-        assert len(AccountLock.query.all()) == 0
+    assert len(AccountLock.query.all()) == 0
