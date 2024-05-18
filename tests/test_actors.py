@@ -76,7 +76,6 @@ def test_on_prepared_agent_transfer_signal(db_session, actors):
     )
 
 
-@pytest.mark.skip
 def test_on_rejected_agent_transfer_signal(db_session, actors):
     actors._on_rejected_agent_transfer_signal(
         coordinator_type="agent",
@@ -86,6 +85,7 @@ def test_on_rejected_agent_transfer_signal(db_session, actors):
         total_locked_amount=0,
         debtor_id=D_ID,
         creditor_id=m.ROOT_CREDITOR_ID,
+        ts=datetime.now(tz=timezone.utc),
     )
 
 

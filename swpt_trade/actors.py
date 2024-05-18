@@ -164,18 +164,15 @@ def _on_rejected_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement!
-
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_rejected_agent_transfer_signal(
+    procedures.reject_account_lock_transfer(
         coordinator_id=coordinator_id,
         coordinator_request_id=coordinator_request_id,
         status_code=status_code,
-        total_locked_amount=total_locked_amount,
         debtor_id=debtor_id,
         creditor_id=creditor_id,
     )

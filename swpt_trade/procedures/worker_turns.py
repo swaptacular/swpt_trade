@@ -4,7 +4,7 @@ from typing import TypeVar, Callable, List, Optional
 from datetime import datetime, timezone, date
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
-from swpt_trade.utils import calc_k, calc_demurrage, contain_principal_overflow
+from swpt_trade.utils import calc_demurrage, contain_principal_overflow
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     MAX_INT32,
@@ -229,3 +229,30 @@ def process_candidate_offer_signal(
                 inserted_at=current_ts,
             )
         )
+
+
+@atomic
+def reject_account_lock_transfer(
+    *,
+    coordinator_id: int,
+    coordinator_request_id: int,
+    status_code: str,
+    debtor_id: int,
+    creditor_id: int
+) -> bool:
+    """Return `True` if a corresponding account lock has been found.
+    """
+    account_lock = (
+        AccountLock.query
+        .filter_by(
+            creditor_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
+        .one_or_none()
+    )
+    if account_lock and not account_lock.has_been_released:
+        account_lock.has_been_released = True
+        account_lock.account_creation_date = None
+        account_lock.account_last_transfer_number = None
+
+    return account_lock is not None

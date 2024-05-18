@@ -1576,3 +1576,57 @@ def test_process_candidate_offer_signal(
     assert als[2].finalized_at is None
     assert als[2].account_creation_date is None
     assert als[2].account_last_transfer_number is None
+
+
+@pytest.mark.parametrize("has_account_lock", [True, False])
+def test_reject_account_lock_transfer(
+        db_session,
+        current_ts,
+        has_account_lock,
+):
+    wt = WorkerTurn(
+        turn_id=0,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=5,
+    )
+    db_session.add(wt)
+    db_session.commit()
+
+    if has_account_lock:
+        al = AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=0,
+            collector_id=999,
+            has_been_released=False,
+            amount=0,
+        )
+        db_session.add(al)
+        db_session.flush()
+        coordinator_request_id = al.coordinator_request_id
+        db_session.commit()
+    else:
+        coordinator_request_id = 0
+
+    p.reject_account_lock_transfer(
+        coordinator_id=777,
+        coordinator_request_id=coordinator_request_id,
+        status_code="TEST",
+        debtor_id=666,
+        creditor_id=777,
+    )
+    if has_account_lock:
+        al = AccountLock.query.one()
+        assert al.has_been_released
+        assert al.account_creation_date is None
+        assert al.account_last_transfer_number is None
+    else:
+        assert len(AccountLock.query.all()) == 0
