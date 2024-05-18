@@ -129,6 +129,8 @@ def _on_account_transfer_signal(
     *args,
     **kwargs
 ) -> None:
+    # TODO: implement!
+
     procedures.process_account_transfer_signal(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
@@ -162,6 +164,8 @@ def _on_rejected_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
+    # TODO: implement!
+
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
@@ -193,6 +197,8 @@ def _on_prepared_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
+    # TODO: implement!
+
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
@@ -224,6 +230,8 @@ def _on_finalized_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
+    # TODO: implement!
+
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
