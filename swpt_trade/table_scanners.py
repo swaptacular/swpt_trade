@@ -2,7 +2,7 @@ from typing import TypeVar, Callable
 from datetime import datetime, timedelta, timezone
 from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
-from sqlalchemy.sql.expression import tuple_, and_, or_, null, true
+from sqlalchemy.sql.expression import tuple_, and_, or_, null
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DebtorInfoDocument,
@@ -654,8 +654,6 @@ class AccountLocksScanner(TableScanner):
         AccountLock.creditor_id,
         AccountLock.debtor_id,
         AccountLock.initiated_at,
-        AccountLock.has_been_released,
-        AccountLock.account_last_transfer_number,
     ]
 
     def __init__(self):
@@ -716,18 +714,10 @@ class AccountLocksScanner(TableScanner):
         c_creditor_id = c.creditor_id
         c_debtor_id = c.debtor_id
         c_initiated_at = c.initiated_at
-        c_has_been_released = c.has_been_released
-        c_account_last_transfer_number = c.account_last_transfer_number
         cutoff_ts = current_ts - self.account_lock_max_interval
 
         def is_stale(row) -> bool:
-            return (
-                row[c_initiated_at] < cutoff_ts
-                or (
-                    row[c_has_been_released]
-                    and row[c_account_last_transfer_number] is None
-                )
-            )
+            return row[c_initiated_at] < cutoff_ts
 
         pks_to_delete = [
             (row[c_creditor_id], row[c_debtor_id])
@@ -738,15 +728,7 @@ class AccountLocksScanner(TableScanner):
             to_delete = (
                 AccountLock.query
                 .filter(self.pk.in_(pks_to_delete))
-                .filter(
-                    or_(
-                        AccountLock.initiated_at < cutoff_ts,
-                        and_(
-                            AccountLock.has_been_released == true(),
-                            AccountLock.account_last_transfer_number == null(),
-                        )
-                    )
-                )
+                .filter(AccountLock.initiated_at < cutoff_ts)
                 .with_for_update(skip_locked=True)
                 .all()
             )

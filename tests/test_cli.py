@@ -580,24 +580,14 @@ def test_delete_stale_account_locks(app, db_session, current_ts):
         account_creation_date=date(2024, 1, 1),
         account_last_transfer_number=789,
     )
-    al3 = m.AccountLock(
-        creditor_id=888,
-        debtor_id=123,
-        turn_id=1,
-        collector_id=789,
-        amount=0,
-        initiated_at=current_ts,
-        has_been_released=True,
-    )
     db.session.add(al1)
     db.session.add(al2)
-    db.session.add(al3)
     db.session.commit()
 
     with db.engine.connect() as conn:
         conn.execute(sqlalchemy.text("ANALYZE account_lock"))
 
-    assert len(m.AccountLock.query.all()) == 3
+    assert len(m.AccountLock.query.all()) == 2
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[

@@ -289,7 +289,7 @@ def process_rejected_account_lock_transfer(
             and lock.debtor_id == debtor_id
             and lock.creditor_id == creditor_id
     ):
-        # The current status is "initiated". Remove the account lock.
+        # The current status is "initiated". Delete the account lock.
         db.session.delete(lock)
 
     return True
@@ -346,8 +346,8 @@ def process_prepared_account_lock_transfer(
             lock.amount = lock.amount or (-locked_amount)
 
             # If either the deadline or the demurrage rate is
-            # inappropriate, change the status to "settled" and
-            # dismiss the transfer.
+            # inappropriate, change the status directly to "settled"
+            # and dismiss the transfer.
             min_deadline = worker_turn.collection_deadline or T_INFINITY
             if deadline < min_deadline or demurrage_rate < min_demurrage_rate:
                 lock.finalized_at = datetime.now(tz=timezone.utc)
@@ -363,9 +363,8 @@ def process_prepared_account_lock_transfer(
             if lock.transfer_id != transfer_id:
                 dismiss()
 
-            elif lock.finalized_at is not None:
-                # Send the already sent "FinalizeTransfer" message
-                # again. (The "ts" field is the only difference.)
+            else:
+                assert lock.finalized_at is not None
                 if lock.commited_amount == 0:
                     dismiss()
                 else:
@@ -383,12 +382,5 @@ def process_prepared_account_lock_transfer(
                             ),
                         )
                     )
-
-            else:
-                # Normally, this should never happen.
-                assert lock.transfer_id == transfer_id
-                assert lock.finalized_at is None
-                assert lock.has_been_released
-                dismiss()
 
     return True
