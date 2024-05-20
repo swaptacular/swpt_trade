@@ -8,7 +8,6 @@ from swpt_trade.utils import (
     TT_BUYER,
     TT_COLLECTOR,
     TT_SELLER,
-    TRADER_TYPES,
     parse_timedelta,
     can_start_new_turn,
     batched,
