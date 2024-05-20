@@ -7,12 +7,15 @@ from swpt_trade.utils import (
     TT_BUYER,
     TT_COLLECTOR,
     TT_SELLER,
+    TRADER_TYPES,
     parse_timedelta,
     can_start_new_turn,
     batched,
     calc_hash,
     i16_to_u16,
     u16_to_i16,
+    i32_to_u32,
+    u32_to_i32,
     contain_principal_overflow,
     calc_k,
     calc_demurrage,
@@ -139,6 +142,32 @@ def test_u16_to_i16():
         u16_to_i16(0x10000)
 
 
+def test_i32_to_u32():
+    assert i32_to_u32(-0x80000000) == 0x80000000
+    assert i32_to_u32(-0x7fffffff) == 0x80000001
+    assert i32_to_u32(-1) == 0xffffffff
+    assert i32_to_u32(1) == 0x00000001
+    assert i32_to_u32(0x7fffffff) == 0x7fffffff
+
+    with pytest.raises(ValueError):
+        i32_to_u32(0x80000000)
+    with pytest.raises(ValueError):
+        i32_to_u32(-0x80000001)
+
+
+def test_u32_to_i32():
+    assert u32_to_i32(0x80000000) == -0x80000000
+    assert u32_to_i32(0x80000001) == -0x7fffffff
+    assert u32_to_i32(0xffffffff) == -1
+    assert u32_to_i32(0x00000001) == 1
+    assert u32_to_i32(0x7fffffff) == 0x7fffffff
+
+    with pytest.raises(ValueError):
+        u32_to_i32(-1)
+    with pytest.raises(ValueError):
+        u32_to_i32(0x100000000)
+
+
 def test_contain_principal_overflow():
     assert contain_principal_overflow(0) == 0
     assert contain_principal_overflow(1) == 1
@@ -168,31 +197,48 @@ def test_calc_demurrage():
     assert calc_demurrage(-50, timedelta(days=-30)) == 1.0
 
 
+@pytest.mark.parametrize("turn_id", [0, 1, -1, 2147483647, -2147483648])
+@pytest.mark.parametrize("trader_type", [TT_BUYER, TT_COLLECTOR, TT_SELLER])
+@pytest.mark.parametrize(
+    "trader_id", [0, 1, -1, 9223372036854775807, -9223372036854775808]
+)
+def test_generate_and_parse_transfer_note(trader_type, turn_id, trader_id):
+    s = generate_transfer_note(turn_id, trader_type, trader_id)
+    assert parse_transfer_note(s) == (turn_id, trader_type, trader_id)
+
+
+def test_generate_transfer_note_failure():
+    for params in [
+            (2147483648, TT_BUYER, 0),
+            (-2147483649, TT_BUYER, 0),
+            (0, TT_BUYER, 9223372036854775808),
+            (0, TT_BUYER, -9223372036854775809),
+            (0, "INVALID", 0),
+    ]:
+        with pytest.raises(ValueError):
+            generate_transfer_note(*params)
+
+
 def test_parse_transfer_note():
     assert (
-        parse_transfer_note("Trading session: a\nBuyer: b\n")
-        == (10, "Buyer", 11)
+        parse_transfer_note("Trading session: 1\nBuyer: b\n")
+        == (1, "Buyer", 11)
     )
     assert (
-        parse_transfer_note("Trading session: A\r\nBuyer: b\r\n")
-        == (10, "Buyer", 11)
+        parse_transfer_note("Trading session: 4294967295\r\nBuyer: B\r\n")
+        == (-1, "Buyer", 11)
     )
     assert (
-        parse_transfer_note("Trading session: a\r\nBuyer: B")
-        == (10, "Buyer", 11)
+        parse_transfer_note("Trading session: 0\r\nBuyer: Ffffffffffffffff")
+        == (0, "Buyer", -1)
     )
     with pytest.raises(ValueError):
         parse_transfer_note("")
-
-    assert (
-        parse_transfer_note(generate_transfer_note(123, TT_BUYER, 456))
-        == (123, TT_BUYER, 456)
-    )
-    assert (
-        parse_transfer_note(generate_transfer_note(123, TT_SELLER, 456))
-        == (123, TT_SELLER, 456)
-    )
-    assert (
-        parse_transfer_note(generate_transfer_note(123, TT_COLLECTOR, 456))
-        == (123, TT_COLLECTOR, 456)
-    )
+    with pytest.raises(ValueError):
+        parse_transfer_note("Trading session: 0\nBuyer: 0Ffffffffffffffff\n")
+    with pytest.raises(ValueError):
+        parse_transfer_note("Trading session: 0\nBuyer: -0fffffffffffffff\n")
+    with pytest.raises(ValueError):
+        parse_transfer_note("Trading session: -1\nBuyer: f\n")
+    with pytest.raises(ValueError):
+        parse_transfer_note("Trading session: 1\nINVALID: 1\n")

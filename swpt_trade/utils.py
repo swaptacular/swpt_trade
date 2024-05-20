@@ -4,6 +4,7 @@ from typing import Tuple
 from hashlib import md5
 from datetime import datetime, timedelta, timezone
 from itertools import islice
+from swpt_pythonlib.utils import i64_to_u64, u64_to_i64
 
 RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
 RE_TRANSFER_NOTE = re.compile(
@@ -19,6 +20,7 @@ SECONDS_IN_YEAR = 365.25 * SECONDS_IN_DAY
 TT_BUYER = "Buyer"
 TT_COLLECTOR = "Collector"
 TT_SELLER = "Seller"
+TRADER_TYPES = set([TT_BUYER, TT_COLLECTOR, TT_SELLER])
 
 
 def parse_timedelta(s: str) -> timedelta:
@@ -116,6 +118,26 @@ def u16_to_i16(value: int) -> int:
     return value - 0x10000
 
 
+def i32_to_u32(value: int) -> int:
+    """Convert a signed 32-bit integer to unsigned 32-bit integer.
+    """
+    if value > 0x7fffffff or value < -0x80000000:
+        raise ValueError()
+    if value >= 0:
+        return value
+    return value + 0x100000000
+
+
+def u32_to_i32(value: int) -> int:
+    """Convert an unsigned 32-bit integer to a signed 32-bit integer.
+    """
+    if value > 0xffffffff or value < 0:
+        raise ValueError()
+    if value <= 0x7fffffff:
+        return value
+    return value - 0x100000000
+
+
 def contain_principal_overflow(value: int) -> int:
     if value <= MIN_INT64:
         return -MAX_INT64
@@ -139,14 +161,18 @@ def generate_transfer_note(
         trader_type: str,
         trader_id: int,
 ) -> str:
+    if trader_type not in TRADER_TYPES:
+        raise ValueError
+
     return (
-        f"Trading session: {turn_id:016x}\n{trader_type}: {trader_id:016x}\n"
+        f"Trading session: {i32_to_u32(turn_id)}\n"
+        f"{trader_type}: {i64_to_u64(trader_id):x}\n"
     )
 
 
 def parse_transfer_note(s: str) -> Tuple[int, str, int]:
     m = RE_TRANSFER_NOTE.fullmatch(s)
     if m:
-        return int(m[1], 16), m[2], int(m[3], 16)
+        return u32_to_i32(int(m[1])), m[2], u64_to_i64(int(m[3], 16))
 
     raise ValueError
