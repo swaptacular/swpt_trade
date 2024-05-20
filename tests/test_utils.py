@@ -221,6 +221,12 @@ def test_generate_transfer_note_failure():
             generate_transfer_note(*params)
 
 
+def test_transfer_note_max_length():
+    tt = sorted([TT_BUYER, TT_COLLECTOR, TT_SELLER], key=lambda x: len(x))[0]
+    s = generate_transfer_note(-1, tt, -1)
+    assert len(s.encode('utf-8')) <= 150
+
+
 def test_parse_transfer_note():
     assert (
         parse_transfer_note("Trading session: 1\nBuyer: b\n")
