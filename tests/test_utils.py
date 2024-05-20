@@ -1,6 +1,7 @@
 import pytest
 import math
 from datetime import timedelta, datetime, timezone
+from flask import current_app
 from swpt_trade.utils import (
     SECONDS_IN_DAY,
     SECONDS_IN_YEAR,
@@ -221,10 +222,11 @@ def test_generate_transfer_note_failure():
             generate_transfer_note(*params)
 
 
-def test_transfer_note_max_length():
+def test_transfer_note_max_length(app):
     tt = sorted([TT_BUYER, TT_COLLECTOR, TT_SELLER], key=lambda x: len(x))[0]
     s = generate_transfer_note(-1, tt, -1)
-    assert len(s.encode('utf-8')) <= 150
+    min_bytes = current_app.config["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
+    assert len(s.encode('utf-8')) <= min_bytes
 
 
 def test_parse_transfer_note():
