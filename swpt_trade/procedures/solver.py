@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, List, Iterable, Tuple
+from typing import TypeVar, Callable, Sequence, List, Iterable, Tuple
 from random import Random
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, insert, text
@@ -41,7 +41,7 @@ def start_new_turn_if_possible(
         base_debtor_id: int,
         max_distance_to_base: int,
         min_trade_amount: int,
-) -> List[Turn]:
+) -> Sequence[Turn]:
     current_ts = datetime.now(tz=timezone.utc)
     db.session.execute(
         text("LOCK TABLE turn IN SHARE ROW EXCLUSIVE MODE"),
@@ -187,7 +187,7 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
 
 
 @atomic
-def get_unfinished_turns() -> List[Turn]:
+def get_unfinished_turns() -> Sequence[Turn]:
     return (
         Turn.query
         .filter(Turn.phase < 4)
@@ -196,7 +196,7 @@ def get_unfinished_turns() -> List[Turn]:
 
 
 @atomic
-def get_turns_by_ids(turn_ids: List[int]) -> List[Turn]:
+def get_turns_by_ids(turn_ids: List[int]) -> Sequence[Turn]:
     return (
         Turn.query
         .filter(Turn.turn_id.in_(turn_ids))
@@ -210,7 +210,7 @@ def get_pristine_collectors(
         hash_mask: int,
         hash_prefix: int,
         max_count: int = None,
-) -> List[Tuple[int, int]]:
+) -> Sequence[Tuple[int, int]]:
     query = (
         db.session.query(
             CollectorAccount.debtor_id, CollectorAccount.collector_id

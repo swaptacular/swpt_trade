@@ -195,6 +195,8 @@ def test_calc_demurrage():
     assert calc_demurrage(-50, timedelta(days=0)) == 1.0
     assert calc_demurrage(50, timedelta(days=30)) == 1.0
     assert calc_demurrage(-50, timedelta(days=-30)) == 1.0
+    assert calc_demurrage(-99.99999999999, timedelta(days=-30)) == 0.0
+    assert calc_demurrage(-100, timedelta(days=-30)) == 0.0
 
 
 @pytest.mark.parametrize("turn_id", [0, 1, -1, 2147483647, -2147483648])

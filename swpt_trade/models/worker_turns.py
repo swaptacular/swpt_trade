@@ -91,11 +91,10 @@ class AccountLock(db.Model):
         db.BigInteger,
         comment=(
             "Can be negative or zero (the trader wants to sell), or positive"
-            " (the trader wants to buy). If the value is negative, that"
-            " amount is guaranteed to be available up until the turn's"
-            " `collection_deadline` has been reached. When selling, the amount"
-            " is calculated by reducing the locked amount in accordance with"
-            " the `demurrage_rate`."
+            " (the trader wants to buy). When selling, and the `transfer_id`"
+            " column is being set to a non-NULL value, the amount will be"
+            " re-calculated to be equal to the locked amount reduced in"
+            " accordance with the effective demurrage rate."
         ),
         nullable=False,
     )
@@ -108,7 +107,6 @@ class AccountLock(db.Model):
         db.CheckConstraint(committed_amount >= 0),
         db.CheckConstraint(or_(committed_amount == 0, finalized_at != null())),
         db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
-        db.CheckConstraint(or_(amount >= 0, transfer_id != null())),
         db.CheckConstraint(
             or_(
                 has_been_released == false(),

@@ -151,6 +151,9 @@ def calc_k(interest_rate: float) -> float:
 
 
 def calc_demurrage(demurrage_rate: float, period: timedelta) -> float:
+    if demurrage_rate < -99.9999:
+        return 0.0
+
     k = calc_k(demurrage_rate)
     t = period.total_seconds()
     return min(math.exp(k * t), 1.0)

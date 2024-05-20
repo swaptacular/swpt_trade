@@ -1,6 +1,6 @@
 import random
 import math
-from typing import TypeVar, Callable, List, Optional
+from typing import TypeVar, Callable, Sequence, Optional
 from datetime import datetime, timezone, date
 from sqlalchemy import select
 from sqlalchemy.orm import exc, load_only, Load
@@ -70,7 +70,7 @@ def update_or_create_worker_turn(turn: Turn) -> None:
 
 
 @atomic
-def get_unfinished_worker_turn_ids() -> List[int]:
+def get_unfinished_worker_turn_ids() -> Sequence[int]:
     return (
         db.session.execute(
             select(WorkerTurn.turn_id)
@@ -82,7 +82,7 @@ def get_unfinished_worker_turn_ids() -> List[int]:
 
 
 @atomic
-def get_pending_worker_turns() -> List[WorkerTurn]:
+def get_pending_worker_turns() -> Sequence[WorkerTurn]:
     return (
         WorkerTurn.query
         .filter(WorkerTurn.worker_turn_subphase < 10)
@@ -193,7 +193,7 @@ def process_candidate_offer_signal(
         account_lock.coordinator_request_id = coordinator_request_id
         account_lock.collector_id = collector.collector_id
         account_lock.initiated_at = current_ts
-        account_lock.amount = max(0, amount)
+        account_lock.amount = amount
         account_lock.committed_amount = 0
         account_lock.has_been_released = False
         account_lock.transfer_id = None
@@ -209,7 +209,7 @@ def process_candidate_offer_signal(
                 coordinator_request_id=coordinator_request_id,
                 collector_id=collector.collector_id,
                 initiated_at=current_ts,
-                amount=max(0, amount),
+                amount=amount,
             )
             db.session.add(account_lock)
 
@@ -319,6 +319,7 @@ def process_prepared_account_lock_transfer(
             coordinator_request_id=coordinator_request_id,
         )
 
+    current_ts = datetime.now(tz=timezone.utc)
     query = (
         db.session.query(AccountLock, WorkerTurn)
         .join(AccountLock.worker_turn)
@@ -343,13 +344,28 @@ def process_prepared_account_lock_transfer(
             assert lock.finalized_at is None
             assert lock.committed_amount == 0
             lock.transfer_id = transfer_id
-            lock.amount = lock.amount or (-locked_amount)
+            collection_end = worker_turn.collection_deadline or T_INFINITY
+
+            if lock.amount <= 0:
+                # When selling, re-calculate the amount so that it is
+                # equal to the locked amount reduced in accordance
+                # with the effective demurrage rate, but not exceeding
+                # the original amount which is for sale.
+                worst_possible_demurrage = calc_demurrage(
+                    demurrage_rate, collection_end - current_ts
+                )
+                lock.amount = max(
+                    lock.amount,
+                    - math.floor(locked_amount * worst_possible_demurrage),
+                )
 
             # If either the deadline or the demurrage rate is
             # inappropriate, change the status directly to "settled"
             # and dismiss the transfer.
-            min_deadline = worker_turn.collection_deadline or T_INFINITY
-            if deadline < min_deadline or demurrage_rate < min_demurrage_rate:
+            if (
+                    deadline < collection_end
+                    or demurrage_rate < min_demurrage_rate
+            ):
                 lock.finalized_at = datetime.now(tz=timezone.utc)
                 dismiss()
 

@@ -1522,7 +1522,7 @@ def test_process_candidate_offer_signal(
     assert als[1].creditor_id == 888
     assert als[1].debtor_id == 666
     assert als[1].turn_id == 1
-    assert als[1].amount == 0  # not locked yet
+    assert als[1].amount == -30000
     assert als[1].collector_id == 999
     assert als[1].has_been_released is False
     assert als[1].initiated_at >= current_ts
