@@ -17,6 +17,7 @@ from swpt_trade.models import (
     ActivateCollectorSignal,
     ConfigureAccountSignal,
     PrepareTransferSignal,
+    FinalizeTransferSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
@@ -1626,3 +1627,414 @@ def test_process_account_lock_rejected_transfer(
     ) == has_account_lock
 
     assert len(AccountLock.query.all()) == 0
+
+
+@pytest.fixture(scope="function")
+def wt_2_5(db_session, current_ts):
+    wt = WorkerTurn(
+        turn_id=1,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=2,
+        phase_deadline=current_ts + timedelta(hours=10),
+        collection_started_at=None,
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=5,
+    )
+    db_session.add(wt)
+    db_session.commit()
+    return wt
+
+
+@pytest.fixture(scope="function")
+def collector_id(db_session):
+    db_session.add(
+        ActiveCollector(
+            debtor_id=666,
+            collector_id=999,
+            account_id="TestCollectorAccount999",
+        )
+    )
+    db_session.commit()
+    return 999
+
+
+@pytest.fixture(scope="function")
+def account_lock(wt_2_5, collector_id):
+    p.process_candidate_offer_signal(
+        demurrage_rate=-50.0,
+        turn_id=wt_2_5.turn_id,
+        creditor_id=888,
+        debtor_id=666,
+        amount=-30000,
+        account_creation_date=date(2024, 1, 1),
+        last_transfer_number=1234,
+    )
+    al = AccountLock.query.one()
+    return al
+
+
+def test_process_alpt_no_lock_id(db_session, current_ts):
+    assert not p.process_account_lock_prepared_transfer(
+        debtor_id=1666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=12345,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+
+def test_process_alpt_wrong_debtor_id(current_ts, account_lock):
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=1666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 1666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at == account_lock.initiated_at
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id is None
+    assert al.amount == account_lock.amount
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+
+def test_process_alpt_wrong_creditor_id(current_ts, account_lock):
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=1888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 1888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at == account_lock.initiated_at
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id is None
+    assert al.amount == account_lock.amount
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+
+def test_process_alpt_sell_success(current_ts, account_lock):
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert -9500 < al.amount < -9400
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+    # Receive the same "PreparedTransfer" message again.
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert -9500 < al.amount < -9400
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+    # Receive "PreparedTransfer" message with another `transfer_id`.
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=124,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 124
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert -9500 < al.amount < -9400
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+
+def test_process_alpt_buy_success(db_session, current_ts, account_lock):
+    al = AccountLock.query.one()
+    al.amount = 50000
+    db_session.commit()
+
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=0,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert al.amount == 50000
+    assert al.committed_amount == 0
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+
+def test_process_alpt_wrong_demurrage_rate(current_ts, account_lock):
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-80,
+        deadline=current_ts + timedelta(days=1000),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    assert len(AccountLock.query.all()) == 0
+
+
+def test_process_alpt_wrong_deadline(current_ts, account_lock):
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    assert len(AccountLock.query.all()) == 0
+
+
+def test_process_alpt_already_dismissed(db_session, current_ts, account_lock):
+    al = AccountLock.query.one()
+    al.transfer_id = 123
+    al.amount = -9500
+    al.finalized_at = current_ts
+    db_session.commit()
+
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert al.amount == -9500
+    assert al.committed_amount == 0
+    assert al.finalized_at == current_ts
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+
+
+def test_process_alpt_already_committed(db_session, current_ts, account_lock):
+    al = AccountLock.query.one()
+    al.transfer_id = 123
+    al.amount = -9500
+    al.finalized_at = current_ts
+    al.committed_amount = 9000
+    db_session.commit()
+
+    assert p.process_account_lock_prepared_transfer(
+        debtor_id=666,
+        creditor_id=888,
+        transfer_id=123,
+        coordinator_id=888,
+        coordinator_request_id=account_lock.coordinator_request_id,
+        locked_amount=10000,
+        demurrage_rate=-49,
+        deadline=current_ts + timedelta(days=1),
+        min_demurrage_rate=-50,
+    )
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 888
+    assert fts.debtor_id == 666
+    assert fts.coordinator_id == 888
+    assert fts.coordinator_request_id == account_lock.coordinator_request_id
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 9000
+    assert fts.transfer_note_format == "-cXchge"
+    assert fts.transfer_note == (
+        f"Trading session: {account_lock.turn_id}\n"
+        f"Buyer: {account_lock.collector_id:x}\n"
+    )
+
+    al = AccountLock.query.one()
+    assert al.debtor_id == 666
+    assert al.creditor_id == 888
+    assert al.turn_id == account_lock.turn_id
+    assert al.collector_id == account_lock.collector_id
+    assert al.initiated_at >= current_ts
+    assert al.coordinator_request_id == account_lock.coordinator_request_id
+    assert al.transfer_id == 123
+    assert al.amount == -9500
+    assert al.committed_amount == 9000
+    assert al.finalized_at == current_ts
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None

@@ -333,70 +333,60 @@ def process_account_lock_prepared_transfer(
     except exc.NoResultFound:
         return False
 
-    if lock.debtor_id != debtor_id or lock.creditor_id != creditor_id:
-        # Normally, this should never happen.
-        dismiss()
-
-    else:
+    if lock.debtor_id == debtor_id and lock.creditor_id == creditor_id:
         if lock.released_at is None and lock.transfer_id is None:
-            # The current status is "initiated". Change it to "prepared".
+            # The current status is "initiated". If possible, change
+            # it to "prepared".
             assert lock.finalized_at is None
             assert lock.committed_amount == 0
-            lock.transfer_id = transfer_id
-            collection_end = worker_turn.collection_deadline or T_INFINITY
+            min_deadline = worker_turn.collection_deadline or T_INFINITY
 
-            if lock.amount <= 0:
-                # When selling, re-calculate the amount so that it is
-                # equal to the locked amount reduced in accordance
-                # with the effective demurrage rate, but not exceeding
-                # the original amount which is for sale.
-                assert locked_amount >= 0
-                worst_possible_demurrage = calc_demurrage(
-                    demurrage_rate, collection_end - lock.initiated_at
-                )
-                lock.amount = max(
-                    lock.amount,
-                    - math.floor(locked_amount * worst_possible_demurrage),
-                )
+            if deadline < min_deadline or demurrage_rate < min_demurrage_rate:
+                # Dismiss the transfer directly when either the
+                # deadline or the demurrage rate is not appropriate.
+                db.session.delete(lock)
 
-            # If either the deadline or the demurrage rate is
-            # inappropriate, change the status directly to "settled"
-            # and dismiss the transfer.
-            if (
-                    deadline < collection_end
-                    or demurrage_rate < min_demurrage_rate
-            ):
-                lock.finalized_at = datetime.now(tz=timezone.utc)
-                dismiss()
+            else:
+                lock.transfer_id = transfer_id
+
+                if lock.amount <= 0:
+                    # When selling, re-calculate the amount so that it
+                    # is equal to the locked amount reduced in
+                    # accordance with the effective demurrage rate,
+                    # but not exceeding the original amount which is
+                    # for sale.
+                    worst_possible_demurrage = calc_demurrage(
+                        demurrage_rate, min_deadline - lock.initiated_at
+                    )
+                    lock.amount = max(
+                        lock.amount,
+                        - math.floor(locked_amount * worst_possible_demurrage),
+                    )
+                return True
 
         elif lock.released_at is None and lock.finalized_at is None:
             # The current status is "prepared". Leave it as it is.
-            if lock.transfer_id != transfer_id:
-                dismiss()
+            if lock.transfer_id == transfer_id:
+                return True
 
         else:
             # The current status is "settled". Leave it as it is.
-            if lock.transfer_id != transfer_id:
-                dismiss()
-
-            else:
-                assert lock.finalized_at is not None
-                if lock.commited_amount == 0:
-                    dismiss()
-                else:
-                    db.session.add(
-                        FinalizeTransferSignal(
-                            creditor_id=creditor_id,
-                            debtor_id=debtor_id,
-                            transfer_id=transfer_id,
-                            coordinator_id=coordinator_id,
-                            coordinator_request_id=coordinator_request_id,
-                            committed_amount=lock.commited_amount,
-                            transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
-                            transfer_note=generate_transfer_note(
-                                lock.turn_id, TT_BUYER, lock.collector_id
-                            ),
-                        )
+            if lock.transfer_id == transfer_id and lock.committed_amount > 0:
+                db.session.add(
+                    FinalizeTransferSignal(
+                        creditor_id=creditor_id,
+                        debtor_id=debtor_id,
+                        transfer_id=transfer_id,
+                        coordinator_id=coordinator_id,
+                        coordinator_request_id=coordinator_request_id,
+                        committed_amount=lock.committed_amount,
+                        transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
+                        transfer_note=generate_transfer_note(
+                            lock.turn_id, TT_BUYER, lock.collector_id
+                        ),
                     )
+                )
+                return True
 
+    dismiss()
     return True

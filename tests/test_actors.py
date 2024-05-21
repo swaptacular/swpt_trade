@@ -64,11 +64,11 @@ def test_on_account_update_signal(db_session, actors):
 def test_on_prepared_agent_transfer_signal(db_session, actors):
     actors._on_prepared_agent_transfer_signal(
         debtor_id=D_ID,
-        creditor_id=2,
-        transfer_id=1,
+        creditor_id=C_ID,
+        transfer_id=123,
         coordinator_type="agent",
         coordinator_id=C_ID,
-        coordinator_request_id=1,
+        coordinator_request_id=456,
         locked_amount=1000,
         recipient=str(C_ID),
         prepared_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
@@ -77,6 +77,15 @@ def test_on_prepared_agent_transfer_signal(db_session, actors):
         final_interest_rate_ts=datetime.now(tz=timezone.utc),
         ts=datetime.now(tz=timezone.utc),
     )
+    fts = m.FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == C_ID
+    assert fts.debtor_id == D_ID
+    assert fts.coordinator_id == C_ID
+    assert fts.coordinator_request_id == 456
+    assert fts.transfer_id == 123
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
 
 
 def test_on_rejected_agent_transfer_signal(db_session, actors):
