@@ -335,8 +335,7 @@ def process_account_lock_prepared_transfer(
 
     if lock.debtor_id == debtor_id and lock.creditor_id == creditor_id:
         if lock.released_at is None and lock.transfer_id is None:
-            # The current status is "initiated". If possible, change
-            # it to "prepared".
+            # The current status is "initiated".
             assert lock.finalized_at is None
             assert lock.committed_amount == 0
             min_deadline = worker_turn.collection_deadline or T_INFINITY
@@ -347,6 +346,7 @@ def process_account_lock_prepared_transfer(
                 db.session.delete(lock)
 
             else:
+                # Change the current status to "prepared".
                 lock.transfer_id = transfer_id
 
                 if lock.amount <= 0:
@@ -362,15 +362,16 @@ def process_account_lock_prepared_transfer(
                         lock.amount,
                         - math.floor(locked_amount * worst_possible_demurrage),
                     )
+
                 return True
 
         elif lock.released_at is None and lock.finalized_at is None:
-            # The current status is "prepared". Leave it as it is.
+            # The current status is "prepared".
             if lock.transfer_id == transfer_id:
                 return True
 
         else:
-            # The current status is "settled". Leave it as it is.
+            # The current status is "settled".
             if lock.transfer_id == transfer_id and lock.committed_amount > 0:
                 db.session.add(
                     FinalizeTransferSignal(
