@@ -350,6 +350,7 @@ def process_account_lock_prepared_transfer(
                 # equal to the locked amount reduced in accordance
                 # with the effective demurrage rate, but not exceeding
                 # the original amount which is for sale.
+                assert locked_amount >= 0
                 worst_possible_demurrage = calc_demurrage(
                     demurrage_rate, collection_end - lock.initiated_at
                 )
