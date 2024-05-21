@@ -262,7 +262,7 @@ def dismiss_prepared_transfer(
 
 
 @atomic
-def process_rejected_account_lock_transfer(
+def process_account_lock_rejected_transfer(
         *,
         coordinator_id: int,
         coordinator_request_id: int,
@@ -296,7 +296,7 @@ def process_rejected_account_lock_transfer(
 
 
 @atomic
-def process_prepared_account_lock_transfer(
+def process_account_lock_prepared_transfer(
         *,
         debtor_id: int,
         creditor_id: int,

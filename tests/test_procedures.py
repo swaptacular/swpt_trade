@@ -1581,7 +1581,7 @@ def test_process_candidate_offer_signal(
 
 
 @pytest.mark.parametrize("has_account_lock", [True, False])
-def test_process_rejected_account_lock_transfer(
+def test_process_account_lock_rejected_transfer(
         db_session,
         current_ts,
         has_account_lock,
@@ -1618,7 +1618,7 @@ def test_process_rejected_account_lock_transfer(
     else:
         coordinator_request_id = 0
 
-    assert p.process_rejected_account_lock_transfer(
+    assert p.process_account_lock_rejected_transfer(
         coordinator_id=777,
         coordinator_request_id=coordinator_request_id,
         status_code="TEST",

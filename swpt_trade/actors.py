@@ -169,7 +169,7 @@ def _on_rejected_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_rejected_account_lock_transfer(
+    procedures.process_account_lock_rejected_transfer(
         coordinator_id=coordinator_id,
         coordinator_request_id=coordinator_request_id,
         status_code=status_code,
@@ -199,7 +199,7 @@ def _on_prepared_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    has_been_processed = procedures.process_prepared_account_lock_transfer(
+    has_been_processed = procedures.process_account_lock_prepared_transfer(
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         transfer_id=transfer_id,
