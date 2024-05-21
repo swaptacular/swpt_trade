@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: c9f5798ef7bb
+Revision ID: e4dfadc89551
 Revises: 01a7c27aad49
-Create Date: 2024-05-21 15:04:00.178485
+Create Date: 2024-05-21 22:40:39.717469
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'c9f5798ef7bb'
+revision = 'e4dfadc89551'
 down_revision = '01a7c27aad49'
 branch_labels = None
 depends_on = None
@@ -62,7 +62,7 @@ def upgrade_():
     sa.CheckConstraint('committed_amount >= 0'),
     sa.CheckConstraint('finalized_at IS NULL OR transfer_id IS NOT NULL'),
     sa.CheckConstraint('released_at IS NULL OR account_creation_date IS NOT NULL AND account_last_transfer_number IS NOT NULL'),
-    sa.CheckConstraint('released_at IS NULL OR transfer_id IS NULL OR finalized_at IS NOT NULL'),
+    sa.CheckConstraint('released_at IS NULL OR finalized_at IS NOT NULL'),
     sa.ForeignKeyConstraint(['turn_id'], ['worker_turn.turn_id'], ),
     sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
     comment='Represents an attempt to arrange the participation of a given account in a given trading turn. Normally, this includes sending a `PrepareTransfer` SMP message.'

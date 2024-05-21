@@ -576,7 +576,9 @@ def test_delete_stale_account_locks(app, db_session, current_ts):
         collector_id=789,
         amount=0,
         initiated_at=current_ts - timedelta(days=300),
+        transfer_id=1234,
         released_at=current_ts,
+        finalized_at=current_ts,
         account_creation_date=date(2024, 1, 1),
         account_last_transfer_number=789,
     )

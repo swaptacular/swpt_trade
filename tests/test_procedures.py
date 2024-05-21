@@ -1425,6 +1425,8 @@ def test_process_candidate_offer_signal(
                 turn_id=0,
                 collector_id=999,
                 released_at=current_ts,
+                transfer_id=123,
+                finalized_at=current_ts,
                 amount=80000,
                 account_creation_date=date(2000, 1, 1),
                 account_last_transfer_number=12345,

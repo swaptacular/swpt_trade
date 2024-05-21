@@ -107,12 +107,7 @@ class AccountLock(db.Model):
         db.CheckConstraint(committed_amount >= 0),
         db.CheckConstraint(or_(committed_amount == 0, finalized_at != null())),
         db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
-        db.CheckConstraint(
-            or_(
-                released_at == null(),
-                or_(transfer_id == null(), finalized_at != null()),
-            )
-        ),
+        db.CheckConstraint(or_(released_at == null(), finalized_at != null())),
         db.CheckConstraint(
             or_(
                 released_at == null(),
