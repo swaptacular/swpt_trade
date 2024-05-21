@@ -222,7 +222,7 @@ def test_generate_transfer_note_failure():
 
 
 def test_transfer_note_max_length(app):
-    tt = sorted([TT_BUYER, TT_COLLECTOR, TT_SELLER], key=lambda x: len(x))[0]
+    tt = sorted([TT_BUYER, TT_COLLECTOR, TT_SELLER], key=lambda x: len(x))[-1]
     s = generate_transfer_note(-1, tt, -1)
     min_bytes = current_app.config["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
     assert len(s.encode('utf-8')) <= min_bytes
