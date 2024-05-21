@@ -319,7 +319,6 @@ def process_prepared_account_lock_transfer(
             coordinator_request_id=coordinator_request_id,
         )
 
-    current_ts = datetime.now(tz=timezone.utc)
     query = (
         db.session.query(AccountLock, WorkerTurn)
         .join(AccountLock.worker_turn)
@@ -352,7 +351,7 @@ def process_prepared_account_lock_transfer(
                 # with the effective demurrage rate, but not exceeding
                 # the original amount which is for sale.
                 worst_possible_demurrage = calc_demurrage(
-                    demurrage_rate, collection_end - current_ts
+                    demurrage_rate, collection_end - lock.initiated_at
                 )
                 lock.amount = max(
                     lock.amount,
