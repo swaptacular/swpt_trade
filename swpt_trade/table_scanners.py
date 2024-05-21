@@ -654,13 +654,17 @@ class AccountLocksScanner(TableScanner):
         AccountLock.creditor_id,
         AccountLock.debtor_id,
         AccountLock.initiated_at,
+        AccountLock.released_at,
     ]
 
     def __init__(self):
         super().__init__()
         self.sharding_realm = current_app.config["SHARDING_REALM"]
-        self.account_lock_max_interval = timedelta(
+        self.lock_max_interval = timedelta(
             days=current_app.config["APP_ACCOUNT_LOCK_MAX_DAYS"]
+        )
+        self.released_lock_max_interval = timedelta(
+            days=current_app.config["APP_RELEASED_ACCOUNT_LOCK_MAX_DAYS"]
         )
 
     @property
@@ -714,10 +718,18 @@ class AccountLocksScanner(TableScanner):
         c_creditor_id = c.creditor_id
         c_debtor_id = c.debtor_id
         c_initiated_at = c.initiated_at
-        cutoff_ts = current_ts - self.account_lock_max_interval
+        c_released_at = c.released_at
+        cutoff_ts = current_ts - self.lock_max_interval
+        released_cutoff_ts = current_ts - self.released_lock_max_interval
 
         def is_stale(row) -> bool:
-            return row[c_initiated_at] < cutoff_ts
+            return (
+                row[c_initiated_at] < cutoff_ts
+                or (
+                    row[c_released_at] is not None
+                    and row[c_released_at] < released_cutoff_ts
+                )
+            )
 
         pks_to_delete = [
             (row[c_creditor_id], row[c_debtor_id])
@@ -728,7 +740,15 @@ class AccountLocksScanner(TableScanner):
             to_delete = (
                 AccountLock.query
                 .filter(self.pk.in_(pks_to_delete))
-                .filter(AccountLock.initiated_at < cutoff_ts)
+                .filter(
+                    or_(
+                        AccountLock.initiated_at < cutoff_ts,
+                        and_(
+                            AccountLock.released_at != null(),
+                            AccountLock.released_at < released_cutoff_ts,
+                        )
+                    )
+                )
                 .with_for_update(skip_locked=True)
                 .all()
             )

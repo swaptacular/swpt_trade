@@ -1423,7 +1423,7 @@ def test_process_candidate_offer_signal(
                 debtor_id=666,
                 turn_id=0,
                 collector_id=999,
-                has_been_released=True,
+                released_at=current_ts,
                 amount=80000,
                 account_creation_date=date(2000, 1, 1),
                 account_last_transfer_number=12345,
@@ -1447,7 +1447,7 @@ def test_process_candidate_offer_signal(
     assert al.turn_id == 1
     assert al.amount == 20000
     assert al.collector_id == 999
-    assert al.has_been_released is False
+    assert al.released_at is None
     assert al.initiated_at >= current_ts
     assert type(al.coordinator_request_id) is int
     assert al.transfer_id is None
@@ -1483,7 +1483,7 @@ def test_process_candidate_offer_signal(
     assert al.turn_id == 1
     assert al.amount == 20000
     assert al.collector_id == 999
-    assert al.has_been_released is False
+    assert al.released_at is None
     assert al.initiated_at >= current_ts
     assert type(al.coordinator_request_id) is int
     assert al.transfer_id is None
@@ -1524,7 +1524,7 @@ def test_process_candidate_offer_signal(
     assert als[1].turn_id == 1
     assert als[1].amount == -30000
     assert als[1].collector_id == 999
-    assert als[1].has_been_released is False
+    assert als[1].released_at is None
     assert als[1].initiated_at >= current_ts
     assert type(als[1].coordinator_request_id) is int
     assert als[1].coordinator_request_id != als[0].coordinator_request_id
@@ -1568,7 +1568,7 @@ def test_process_candidate_offer_signal(
     assert als[2].turn_id == 1
     assert als[2].amount == -50000  # already locked
     assert als[2].collector_id == 999
-    assert als[2].has_been_released is False
+    assert als[2].released_at is None
     assert als[2].initiated_at >= current_ts
     assert type(als[2].coordinator_request_id) is int
     assert als[2].coordinator_request_id != als[0].coordinator_request_id
@@ -1608,7 +1608,6 @@ def test_process_account_lock_rejected_transfer(
             debtor_id=666,
             turn_id=0,
             collector_id=999,
-            has_been_released=False,
             amount=0,
         )
         db_session.add(al)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
-from sqlalchemy.sql.expression import null, false, or_, and_
+from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -76,7 +76,6 @@ class AccountLock(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, nullable=False)
     collector_id = db.Column(db.BigInteger, nullable=False)
-    has_been_released = db.Column(db.BOOLEAN, nullable=False, default=False)
     initiated_at = db.Column(
         db.TIMESTAMP(timezone=True),
         nullable=False,
@@ -100,6 +99,7 @@ class AccountLock(db.Model):
     )
     committed_amount = db.Column(db.BigInteger, nullable=False, default=0)
     finalized_at = db.Column(db.TIMESTAMP(timezone=True))
+    released_at = db.Column(db.TIMESTAMP(timezone=True))
     account_creation_date = db.Column(db.DATE)
     account_last_transfer_number = db.Column(db.BigInteger)
     __mapper_args__ = {"eager_defaults": True}
@@ -109,13 +109,13 @@ class AccountLock(db.Model):
         db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
         db.CheckConstraint(
             or_(
-                has_been_released == false(),
+                released_at == null(),
                 or_(transfer_id == null(), finalized_at != null()),
             )
         ),
         db.CheckConstraint(
             or_(
-                has_been_released == false(),
+                released_at == null(),
                 and_(
                     account_creation_date != null(),
                     account_last_transfer_number != null(),
@@ -146,7 +146,7 @@ class AccountLock(db.Model):
 
     def is_in_force(self, acd: date, altn: int) -> bool:
         return not (
-            self.has_been_released
+            self.released_at is not None
             and (
                 self.account_creation_date < acd
                 or (

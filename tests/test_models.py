@@ -308,7 +308,7 @@ def test_account_lock_is_in_force(current_ts):
         debtor_id=666,
         turn_id=1,
         collector_id=123,
-        has_been_released=True,
+        released_at=current_ts,
         initiated_at=current_ts,
         coordinator_request_id=456,
         transfer_id=678,
@@ -323,7 +323,7 @@ def test_account_lock_is_in_force(current_ts):
     assert not al.is_in_force(date(2024, 5, 1), 321)
     assert not al.is_in_force(date(2024, 5, 1), 322)
 
-    al.has_been_released = False
+    al.released_at = None
     assert al.is_in_force(date(2024, 4, 1), 322)
     assert al.is_in_force(date(2024, 5, 1), 320)
     assert al.is_in_force(date(2024, 5, 1), 321)

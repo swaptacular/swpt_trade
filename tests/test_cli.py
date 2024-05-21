@@ -576,7 +576,7 @@ def test_delete_stale_account_locks(app, db_session, current_ts):
         collector_id=789,
         amount=0,
         initiated_at=current_ts - timedelta(days=300),
-        has_been_released=True,
+        released_at=current_ts,
         account_creation_date=date(2024, 1, 1),
         account_last_transfer_number=789,
     )
@@ -1406,7 +1406,6 @@ def test_run_phase2_subphase5(
             debtor_id=666,
             turn_id=t1.turn_id,
             collector_id=789,
-            has_been_released=False,
             transfer_id=1234,
             amount=-10000,
         )
@@ -1417,7 +1416,6 @@ def test_run_phase2_subphase5(
             debtor_id=666,
             turn_id=t1.turn_id,
             collector_id=789,
-            has_been_released=False,
             transfer_id=1235,
             amount=-10001,
         )
@@ -1428,7 +1426,6 @@ def test_run_phase2_subphase5(
             debtor_id=777,
             turn_id=t1.turn_id,
             collector_id=890,
-            has_been_released=False,
             transfer_id=None,
             amount=0,
         )
@@ -1439,7 +1436,6 @@ def test_run_phase2_subphase5(
             debtor_id=777,
             turn_id=t1.turn_id,
             collector_id=890,
-            has_been_released=False,
             transfer_id=5678,
             amount=30000,
         )
@@ -1450,7 +1446,6 @@ def test_run_phase2_subphase5(
             debtor_id=777,
             turn_id=t1.turn_id,
             collector_id=890,
-            has_been_released=False,
             transfer_id=5679,
             amount=30001,
         )
@@ -1461,7 +1456,6 @@ def test_run_phase2_subphase5(
             debtor_id=666,
             turn_id=t1.turn_id,
             collector_id=789,
-            has_been_released=False,
             transfer_id=None,
             amount=50000,
         )
@@ -1472,7 +1466,7 @@ def test_run_phase2_subphase5(
             debtor_id=888,
             turn_id=t1.turn_id,
             collector_id=890,
-            has_been_released=True,
+            released_at=current_ts,
             transfer_id=2345,
             amount=80000,
             finalized_at=current_ts,

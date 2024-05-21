@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from itertools import groupby
 from sqlalchemy import select, insert, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import null, false, and_
+from sqlalchemy.sql.expression import null, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
@@ -391,7 +391,7 @@ def _populate_sell_offers(w_conn, s_conn, turn_id):
             .where(
                 and_(
                     AccountLock.turn_id == turn_id,
-                    AccountLock.has_been_released == false(),
+                    AccountLock.released_at == null(),
                     AccountLock.transfer_id != null(),
                     AccountLock.finalized_at == null(),
                     AccountLock.amount < 0,
@@ -443,7 +443,7 @@ def _populate_buy_offers(w_conn, s_conn, turn_id):
             .where(
                 and_(
                     AccountLock.turn_id == turn_id,
-                    AccountLock.has_been_released == false(),
+                    AccountLock.released_at == null(),
                     AccountLock.transfer_id != null(),
                     AccountLock.finalized_at == null(),
                     AccountLock.amount > 0,

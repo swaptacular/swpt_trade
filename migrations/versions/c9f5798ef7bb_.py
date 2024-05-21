@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 3bf885b27648
+Revision ID: c9f5798ef7bb
 Revises: 01a7c27aad49
-Create Date: 2024-05-20 17:44:28.654997
+Create Date: 2024-05-21 15:04:00.178485
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3bf885b27648'
+revision = 'c9f5798ef7bb'
 down_revision = '01a7c27aad49'
 branch_labels = None
 depends_on = None
@@ -49,20 +49,20 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
-    sa.Column('has_been_released', sa.BOOLEAN(), nullable=False),
     sa.Column('initiated_at', sa.TIMESTAMP(timezone=True), nullable=False, comment='The timestamp of the sent `PrepareTransfer` SMP message.'),
     sa.Column('coordinator_request_id', sa.BigInteger(), server_default=sa.text("nextval('coordinator_request_id_seq')"), nullable=False),
     sa.Column('transfer_id', sa.BigInteger(), nullable=True),
     sa.Column('amount', sa.BigInteger(), nullable=False, comment='Can be negative or zero (the trader wants to sell), or positive (the trader wants to buy). When selling, and the `transfer_id` column is being set to a non-NULL value, the amount will be re-calculated to be equal to the locked amount reduced in accordance with the effective demurrage rate.'),
     sa.Column('committed_amount', sa.BigInteger(), nullable=False),
     sa.Column('finalized_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('released_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('account_creation_date', sa.DATE(), nullable=True),
     sa.Column('account_last_transfer_number', sa.BigInteger(), nullable=True),
     sa.CheckConstraint('committed_amount = 0 OR finalized_at IS NOT NULL'),
     sa.CheckConstraint('committed_amount >= 0'),
     sa.CheckConstraint('finalized_at IS NULL OR transfer_id IS NOT NULL'),
-    sa.CheckConstraint('has_been_released = false OR account_creation_date IS NOT NULL AND account_last_transfer_number IS NOT NULL'),
-    sa.CheckConstraint('has_been_released = false OR transfer_id IS NULL OR finalized_at IS NOT NULL'),
+    sa.CheckConstraint('released_at IS NULL OR account_creation_date IS NOT NULL AND account_last_transfer_number IS NOT NULL'),
+    sa.CheckConstraint('released_at IS NULL OR transfer_id IS NULL OR finalized_at IS NOT NULL'),
     sa.ForeignKeyConstraint(['turn_id'], ['worker_turn.turn_id'], ),
     sa.PrimaryKeyConstraint('creditor_id', 'debtor_id'),
     comment='Represents an attempt to arrange the participation of a given account in a given trading turn. Normally, this includes sending a `PrepareTransfer` SMP message.'

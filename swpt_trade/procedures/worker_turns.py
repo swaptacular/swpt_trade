@@ -195,9 +195,9 @@ def process_candidate_offer_signal(
         account_lock.initiated_at = current_ts
         account_lock.amount = amount
         account_lock.committed_amount = 0
-        account_lock.has_been_released = False
         account_lock.transfer_id = None
         account_lock.finalized_at = None
+        account_lock.released_at = None
         account_lock.account_creation_date = None
         account_lock.account_last_transfer_number = None
     else:
@@ -284,7 +284,7 @@ def process_account_lock_rejected_transfer(
         return False
 
     if (
-            not lock.has_been_released
+            lock.released_at is None
             and lock.transfer_id is None
             and lock.debtor_id == debtor_id
             and lock.creditor_id == creditor_id
@@ -338,7 +338,7 @@ def process_account_lock_prepared_transfer(
         dismiss()
 
     else:
-        if not lock.has_been_released and lock.transfer_id is None:
+        if lock.released_at is None and lock.transfer_id is None:
             # The current status is "initiated". Change it to "prepared".
             assert lock.finalized_at is None
             assert lock.committed_amount == 0
@@ -368,7 +368,7 @@ def process_account_lock_prepared_transfer(
                 lock.finalized_at = datetime.now(tz=timezone.utc)
                 dismiss()
 
-        elif not lock.has_been_released and lock.finalized_at is None:
+        elif lock.released_at is None and lock.finalized_at is None:
             # The current status is "prepared". Leave it as it is.
             if lock.transfer_id != transfer_id:
                 dismiss()
