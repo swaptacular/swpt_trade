@@ -1454,7 +1454,6 @@ def test_process_candidate_offer_signal(
     assert al.initiated_at >= current_ts
     assert type(al.coordinator_request_id) is int
     assert al.transfer_id is None
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.account_creation_date is None
     assert al.account_last_transfer_number is None
@@ -1490,7 +1489,6 @@ def test_process_candidate_offer_signal(
     assert al.initiated_at >= current_ts
     assert type(al.coordinator_request_id) is int
     assert al.transfer_id is None
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.account_creation_date is None
     assert al.account_last_transfer_number is None
@@ -1532,7 +1530,6 @@ def test_process_candidate_offer_signal(
     assert type(als[1].coordinator_request_id) is int
     assert als[1].coordinator_request_id != als[0].coordinator_request_id
     assert als[1].transfer_id is None
-    assert als[1].committed_amount == 0
     assert als[1].finalized_at is None
     assert als[1].account_creation_date is None
     assert als[1].account_last_transfer_number is None
@@ -1577,7 +1574,6 @@ def test_process_candidate_offer_signal(
     assert als[2].coordinator_request_id != als[0].coordinator_request_id
     assert als[2].coordinator_request_id != als[1].coordinator_request_id
     assert type(als[2].transfer_id) is int
-    assert als[2].committed_amount == 0
     assert als[2].finalized_at is None
     assert als[2].account_creation_date is None
     assert als[2].account_last_transfer_number is None
@@ -1725,7 +1721,6 @@ def test_process_alpt_wrong_debtor_id(current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id is None
     assert al.amount == account_lock.amount
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1763,7 +1758,6 @@ def test_process_alpt_wrong_creditor_id(current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id is None
     assert al.amount == account_lock.amount
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1793,7 +1787,6 @@ def test_process_alpt_sell_success(current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
     assert -9500 < al.amount < -9400
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1822,7 +1815,6 @@ def test_process_alpt_sell_success(current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
     assert -9500 < al.amount < -9400
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1859,7 +1851,6 @@ def test_process_alpt_sell_success(current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
     assert -9500 < al.amount < -9400
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1893,7 +1884,6 @@ def test_process_alpt_buy_success(db_session, current_ts, account_lock):
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
     assert al.amount == 50000
-    assert al.committed_amount == 0
     assert al.finalized_at is None
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1953,7 +1943,7 @@ def test_process_alpt_wrong_deadline(current_ts, account_lock):
 def test_process_alpt_already_dismissed(db_session, current_ts, account_lock):
     al = AccountLock.query.one()
     al.transfer_id = 123
-    al.amount = -9500
+    al.amount = 0
     al.finalized_at = current_ts
     db_session.commit()
 
@@ -1986,8 +1976,7 @@ def test_process_alpt_already_dismissed(db_session, current_ts, account_lock):
     assert al.initiated_at >= current_ts
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
-    assert al.amount == -9500
-    assert al.committed_amount == 0
+    assert al.amount == 0
     assert al.finalized_at == current_ts
     assert al.released_at is None
     assert al.account_creation_date is None
@@ -1997,9 +1986,8 @@ def test_process_alpt_already_dismissed(db_session, current_ts, account_lock):
 def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     al = AccountLock.query.one()
     al.transfer_id = 123
-    al.amount = -9500
     al.finalized_at = current_ts
-    al.committed_amount = 9000
+    al.amount = -9000
     db_session.commit()
 
     assert p.process_account_lock_prepared_transfer(
@@ -2034,8 +2022,7 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     assert al.initiated_at >= current_ts
     assert al.coordinator_request_id == account_lock.coordinator_request_id
     assert al.transfer_id == 123
-    assert al.amount == -9500
-    assert al.committed_amount == 9000
+    assert al.amount == -9000
     assert al.finalized_at == current_ts
     assert al.released_at is None
     assert al.account_creation_date is None

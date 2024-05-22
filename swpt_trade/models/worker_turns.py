@@ -85,7 +85,6 @@ class AccountLock(db.Model):
     coordinator_request_id = db.Column(
         db.BigInteger, nullable=False, server_default=cr_seq.next_value()
     )
-    transfer_id = db.Column(db.BigInteger)
     amount = db.Column(
         db.BigInteger,
         comment=(
@@ -93,25 +92,29 @@ class AccountLock(db.Model):
             " (the trader wants to buy). When selling, and the `transfer_id`"
             " column is being set to a non-NULL value, the amount will be"
             " re-calculated to be equal to the locked amount reduced in"
-            " accordance with the effective demurrage rate."
+            " accordance with the effective demurrage rate. Also, when"
+            " selling, and the `finalized_at` column is being set to a"
+            " non-NULL value, the amount will be re-set to be equal to the"
+            " committed amount with a negative sign."
         ),
         nullable=False,
     )
-    committed_amount = db.Column(db.BigInteger, nullable=False, default=0)
-    finalized_at = db.Column(db.TIMESTAMP(timezone=True))
+    transfer_id = db.Column(db.BigInteger)
+    finalized_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        comment="The timestamp of the sent `FinalizeTransfer` SMP message.",
+    )
     released_at = db.Column(db.TIMESTAMP(timezone=True))
     account_creation_date = db.Column(db.DATE)
     account_last_transfer_number = db.Column(db.BigInteger)
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
-        db.CheckConstraint(committed_amount >= 0),
-        db.CheckConstraint(or_(committed_amount == 0, finalized_at != null())),
         db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
-        db.CheckConstraint(or_(released_at == null(), finalized_at != null())),
         db.CheckConstraint(
             or_(
                 released_at == null(),
                 and_(
+                    finalized_at != null(),
                     account_creation_date != null(),
                     account_last_transfer_number != null(),
                 ),

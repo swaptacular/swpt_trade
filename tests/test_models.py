@@ -314,7 +314,6 @@ def test_account_lock_is_in_force(current_ts):
         transfer_id=678,
         amount=1000,
         finalized_at=None,
-        committed_amount=0,
         account_creation_date=date(2024, 5, 1),
         account_last_transfer_number=321,
     )

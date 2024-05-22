@@ -194,7 +194,6 @@ def process_candidate_offer_signal(
         account_lock.collector_id = collector.collector_id
         account_lock.initiated_at = current_ts
         account_lock.amount = amount
-        account_lock.committed_amount = 0
         account_lock.transfer_id = None
         account_lock.finalized_at = None
         account_lock.released_at = None
@@ -337,7 +336,7 @@ def process_account_lock_prepared_transfer(
         if lock.released_at is None and lock.transfer_id is None:
             # The current status is "initiated".
             assert lock.finalized_at is None
-            assert lock.committed_amount == 0
+
             min_deadline = worker_turn.collection_deadline or T_INFINITY
 
             if deadline < min_deadline or demurrage_rate < min_demurrage_rate:
@@ -367,12 +366,17 @@ def process_account_lock_prepared_transfer(
 
         elif lock.released_at is None and lock.finalized_at is None:
             # The current status is "prepared".
+            assert lock.transfer_id is not None
+
             if lock.transfer_id == transfer_id:
                 return True
 
         else:
             # The current status is "settled".
-            if lock.transfer_id == transfer_id and lock.committed_amount > 0:
+            assert lock.transfer_id is not None
+            assert lock.finalized_at is not None
+
+            if lock.transfer_id == transfer_id and lock.amount < 0:
                 db.session.add(
                     FinalizeTransferSignal(
                         creditor_id=creditor_id,
@@ -380,7 +384,7 @@ def process_account_lock_prepared_transfer(
                         transfer_id=transfer_id,
                         coordinator_id=coordinator_id,
                         coordinator_request_id=coordinator_request_id,
-                        committed_amount=lock.committed_amount,
+                        committed_amount=(-lock.amount),
                         transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
                         transfer_note=generate_transfer_note(
                             lock.turn_id, TT_BUYER, lock.collector_id
