@@ -253,9 +253,9 @@ class Configuration(metaclass=MetaEnvReader):
 
     APP_ENABLE_CORS = False
     APP_VERIFY_SSL_CERTS = True
-    APP_TURN_MAX_COMMIT_PERIOD: parse_timedelta = "30d"
-    APP_TURN_PHASE_CUSHION_PERIOD: parse_timedelta = "5m"
-    APP_INTEREST_RATE_HISTORY_PERIOD: parse_timedelta = "60d"
+    APP_TURN_MAX_COMMIT_PERIOD: parse_timedelta = parse_timedelta("30d")
+    APP_TURN_PHASE_CUSHION_PERIOD: parse_timedelta = parse_timedelta("5m")
+    APP_INTEREST_RATE_HISTORY_PERIOD: parse_timedelta = parse_timedelta("60d")
     APP_MIN_DEMURRAGE_RATE = -50.0
     APP_MIN_TRANSFER_NOTE_MAX_BYTES = 60
     APP_ACCOUNT_LOCK_MAX_DAYS = 365.0
