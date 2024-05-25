@@ -5,15 +5,15 @@ from swpt_pythonlib.utils import Seqnum
 from sqlalchemy.orm import load_only
 from swpt_trade.extensions import db
 from swpt_trade.models import (
+    HUGE_NEGLIGIBLE_AMOUNT,
+    DEFAULT_CONFIG_FLAGS,
     NeededWorkerAccount,
-    InterestRateChange,
     WorkerAccount,
+    InterestRateChange,
     RecentlyNeededCollector,
     ConfigureAccountSignal,
     ActivateCollectorSignal,
     DiscoverDebtorSignal,
-    HUGE_NEGLIGIBLE_AMOUNT,
-    DEFAULT_CONFIG_FLAGS,
 )
 
 T = TypeVar("T")
@@ -242,6 +242,37 @@ def process_account_update_signal(
 
 
 @atomic
+def process_account_purge_signal(
+        *,
+        debtor_id: int,
+        creditor_id: int,
+        creation_date: date,
+) -> bool:
+    is_needed_account = (
+        db.session.query(
+            NeededWorkerAccount.query
+            .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
+            .with_for_update(read=True)
+            .exists()
+        )
+        .scalar()
+    )
+    worker_account = (
+        WorkerAccount.query.filter_by(
+            creditor_id=creditor_id, debtor_id=debtor_id
+        )
+        .filter(WorkerAccount.creation_date <= creation_date)
+        .with_for_update()
+        .options(load_only(WorkerAccount.creation_date))
+        .one_or_none()
+    )
+    if worker_account:
+        db.session.delete(worker_account)
+
+    return is_needed_account
+
+
+@atomic
 def store_interest_rate_change(
         *,
         creditor_id: int,
@@ -339,37 +370,6 @@ def mark_as_recently_needed_collector(
                     needed_at=needed_at,
                 )
             )
-
-
-@atomic
-def process_account_purge_signal(
-        *,
-        debtor_id: int,
-        creditor_id: int,
-        creation_date: date,
-) -> bool:
-    is_needed_account = (
-        db.session.query(
-            NeededWorkerAccount.query
-            .filter_by(creditor_id=creditor_id, debtor_id=debtor_id)
-            .with_for_update(read=True)
-            .exists()
-        )
-        .scalar()
-    )
-    worker_account = (
-        WorkerAccount.query.filter_by(
-            creditor_id=creditor_id, debtor_id=debtor_id
-        )
-        .filter(WorkerAccount.creation_date <= creation_date)
-        .with_for_update()
-        .options(load_only(WorkerAccount.creation_date))
-        .one_or_none()
-    )
-    if worker_account:
-        db.session.delete(worker_account)
-
-    return is_needed_account
 
 
 def _discard_unneeded_account(

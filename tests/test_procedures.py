@@ -1616,7 +1616,7 @@ def test_process_account_lock_rejected_transfer(
     else:
         coordinator_request_id = 0
 
-    assert p.process_account_lock_rejected_transfer(
+    assert p.put_rejected_transfer_through_account_locks(
         coordinator_id=777,
         coordinator_request_id=coordinator_request_id,
         status_code="TEST",
@@ -1676,7 +1676,7 @@ def account_lock(wt_2_5, collector_id):
 
 
 def test_process_alpt_no_lock_id(db_session, current_ts):
-    assert not p.process_account_lock_prepared_transfer(
+    assert not p.put_prepared_transfer_through_account_locks(
         debtor_id=1666,
         creditor_id=888,
         transfer_id=123,
@@ -1691,7 +1691,7 @@ def test_process_alpt_no_lock_id(db_session, current_ts):
 
 
 def test_process_alpt_wrong_debtor_id(current_ts, account_lock):
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=1666,
         creditor_id=888,
         transfer_id=123,
@@ -1728,7 +1728,7 @@ def test_process_alpt_wrong_debtor_id(current_ts, account_lock):
 
 
 def test_process_alpt_wrong_creditor_id(current_ts, account_lock):
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=1888,
         transfer_id=123,
@@ -1765,7 +1765,7 @@ def test_process_alpt_wrong_creditor_id(current_ts, account_lock):
 
 
 def test_process_alpt_sell_success(current_ts, account_lock):
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1793,7 +1793,7 @@ def test_process_alpt_sell_success(current_ts, account_lock):
     assert al.account_last_transfer_number is None
 
     # Receive the same "PreparedTransfer" message again.
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1821,7 +1821,7 @@ def test_process_alpt_sell_success(current_ts, account_lock):
     assert al.account_last_transfer_number is None
 
     # Receive "PreparedTransfer" message with another `transfer_id`.
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=124,
@@ -1862,7 +1862,7 @@ def test_process_alpt_buy_success(db_session, current_ts, account_lock):
     al.amount = 50000
     db_session.commit()
 
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1891,7 +1891,7 @@ def test_process_alpt_buy_success(db_session, current_ts, account_lock):
 
 
 def test_process_alpt_wrong_demurrage_rate(current_ts, account_lock):
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1916,7 +1916,7 @@ def test_process_alpt_wrong_demurrage_rate(current_ts, account_lock):
 
 
 def test_process_alpt_wrong_deadline(current_ts, account_lock):
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1947,7 +1947,7 @@ def test_process_alpt_already_dismissed(db_session, current_ts, account_lock):
     al.finalized_at = current_ts
     db_session.commit()
 
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
@@ -1990,7 +1990,7 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     al.amount = -9000
     db_session.commit()
 
-    assert p.process_account_lock_prepared_transfer(
+    assert p.put_prepared_transfer_through_account_locks(
         debtor_id=666,
         creditor_id=888,
         transfer_id=123,
