@@ -8,6 +8,7 @@ from swpt_trade.models import (
     NeededWorkerAccount,
     InterestRateChange,
     WorkerAccount,
+    RecentlyNeededCollector,
     ConfigureAccountSignal,
     ActivateCollectorSignal,
     DiscoverDebtorSignal,
@@ -19,6 +20,66 @@ T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
 EPS = 1e-5
+
+
+@atomic
+def configure_worker_account(
+        *,
+        debtor_id: int,
+        collector_id: int,
+        max_postponement: timedelta,
+) -> None:
+    def has_worker_account():
+        return (
+            db.session.query(
+                WorkerAccount.query
+                .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+                .exists()
+            )
+            .scalar()
+        )
+
+    current_ts = datetime.now(tz=timezone.utc)
+    needed_worker_account = (
+        NeededWorkerAccount.query
+        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+        .one_or_none()
+    )
+    if needed_worker_account is None:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                NeededWorkerAccount(
+                    creditor_id=collector_id,
+                    debtor_id=debtor_id,
+                    configured_at=current_ts,
+                )
+            )
+        must_configure_account = True
+    elif (
+            needed_worker_account.configured_at + max_postponement < current_ts
+            and not has_worker_account()
+    ):
+        # It's been a while since the last `ConfigureAccount` message
+        # was sent for this collector account, and yet there is no
+        # account created. The only reasonable thing that we can do in
+        # this case, is to send another `ConfigureAccount` message for
+        # the account, hoping that this will fix the problem.
+        needed_worker_account.configured_at = current_ts
+        must_configure_account = True
+    else:
+        must_configure_account = False
+
+    if must_configure_account:
+        db.session.add(
+            ConfigureAccountSignal(
+                creditor_id=collector_id,
+                debtor_id=debtor_id,
+                ts=current_ts,
+                seqnum=0,
+                negligible_amount=HUGE_NEGLIGIBLE_AMOUNT,
+                config_flags=DEFAULT_CONFIG_FLAGS,
+            )
+        )
 
 
 @atomic
@@ -251,63 +312,33 @@ def compact_interest_rate_changes(
 
 
 @atomic
-def configure_worker_account(
-        *,
-        debtor_id: int,
-        collector_id: int,
-        max_postponement: timedelta,
-) -> None:
-    def has_worker_account():
-        return (
-            db.session.query(
-                WorkerAccount.query
-                .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
-                .exists()
-            )
-            .scalar()
+def is_recently_needed_collector(debtor_id: int) -> bool:
+    return (
+        db.session.query(
+            RecentlyNeededCollector.query
+            .filter_by(debtor_id=debtor_id)
+            .exists()
         )
-
-    current_ts = datetime.now(tz=timezone.utc)
-    needed_worker_account = (
-        NeededWorkerAccount.query
-        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
-        .one_or_none()
+        .scalar()
     )
-    if needed_worker_account is None:
+
+
+@atomic
+def mark_as_recently_needed_collector(
+        debtor_id: int,
+        needed_at: Optional[datetime] = None,
+) -> None:
+    if needed_at is None:
+        needed_at = datetime.now(tz=timezone.utc)
+
+    if not is_recently_needed_collector(debtor_id):
         with db.retry_on_integrity_error():
             db.session.add(
-                NeededWorkerAccount(
-                    creditor_id=collector_id,
+                RecentlyNeededCollector(
                     debtor_id=debtor_id,
-                    configured_at=current_ts,
+                    needed_at=needed_at,
                 )
             )
-        must_configure_account = True
-    elif (
-            needed_worker_account.configured_at + max_postponement < current_ts
-            and not has_worker_account()
-    ):
-        # It's been a while since the last `ConfigureAccount` message
-        # was sent for this collector account, and yet there is no
-        # account created. The only reasonable thing that we can do in
-        # this case, is to send another `ConfigureAccount` message for
-        # the account, hoping that this will fix the problem.
-        needed_worker_account.configured_at = current_ts
-        must_configure_account = True
-    else:
-        must_configure_account = False
-
-    if must_configure_account:
-        db.session.add(
-            ConfigureAccountSignal(
-                creditor_id=collector_id,
-                debtor_id=debtor_id,
-                ts=current_ts,
-                seqnum=0,
-                negligible_amount=HUGE_NEGLIGIBLE_AMOUNT,
-                config_flags=DEFAULT_CONFIG_FLAGS,
-            )
-        )
 
 
 @atomic
