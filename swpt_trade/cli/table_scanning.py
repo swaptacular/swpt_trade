@@ -25,13 +25,13 @@ def scan_debtor_info_documents(days, quit_early):
     APP_DEBTOR_INFO_DOCUMENTS_SCAN_DAYS is taken. If it is not set,
     the default number of days is 7.
     """
-    from swpt_trade.table_scanners import DebtorInfoDocumentScanner
+    from swpt_trade.table_scanners import DebtorInfoDocumentsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started debtor info documents scanner.")
     days = days or current_app.config["APP_DEBTOR_INFO_DOCUMENTS_SCAN_DAYS"]
     assert days > 0.0
-    scanner = DebtorInfoDocumentScanner()
+    scanner = DebtorInfoDocumentsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 
@@ -53,13 +53,13 @@ def scan_debtor_locator_claims(days, quit_early):
     APP_DEBTOR_LOCATOR_CLAIMS_SCAN_DAYS is taken. If it is not set,
     the default number of days is 1.
     """
-    from swpt_trade.table_scanners import DebtorLocatorClaimScanner
+    from swpt_trade.table_scanners import DebtorLocatorClaimsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started debtor locator claims scanner.")
     days = days or current_app.config["APP_DEBTOR_LOCATOR_CLAIMS_SCAN_DAYS"]
     assert days > 0.0
-    scanner = DebtorLocatorClaimScanner()
+    scanner = DebtorLocatorClaimsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 
@@ -165,13 +165,13 @@ def scan_interest_rate_changes(days, quit_early):
     APP_INTEREST_RATE_CHANGES_SCAN_DAYS is taken. If it is not set,
     the default number of days is 7.
     """
-    from swpt_trade.table_scanners import InterestRateChangeScanner
+    from swpt_trade.table_scanners import InterestRateChangesScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started interest rate changes scanner.")
     days = days or current_app.config["APP_INTEREST_RATE_CHANGES_SCAN_DAYS"]
     assert days > 0.0
-    scanner = InterestRateChangeScanner()
+    scanner = InterestRateChangesScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
 
 
