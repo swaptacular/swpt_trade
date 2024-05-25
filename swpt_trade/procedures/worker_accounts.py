@@ -251,6 +251,66 @@ def compact_interest_rate_changes(
 
 
 @atomic
+def configure_worker_account(
+        *,
+        debtor_id: int,
+        collector_id: int,
+        max_postponement: timedelta,
+) -> None:
+    def has_worker_account():
+        return (
+            db.session.query(
+                WorkerAccount.query
+                .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+                .exists()
+            )
+            .scalar()
+        )
+
+    current_ts = datetime.now(tz=timezone.utc)
+    needed_worker_account = (
+        NeededWorkerAccount.query
+        .filter_by(creditor_id=collector_id, debtor_id=debtor_id)
+        .one_or_none()
+    )
+    if needed_worker_account is None:
+        with db.retry_on_integrity_error():
+            db.session.add(
+                NeededWorkerAccount(
+                    creditor_id=collector_id,
+                    debtor_id=debtor_id,
+                    configured_at=current_ts,
+                )
+            )
+        must_configure_account = True
+    elif (
+            needed_worker_account.configured_at + max_postponement < current_ts
+            and not has_worker_account()
+    ):
+        # It's been a while since the last `ConfigureAccount` message
+        # was sent for this collector account, and yet there is no
+        # account created. The only reasonable thing that we can do in
+        # this case, is to send another `ConfigureAccount` message for
+        # the account, hoping that this will fix the problem.
+        needed_worker_account.configured_at = current_ts
+        must_configure_account = True
+    else:
+        must_configure_account = False
+
+    if must_configure_account:
+        db.session.add(
+            ConfigureAccountSignal(
+                creditor_id=collector_id,
+                debtor_id=debtor_id,
+                ts=current_ts,
+                seqnum=0,
+                negligible_amount=HUGE_NEGLIGIBLE_AMOUNT,
+                config_flags=DEFAULT_CONFIG_FLAGS,
+            )
+        )
+
+
+@atomic
 def process_account_purge_signal(
         *,
         debtor_id: int,

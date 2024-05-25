@@ -1048,7 +1048,7 @@ def process_pristine_collectors(threads, wait, quit_early):
         else current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_WAIT"]
     )
     max_count = current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_MAX_COUNT"]
-    max_delay = timedelta(
+    max_postponement = timedelta(
         days=current_app.config["APP_EXTREME_MESSAGE_DELAY_DAYS"]
     )
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
@@ -1064,8 +1064,10 @@ def process_pristine_collectors(threads, wait, quit_early):
 
     def process_pristine_collector(debtor_id, collector_id):
         assert sharding_realm.match(collector_id)
-        procedures.process_pristine_collector(
-            debtor_id=debtor_id, collector_id=collector_id, max_delay=max_delay
+        procedures.configure_worker_account(
+            debtor_id=debtor_id,
+            collector_id=collector_id,
+            max_postponement=max_postponement,
         )
         procedures.mark_requested_collector(
             debtor_id=debtor_id, collector_id=collector_id
