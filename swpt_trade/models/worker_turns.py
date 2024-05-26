@@ -321,7 +321,7 @@ class WorkerReceiving(db.Model):
     __table_args__ = (
         # NOTE: When the expected amount is `1`, after applying the
         # possibly negative interest rate, and rounding down, the
-        # received amount would have be zero. Therefore we should
+        # received amount would have to be zero. Therefore we should
         # expect to receive only amounts greater than `1`.
         db.CheckConstraint(expected_amount > 1),
         db.CheckConstraint(received_amount >= 0),
