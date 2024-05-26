@@ -284,7 +284,9 @@ class SendingTrigger(db.Model):
             collector_id,
             turn_id,
             debtor_id,
-            postgresql_where=total_collected_amount != null(),
+            postgresql_where=(
+                total_collected_amount == expected_collected_amount
+            ),
         ),
         {
             "comment": (
