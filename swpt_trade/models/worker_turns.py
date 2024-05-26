@@ -192,3 +192,193 @@ class AccountLock(db.Model):
                 )
             )
         )
+
+
+class CreditorParticipation(db.Model):
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            "Can be positive or negative, but can not be zero. A positive"
+            " number indicates that this amount should be given to the"
+            " creditor. A negative number indicates that this amount should"
+            " be taken from the creditor."
+        ),
+    )
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint(amount != 0),
+        {
+            "comment": (
+                'Indicates that the given amount must be given or taken'
+                ' to/from the given creditor as part of the given trading'
+                ' turn. During the phase 3 of each turn, "worker" servers'
+                ' will move the records from the "creditor_giving" and'
+                ' and "creditor_taking" solver tables to this table.'
+            ),
+        },
+    )
+
+
+class WorkerCollecting(db.Model):
+    collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    collected_amount = db.Column(db.BigInteger)
+    __table_args__ = (
+        db.CheckConstraint(collected_amount > 0),
+        db.Index(
+            "idx_worker_collecting_not_done",
+            collector_id,
+            turn_id,
+            debtor_id,
+            postgresql_where=collected_amount == null(),
+        ),
+        {
+            "comment": (
+                'Indicates that the given amount will be withdrawn (collected)'
+                " from the given creditor's account, as part of the given"
+                ' trading turn, and will be transferred to the given'
+                ' collector. During the phase 3 of each turn, "worker" servers'
+                ' will move the records from the "collector_collecting" solver'
+                ' table to this table.'
+            ),
+        },
+    )
+
+
+class SendingTrigger(db.Model):
+    collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    expected_collected_amount = db.Column(db.BigInteger, nullable=False)
+    total_collected_amount = db.Column(db.BigInteger)
+    __table_args__ = (
+        db.CheckConstraint(expected_collected_amount > 0),
+        db.CheckConstraint(total_collected_amount >= 0),
+        db.Index(
+            "idx_sending_trigger_done",
+            collector_id,
+            turn_id,
+            debtor_id,
+            postgresql_where=total_collected_amount != null(),
+        ),
+        {
+            "comment": (
+                'Indicates that once all transfers for the corresponding'
+                ' records in the "worker_collecting" table have been received,'
+                ' the given collector should start sending funds to other'
+                ' collectors, as stated in the "worker_sending" table.'
+            ),
+        },
+    )
+
+
+class WorkerSending(db.Model):
+    from_collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    to_collector_id = db.Column(db.BigInteger, primary_key=True)
+    amount = db.Column(db.BigInteger, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint(amount > 0),
+        {
+            "comment": (
+                'Indicates that the given amount must be transferred (sent)'
+                ' to another collector account, as part of the given trading'
+                ' turn. During the phase 3 of each turn, "worker" servers will'
+                ' move the records from the "collector_sending" solver table'
+                ' to this table.'
+            ),
+        },
+    )
+
+
+class WorkerReceiving(db.Model):
+    to_collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    from_collector_id = db.Column(db.BigInteger, primary_key=True)
+    received_amount = db.Column(db.BigInteger)
+    __table_args__ = (
+        db.CheckConstraint(received_amount > 0),
+        db.Index(
+            "idx_worker_receiving_not_done",
+            to_collector_id,
+            turn_id,
+            debtor_id,
+            postgresql_where=received_amount == null(),
+        ),
+        {
+            "comment": (
+                'Indicates the given amount will be transferred (received)'
+                ' from another collector account, as part of the given trading'
+                ' turn. During the phase 3 of each turn, "worker" servers will'
+                ' move the records from the "collector_receiving" solver table'
+                ' to this table.'
+            ),
+        },
+    )
+
+
+class DispatchingTrigger(db.Model):
+    collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    expected_collected_amount = db.Column(db.BigInteger, nullable=False)
+    max_sent_amount = db.Column(db.BigInteger, nullable=False)
+    total_received_amount = db.Column(db.BigInteger)
+    __table_args__ = (
+        db.CheckConstraint(expected_collected_amount >= 0),
+        db.CheckConstraint(max_sent_amount >= 0),
+        db.CheckConstraint(max_sent_amount <= expected_collected_amount),
+        db.CheckConstraint(total_received_amount >= 0),
+        db.Index(
+            "idx_dispatching_trigger_done",
+            collector_id,
+            turn_id,
+            debtor_id,
+            postgresql_where=total_received_amount != null(),
+        ),
+        {
+            "comment": (
+                'Indicates that once all transfers for the corresponding'
+                ' records in the "worker_collecting" and "worker_receiving"'
+                ' tables have been received, the given collector should start'
+                " dispatching funds to creditors' accounts, as stated in the"
+                '"worker_dispatching" table.'
+            ),
+        },
+    )
+
+    @property
+    def available_amount(self):
+        return (
+            + self.expected_collected_amount
+            - self.max_sent_amount
+            + (self.total_received_amount or 0)
+        )
+
+
+class WorkerDispatching(db.Model):
+    collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_id = db.Column(db.BigInteger, primary_key=True)
+    amount = db.Column(db.BigInteger, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint(amount > 0),
+        {
+            "comment": (
+                'Indicates that the given amount must be deposited'
+                ' (dispatched) to the given customer account, as part of the'
+                ' given trading turn. During the phase 3 of each turn,'
+                ' "worker" servers will move the records from the'
+                ' "collector_dispatching" solver table to this table.'
+            ),
+        },
+    )
