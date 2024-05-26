@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
-from sqlalchemy.sql.expression import null, or_, and_
+from sqlalchemy.sql.expression import null, true, or_, and_
 from sqlalchemy.orm import foreign
 from swpt_trade.extensions import db
 
@@ -229,15 +229,17 @@ class WorkerCollecting(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
-    collected_amount = db.Column(db.BigInteger)
+    expected_amount = db.Column(db.BigInteger, nullable=False)
+    collected_amount = db.Column(db.BigInteger, nullable=False, default=0)
     __table_args__ = (
-        db.CheckConstraint(collected_amount > 0),
+        db.CheckConstraint(expected_amount > 0),
+        db.CheckConstraint(collected_amount >= 0),
         db.Index(
             "idx_worker_collecting_not_done",
             collector_id,
             turn_id,
             debtor_id,
-            postgresql_where=collected_amount == null(),
+            postgresql_where=collected_amount < expected_amount,
         ),
         {
             "comment": (
@@ -260,33 +262,14 @@ class SendingTrigger(db.Model):
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    expected_collected_amount = db.Column(
-        db.BigInteger,
-        nullable=False,
-        comment=(
-            'The sum of all amounts for the corresponding records in the'
-            ' "worker_collecting" table.'
-        ),
-    )
-    total_collected_amount = db.Column(
-        db.BigInteger,
-        comment=(
-            "A non-NULL value indicates that all transfers for the"
-            ' corresponding records in the "worker_collecting" table have'
-            ' been received.'
-        ),
-    )
+    all_collected = db.Column(db.BOOLEAN, nullable=False, default=False)
     __table_args__ = (
-        db.CheckConstraint(expected_collected_amount > 0),
-        db.CheckConstraint(total_collected_amount >= 0),
         db.Index(
             "idx_sending_trigger_all_collected",
             collector_id,
             turn_id,
             debtor_id,
-            postgresql_where=(
-                total_collected_amount == expected_collected_amount
-            ),
+            postgresql_where=all_collected == true(),
         ),
         {
             "comment": (
@@ -305,7 +288,7 @@ class SendingTrigger(db.Model):
 
     @property
     def should_start_sending(self) -> bool:
-        return self.total_collected_amount == self.expected_collected_amount
+        return self.all_collected
 
 
 class WorkerSending(db.Model):
@@ -333,15 +316,21 @@ class WorkerReceiving(db.Model):
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     from_collector_id = db.Column(db.BigInteger, primary_key=True)
-    received_amount = db.Column(db.BigInteger)
+    expected_amount = db.Column(db.BigInteger, nullable=False)
+    received_amount = db.Column(db.BigInteger, nullable=False, default=0)
     __table_args__ = (
-        db.CheckConstraint(received_amount > 0),
+        # NOTE: When the expected amount is `1`, after applying the
+        # possibly negative interest rate, and rounding down, the
+        # received amount would have be zero. Therefore we should
+        # expect to receive only amounts greater than `1`.
+        db.CheckConstraint(expected_amount > 1),
+        db.CheckConstraint(received_amount >= 0),
         db.Index(
             "idx_worker_receiving_not_done",
             to_collector_id,
             turn_id,
             debtor_id,
-            postgresql_where=received_amount == null(),
+            postgresql_where=received_amount == 0,
         ),
         {
             "comment": (
@@ -367,15 +356,15 @@ class DispatchingTrigger(db.Model):
         db.BigInteger,
         nullable=False,
         comment=(
-            'The sum of all amounts for the corresponding records in the'
-            ' "worker_collecting" table.'
+            'The sum of all "expected_amount"s from the corresponding records'
+            ' in the "worker_collecting" table.'
         ),
     )
     expected_sent_amount = db.Column(
         db.BigInteger,
         nullable=False,
         comment=(
-            'The sum of all amounts for the corresponding records in the'
+            'The sum of all "amount"s from the corresponding records in the'
             ' "worker_sending" table.'
         ),
     )
@@ -423,10 +412,7 @@ class DispatchingTrigger(db.Model):
     def should_start_dispatching(self) -> bool:
         return (
             self.total_received_amount is not None
-            and (
-                (st := self.sending_trigger) is None
-                or st.total_collected_amount == st.expected_collected_amount
-            )
+            and ((st := self.sending_trigger) is None or st.all_collected)
         )
 
     @property
