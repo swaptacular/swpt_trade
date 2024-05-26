@@ -371,9 +371,9 @@ class DispatchingTrigger(db.Model):
     total_received_amount = db.Column(
         db.BigInteger,
         comment=(
-            "A non-NULL value indicates that all transfers for the"
-            ' corresponding records in the "worker_receiving" table have'
-            ' been received.'
+            "A non-NULL value (including zero) indicates that all transfers"
+            ' for the corresponding records in the "worker_receiving" table'
+            ' have been received.'
         ),
     )
     __table_args__ = (
