@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
 from sqlalchemy.sql.expression import null, or_, and_
+from sqlalchemy.orm import foreign
 from swpt_trade.extensions import db
 
 
@@ -248,6 +249,10 @@ class WorkerCollecting(db.Model):
                 ' table to this table.'
             ),
         },
+        # NOTE: Normally, there should be a foreign key constraint
+        # connecting each row in this table to a row in the
+        # "sending_trigger. For performance reasons, however, this
+        # foreign key is not declared.
     )
 
 
@@ -255,13 +260,27 @@ class SendingTrigger(db.Model):
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    expected_collected_amount = db.Column(db.BigInteger, nullable=False)
-    total_collected_amount = db.Column(db.BigInteger)
+    expected_collected_amount = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts for the corresponding records in the'
+            ' "worker_collecting" table.'
+        ),
+    )
+    total_collected_amount = db.Column(
+        db.BigInteger,
+        comment=(
+            "A non-NULL value indicates that all transfers for the"
+            ' corresponding records in the "worker_collecting" table have'
+            ' been received.'
+        ),
+    )
     __table_args__ = (
         db.CheckConstraint(expected_collected_amount > 0),
         db.CheckConstraint(total_collected_amount >= 0),
         db.Index(
-            "idx_sending_trigger_done",
+            "idx_sending_trigger_all_collected",
             collector_id,
             turn_id,
             debtor_id,
@@ -272,10 +291,19 @@ class SendingTrigger(db.Model):
                 'Indicates that once all transfers for the corresponding'
                 ' records in the "worker_collecting" table have been received,'
                 ' the given collector should start sending funds to other'
-                ' collectors, as stated in the "worker_sending" table.'
+                ' collectors, as stated in the "worker_sending" table. Note'
+                ' that even if there are no relevant records in the'
+                ' "worker_sending" table, when there is at least one'
+                ' corresponding record in the "worker_collecting" table,'
+                ' there will be a record in the "sending_trigger" table as'
+                ' well.'
             ),
         },
     )
+
+    @property
+    def should_start_sending(self) -> bool:
+        return self.total_collected_amount == self.expected_collected_amount
 
 
 class WorkerSending(db.Model):
@@ -322,6 +350,10 @@ class WorkerReceiving(db.Model):
                 ' to this table.'
             ),
         },
+        # NOTE: Normally, there should be a foreign key constraint
+        # connecting each row in this table to a row in the
+        # "dispatching_trigger. For performance reasons, however, this
+        # foreign key is not declared.
     )
 
 
@@ -329,16 +361,37 @@ class DispatchingTrigger(db.Model):
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
-    expected_collected_amount = db.Column(db.BigInteger, nullable=False)
-    max_sent_amount = db.Column(db.BigInteger, nullable=False)
-    total_received_amount = db.Column(db.BigInteger)
+    expected_collected_amount = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts for the corresponding records in the'
+            ' "worker_collecting" table.'
+        ),
+    )
+    expected_sent_amount = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts for the corresponding records in the'
+            ' "worker_sending" table.'
+        ),
+    )
+    total_received_amount = db.Column(
+        db.BigInteger,
+        comment=(
+            "A non-NULL value indicates that all transfers for the"
+            ' corresponding records in the "worker_receiving" table have'
+            ' been received.'
+        ),
+    )
     __table_args__ = (
         db.CheckConstraint(expected_collected_amount >= 0),
-        db.CheckConstraint(max_sent_amount >= 0),
-        db.CheckConstraint(max_sent_amount <= expected_collected_amount),
+        db.CheckConstraint(expected_sent_amount >= 0),
+        db.CheckConstraint(expected_sent_amount <= expected_collected_amount),
         db.CheckConstraint(total_received_amount >= 0),
         db.Index(
-            "idx_dispatching_trigger_done",
+            "idx_dispatching_trigger_all_received",
             collector_id,
             turn_id,
             debtor_id,
@@ -350,16 +403,35 @@ class DispatchingTrigger(db.Model):
                 ' records in the "worker_collecting" and "worker_receiving"'
                 ' tables have been received, the given collector should start'
                 " dispatching funds to creditors' accounts, as stated in the"
-                '"worker_dispatching" table.'
+                ' "worker_dispatching" table.'
             ),
         },
     )
 
+    sending_trigger = db.relationship(
+        SendingTrigger,
+        primaryjoin=and_(
+            SendingTrigger.collector_id == foreign(collector_id),
+            SendingTrigger.turn_id == foreign(turn_id),
+            SendingTrigger.debtor_id == foreign(debtor_id),
+        ),
+    )
+
     @property
-    def available_amount(self):
+    def should_start_dispatching(self) -> bool:
+        return (
+            self.total_received_amount is not None
+            and (
+                (st := self.sending_trigger) is None
+                or st.total_collected_amount == st.expected_collected_amount
+            )
+        )
+
+    @property
+    def available_amount(self) -> int:
         return (
             + self.expected_collected_amount
-            - self.max_sent_amount
+            - self.expected_sent_amount
             + (self.total_received_amount or 0)
         )
 
