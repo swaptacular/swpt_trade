@@ -10,8 +10,6 @@ atomic: Callable[[T], T] = db.atomic
 
 
 class RecentlyNeededCollectorsScanner(TableScanner):
-    """Garbage collects recently needed collector records."""
-
     table = RecentlyNeededCollector.__table__
     pk = table.c.debtor_id
 

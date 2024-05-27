@@ -232,3 +232,173 @@ def scan_account_locks(days, quit_early):
     assert days > 0.0
     scanner = AccountLocksScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_creditor_participations")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_creditor_participations(days, quit_early):
+    """Start a process that garbage collects creditor participation
+    records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the creditor participations table. If the
+    number of days is not specified, the value of the environment
+    variable APP_CREDITOR_PARTICIPATIONS_DAYS is taken. If it is not
+    set, the default number of days is 1.
+    """
+    from swpt_trade.table_scanners import CreditorParticipationsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started creditor participation records scanner.")
+    days = days or current_app.config["APP_CREDITOR_PARTICIPATIONS_DAYS"]
+    assert days > 0.0
+    scanner = CreditorParticipationsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_dispatching_statuses")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_dispatching_statuses(days, quit_early):
+    """Start a process that garbage collects dispatching status records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the dispatching status table. If the number of
+    days is not specified, the value of the environment variable
+    APP_DISPATCHING_STATUSES_DAYS is taken. If it is not set, the
+    default number of days is 1.
+    """
+    from swpt_trade.table_scanners import DispatchingStatusesScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started dispatching status records scanner.")
+    days = days or current_app.config["APP_DISPATCHING_STATUSES_DAYS"]
+    assert days > 0.0
+    scanner = DispatchingStatusesScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_worker_collectings")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_worker_collectings(days, quit_early):
+    """Start a process that garbage collects worker collecting records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the worker collecting table. If the number of
+    days is not specified, the value of the environment variable
+    APP_WORKER_COLLECTINGS_DAYS is taken. If it is not set, the
+    default number of days is 1.
+    """
+    from swpt_trade.table_scanners import WorkerCollectingsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started worker collecting records scanner.")
+    days = days or current_app.config["APP_WORKER_COLLECTINGS_DAYS"]
+    assert days > 0.0
+    scanner = WorkerCollectingsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_worker_sendings")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_worker_sendings(days, quit_early):
+    """Start a process that garbage collects worker sending records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the worker sending table. If the number of
+    days is not specified, the value of the environment variable
+    APP_WORKER_SENDINGS_DAYS is taken. If it is not set, the default
+    number of days is 1.
+    """
+    from swpt_trade.table_scanners import WorkerSendingsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started worker sending records scanner.")
+    days = days or current_app.config["APP_WORKER_SENDINGS_DAYS"]
+    assert days > 0.0
+    scanner = WorkerSendingsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_worker_receivings")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_worker_receivings(days, quit_early):
+    """Start a process that garbage collects worker receiving records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the worker receiving table. If the number of
+    days is not specified, the value of the environment variable
+    APP_WORKER_RECEIVINGS_DAYS is taken. If it is not set, the default
+    number of days is 1.
+
+    """
+    from swpt_trade.table_scanners import WorkerReceivingsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started worker receiving records scanner.")
+    days = days or current_app.config["APP_WORKER_RECEIVINGS_DAYS"]
+    assert days > 0.0
+    scanner = WorkerReceivingsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_worker_dispatchings")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_worker_dispatchings(days, quit_early):
+    """Start a process that garbage collects worker dispatching records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the worker dispatching table. If the number of
+    days is not specified, the value of the environment variable
+    APP_WORKER_DISPATCHINGS_DAYS is taken. If it is not set, the
+    default number of days is 1.
+    """
+    from swpt_trade.table_scanners import WorkerDispatchingsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started worker dispatching records scanner.")
+    days = days or current_app.config["APP_WORKER_DISPATCHINGS_DAYS"]
+    assert days > 0.0
+    scanner = WorkerDispatchingsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)

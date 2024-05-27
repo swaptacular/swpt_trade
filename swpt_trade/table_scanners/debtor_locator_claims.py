@@ -11,8 +11,6 @@ atomic: Callable[[T], T] = db.atomic
 
 
 class DebtorLocatorClaimsScanner(TableScanner):
-    """Garbage collects stale debtor locator claims."""
-
     table = DebtorLocatorClaim.__table__
     pk = table.c.debtor_id
     columns = [

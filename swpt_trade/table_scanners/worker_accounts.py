@@ -11,8 +11,6 @@ atomic: Callable[[T], T] = db.atomic
 
 
 class WorkerAccountsScanner(TableScanner):
-    """Garbage collects worker accounts."""
-
     table = WorkerAccount.__table__
     pk = tuple_(table.c.creditor_id, table.c.debtor_id)
     columns = [

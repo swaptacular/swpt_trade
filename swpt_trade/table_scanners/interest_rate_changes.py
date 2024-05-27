@@ -1,18 +1,16 @@
 from typing import TypeVar, Callable
 from datetime import datetime, timezone
-from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
 from sqlalchemy.sql.expression import tuple_
 from swpt_trade.extensions import db
 from swpt_trade.models import InterestRateChange
+from .common import ParentRecordsCleaner
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
 
-class InterestRateChangesScanner(TableScanner):
-    """Garbage collects interest rage changes."""
-
+class InterestRateChangesScanner(ParentRecordsCleaner):
     table = InterestRateChange.__table__
     pk = tuple_(table.c.creditor_id, table.c.debtor_id, table.c.change_ts)
     columns = [
@@ -39,10 +37,8 @@ class InterestRateChangesScanner(TableScanner):
 
     @atomic
     def process_rows(self, rows):
-        current_ts = datetime.now(tz=timezone.utc)
-
-        if current_app.config["DELETE_PARENT_SHARD_RECORDS"]:
-            self._delete_parent_shard_records(rows, current_ts)
+        assert current_app.config["DELETE_PARENT_SHARD_RECORDS"]
+        self._delete_parent_shard_records(rows, datetime.now(tz=timezone.utc))
 
     def _delete_parent_shard_records(self, rows, current_ts):
         c = self.table.c

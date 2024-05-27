@@ -17,8 +17,6 @@ atomic: Callable[[T], T] = db.atomic
 
 
 class TradingPoliciesScanner(TableScanner):
-    """Garbage collects useless trading policies."""
-
     table = TradingPolicy.__table__
     pk = tuple_(table.c.creditor_id, table.c.debtor_id)
 

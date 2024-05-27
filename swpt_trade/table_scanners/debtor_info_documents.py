@@ -10,8 +10,6 @@ atomic: Callable[[T], T] = db.atomic
 
 
 class DebtorInfoDocumentsScanner(TableScanner):
-    """Garbage collects stale debtor info documents."""
-
     table = DebtorInfoDocument.__table__
     pk = table.c.debtor_info_locator
     columns = [

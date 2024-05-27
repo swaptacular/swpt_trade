@@ -223,10 +223,13 @@ class CreditorParticipation(db.Model):
     )
 
 
-class TransfersTrigger(db.Model):
+class DispatchingStatus(db.Model):
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
+    inserted_at = db.Column(
+        db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
+    )
     amount_to_collect = db.Column(
         db.BigInteger,
         nullable=False,
@@ -243,7 +246,7 @@ class TransfersTrigger(db.Model):
             ' "worker_sending" table.'
         ),
     )
-    triggered_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
+    started_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
     all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
     total_received_amount = db.Column(
         db.BigInteger,
@@ -253,6 +256,7 @@ class TransfersTrigger(db.Model):
             ' have been received.'
         ),
     )
+    started_dispatching = db.Column(db.BOOLEAN, nullable=False, default=False)
     __table_args__ = (
         db.CheckConstraint(amount_to_collect >= 0),
         db.CheckConstraint(amount_to_send >= 0),
@@ -261,8 +265,8 @@ class TransfersTrigger(db.Model):
         {
             "comment": (
                 'Represents the status of the process of collecting, sending,'
-                ' and receiving for a given collector account during a given'
-                ' trading turn.'
+                ' receiving, and dispatching for a given collector account,'
+                ' during a given trading turn.'
             ),
         },
     )
@@ -300,8 +304,8 @@ class WorkerCollecting(db.Model):
         },
         # NOTE: Normally, there should be a foreign key constraint
         # connecting each row in this table to a row in the
-        # "transfers_trigger" table. For performance reasons, however,
-        # this foreign key is not declared.
+        # "dispatching_status" table. For performance reasons,
+        # however, this foreign key is not declared.
     )
 
 
@@ -368,8 +372,8 @@ class WorkerReceiving(db.Model):
         },
         # NOTE: Normally, there should be a foreign key constraint
         # connecting each row in this table to a row in the
-        # "transfers_trigger" table. For performance reasons, however,
-        # this foreign key is not declared.
+        # "dispatching_status" table. For performance reasons,
+        # however, this foreign key is not declared.
     )
 
 
