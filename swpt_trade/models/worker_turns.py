@@ -1,8 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
-from sqlalchemy.sql.expression import null, true, or_, and_
-from sqlalchemy.orm import foreign
+from sqlalchemy.sql.expression import null, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -224,23 +223,71 @@ class CreditorParticipation(db.Model):
     )
 
 
+class TransfersTrigger(db.Model):
+    collector_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    amount_to_collect = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts from the corresponding records in the'
+            ' "worker_collecting" table.'
+        ),
+    )
+    amount_to_send = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts from the corresponding records in the'
+            ' "worker_sending" table.'
+        ),
+    )
+    triggered_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
+    all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
+    total_received_amount = db.Column(
+        db.BigInteger,
+        comment=(
+            "A non-NULL value (including zero) indicates that all transfers"
+            ' for the corresponding records in the "worker_receiving" table'
+            ' have been received.'
+        ),
+    )
+    __table_args__ = (
+        db.CheckConstraint(amount_to_collect >= 0),
+        db.CheckConstraint(amount_to_send >= 0),
+        db.CheckConstraint(amount_to_send <= amount_to_collect),
+        db.CheckConstraint(total_received_amount >= 0),
+        {
+            "comment": (
+                'Represents the status of the process of collecting, sending,'
+                ' and receiving for a given collector account during a given'
+                ' trading turn.'
+            ),
+        },
+    )
+
+    @property
+    def all_received(self) -> bool:
+        return self.total_received_amount is not None
+
+    @property
+    def available_amount(self) -> int:
+        return (
+            + self.amount_to_collect
+            - self.amount_to_send
+            + (self.total_received_amount or 0)
+        )
+
+
 class WorkerCollecting(db.Model):
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
-    expected_amount = db.Column(db.BigInteger, nullable=False)
-    collected_amount = db.Column(db.BigInteger, nullable=False, default=0)
+    amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.CheckConstraint(expected_amount > 0),
-        db.CheckConstraint(collected_amount >= 0),
-        db.Index(
-            "idx_worker_collecting_not_done",
-            collector_id,
-            turn_id,
-            debtor_id,
-            postgresql_where=collected_amount < expected_amount,
-        ),
+        db.CheckConstraint(amount > 0),
         {
             "comment": (
                 'Indicates that the given amount will be withdrawn (collected)'
@@ -253,42 +300,9 @@ class WorkerCollecting(db.Model):
         },
         # NOTE: Normally, there should be a foreign key constraint
         # connecting each row in this table to a row in the
-        # "sending_trigger. For performance reasons, however, this
-        # foreign key is not declared.
+        # "transfers_trigger" table. For performance reasons, however,
+        # this foreign key is not declared.
     )
-
-
-class SendingTrigger(db.Model):
-    collector_id = db.Column(db.BigInteger, primary_key=True)
-    turn_id = db.Column(db.Integer, primary_key=True)
-    debtor_id = db.Column(db.BigInteger, primary_key=True)
-    all_collected = db.Column(db.BOOLEAN, nullable=False, default=False)
-    __table_args__ = (
-        db.Index(
-            "idx_sending_trigger_all_collected",
-            collector_id,
-            turn_id,
-            debtor_id,
-            postgresql_where=all_collected == true(),
-        ),
-        {
-            "comment": (
-                'Indicates that once all transfers for the corresponding'
-                ' records in the "worker_collecting" table have been received,'
-                ' the given collector should start sending funds to other'
-                ' collectors, as stated in the "worker_sending" table. Note'
-                ' that even if there are no relevant records in the'
-                ' "worker_sending" table, when there is at least one'
-                ' corresponding record in the "worker_collecting" table,'
-                ' there will be a record in the "sending_trigger" table as'
-                ' well.'
-            ),
-        },
-    )
-
-    @property
-    def should_start_sending(self) -> bool:
-        return self.all_collected
 
 
 class WorkerSending(db.Model):
@@ -317,24 +331,35 @@ class WorkerReceiving(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     from_collector_id = db.Column(db.BigInteger, primary_key=True)
     expected_amount = db.Column(db.BigInteger, nullable=False)
-    received_amount = db.Column(db.BigInteger, nullable=False, default=0)
-    __table_args__ = (
+    received_amount = db.Column(
+        db.BigInteger,
+        nullable=False,
+        default=0,
+        comment=(
+            'The received amount will be equal to the expected amount'
+            ' minus the accumulated negative interest (that is: when'
+            ' the interest rate is negative).'
+        ),
         # NOTE: When the expected amount is `1`, after applying the
         # possibly negative interest rate, and rounding down, the
-        # received amount would have to be zero. Therefore, we should
-        # expect to receive only amounts greater than `1`.
+        # received amount would have to be zero, which is impossible.
+        # Therefore, we can expect to receive only amounts greater
+        # than `1`.
+    )
+    __table_args__ = (
         db.CheckConstraint(expected_amount > 1),
         db.CheckConstraint(received_amount >= 0),
         db.Index(
-            "idx_worker_receiving_not_done",
+            "idx_worker_receiving_not_received",
             to_collector_id,
             turn_id,
             debtor_id,
+            from_collector_id,
             postgresql_where=received_amount == 0,
         ),
         {
             "comment": (
-                'Indicates the given amount will be transferred (received)'
+                'Indicates that some amount will be transferred (received)'
                 ' from another collector account, as part of the given trading'
                 ' turn. During the phase 3 of each turn, "worker" servers will'
                 ' move the records from the "collector_receiving" solver table'
@@ -343,85 +368,9 @@ class WorkerReceiving(db.Model):
         },
         # NOTE: Normally, there should be a foreign key constraint
         # connecting each row in this table to a row in the
-        # "dispatching_trigger. For performance reasons, however, this
-        # foreign key is not declared.
+        # "transfers_trigger" table. For performance reasons, however,
+        # this foreign key is not declared.
     )
-
-
-class DispatchingTrigger(db.Model):
-    collector_id = db.Column(db.BigInteger, primary_key=True)
-    turn_id = db.Column(db.Integer, primary_key=True)
-    debtor_id = db.Column(db.BigInteger, primary_key=True)
-    expected_collected_amount = db.Column(
-        db.BigInteger,
-        nullable=False,
-        comment=(
-            'The sum of all "expected_amount"s from the corresponding records'
-            ' in the "worker_collecting" table.'
-        ),
-    )
-    expected_sent_amount = db.Column(
-        db.BigInteger,
-        nullable=False,
-        comment=(
-            'The sum of all "amount"s from the corresponding records in the'
-            ' "worker_sending" table.'
-        ),
-    )
-    total_received_amount = db.Column(
-        db.BigInteger,
-        comment=(
-            "A non-NULL value (including zero) indicates that all transfers"
-            ' for the corresponding records in the "worker_receiving" table'
-            ' have been received.'
-        ),
-    )
-    __table_args__ = (
-        db.CheckConstraint(expected_collected_amount >= 0),
-        db.CheckConstraint(expected_sent_amount >= 0),
-        db.CheckConstraint(expected_sent_amount <= expected_collected_amount),
-        db.CheckConstraint(total_received_amount >= 0),
-        db.Index(
-            "idx_dispatching_trigger_all_received",
-            collector_id,
-            turn_id,
-            debtor_id,
-            postgresql_where=total_received_amount != null(),
-        ),
-        {
-            "comment": (
-                'Indicates that once all transfers for the corresponding'
-                ' records in the "worker_collecting" and "worker_receiving"'
-                ' tables have been received, the given collector should start'
-                " dispatching funds to creditors' accounts, as stated in the"
-                ' "worker_dispatching" table.'
-            ),
-        },
-    )
-
-    sending_trigger = db.relationship(
-        SendingTrigger,
-        primaryjoin=and_(
-            SendingTrigger.collector_id == foreign(collector_id),
-            SendingTrigger.turn_id == foreign(turn_id),
-            SendingTrigger.debtor_id == foreign(debtor_id),
-        ),
-    )
-
-    @property
-    def should_start_dispatching(self) -> bool:
-        return (
-            self.total_received_amount is not None
-            and ((st := self.sending_trigger) is None or st.all_collected)
-        )
-
-    @property
-    def available_amount(self) -> int:
-        return (
-            + self.expected_collected_amount
-            - self.expected_sent_amount
-            + (self.total_received_amount or 0)
-        )
 
 
 class WorkerDispatching(db.Model):
