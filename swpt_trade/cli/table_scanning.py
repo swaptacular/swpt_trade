@@ -135,7 +135,7 @@ def scan_needed_worker_accounts(days, quit_early):
     single pass through the needed worker accounts table. If the
     number of days is not specified, the value of the environment
     variable APP_NEEDED_WORKER_ACCOUNTS_SCAN_DAYS is taken. If it is
-    not set, the default number of days is 7.
+    not set, the default number of days is 1.
     """
     from swpt_trade.table_scanners import NeededWorkerAccountsScanner
 
@@ -163,7 +163,7 @@ def scan_interest_rate_changes(days, quit_early):
     single pass through the debtor info documents table. If the number
     of days is not specified, the value of the environment variable
     APP_INTEREST_RATE_CHANGES_SCAN_DAYS is taken. If it is not set,
-    the default number of days is 7.
+    the default number of days is 1.
     """
     from swpt_trade.table_scanners import InterestRateChangesScanner
 
