@@ -787,6 +787,383 @@ def test_delete_parent_needed_worker_accounts(
     assert nwas[0].creditor_id == 888
 
 
+def test_delete_parent_creditor_participations(
+        app,
+        db_session,
+        restore_sharding_realm,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    cp1 = m.CreditorParticipation(
+        creditor_id=666, debtor_id=1, turn_id=1, amount=1, collector_id=1
+    )
+    cp2 = m.CreditorParticipation(
+        creditor_id=777, debtor_id=1, turn_id=1, amount=1, collector_id=1
+    )
+    cp3 = m.CreditorParticipation(
+        creditor_id=888, debtor_id=1, turn_id=1, amount=1, collector_id=1
+    )
+    db.session.add(cp1)
+    db.session.add(cp2)
+    db.session.add(cp3)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE creditor_participation"))
+
+    assert len(m.CreditorParticipation.query.all()) == 3
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_creditor_participations",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    cps = m.CreditorParticipation.query.all()
+    assert len(cps) == 1
+    assert cps[0].creditor_id == 888
+
+
+def test_delete_dispatching_statuses(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    ds1 = m.DispatchingStatus(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        purge_at=current_ts + timedelta(days=1000),
+        amount_to_collect=0,
+        amount_to_send=0,
+    )
+    ds2 = m.DispatchingStatus(
+        collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        purge_at=current_ts + timedelta(days=1000),
+        amount_to_collect=0,
+        amount_to_send=0,
+    )
+    ds3 = m.DispatchingStatus(
+        collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        purge_at=current_ts + timedelta(days=1000),
+        amount_to_collect=0,
+        amount_to_send=0,
+    )
+    ds4 = m.DispatchingStatus(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        purge_at=current_ts - timedelta(days=1),
+        amount_to_collect=0,
+        amount_to_send=0,
+    )
+    db.session.add(ds1)
+    db.session.add(ds2)
+    db.session.add(ds3)
+    db.session.add(ds4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE dispatching_status"))
+
+    assert len(m.DispatchingStatus.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_dispatching_statuses",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    dss = m.DispatchingStatus.query.all()
+    assert len(dss) == 1
+    assert dss[0].collector_id == 888
+
+
+def test_delete_worker_collectings(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    wc1 = m.WorkerCollecting(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wc2 = m.WorkerCollecting(
+        collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wc3 = m.WorkerCollecting(
+        collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wc4 = m.WorkerCollecting(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts - timedelta(days=1),
+    )
+    db.session.add(wc1)
+    db.session.add(wc2)
+    db.session.add(wc3)
+    db.session.add(wc4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_collecting"))
+
+    assert len(m.WorkerCollecting.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_collectings",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wcs = m.WorkerCollecting.query.all()
+    assert len(wcs) == 1
+    assert wcs[0].collector_id == 888
+
+
+def test_delete_worker_dispatchings(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    wd1 = m.WorkerDispatching(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wd2 = m.WorkerDispatching(
+        collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wd3 = m.WorkerDispatching(
+        collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wd4 = m.WorkerDispatching(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        amount=1000,
+        purge_at=current_ts - timedelta(days=1),
+    )
+    db.session.add(wd1)
+    db.session.add(wd2)
+    db.session.add(wd3)
+    db.session.add(wd4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_dispatching"))
+
+    assert len(m.WorkerDispatching.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_dispatchings",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wds = m.WorkerDispatching.query.all()
+    assert len(wds) == 1
+    assert wds[0].collector_id == 888
+
+
+def test_delete_worker_receivings(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    wr1 = m.WorkerReceiving(
+        to_collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        from_collector_id=1,
+        expected_amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wr2 = m.WorkerReceiving(
+        to_collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        from_collector_id=1,
+        expected_amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wr3 = m.WorkerReceiving(
+        to_collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        from_collector_id=1,
+        expected_amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    wr4 = m.WorkerReceiving(
+        to_collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        from_collector_id=1,
+        expected_amount=1000,
+        purge_at=current_ts - timedelta(days=1),
+    )
+    db.session.add(wr1)
+    db.session.add(wr2)
+    db.session.add(wr3)
+    db.session.add(wr4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_receiving"))
+
+    assert len(m.WorkerReceiving.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_receivings",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wrs = m.WorkerReceiving.query.all()
+    assert len(wrs) == 1
+    assert wrs[0].to_collector_id == 888
+
+
+def test_delete_worker_sendings(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    ws1 = m.WorkerSending(
+        from_collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        to_collector_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    ws2 = m.WorkerSending(
+        from_collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        to_collector_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    ws3 = m.WorkerSending(
+        from_collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        to_collector_id=1,
+        amount=1000,
+        purge_at=current_ts + timedelta(days=1000),
+    )
+    ws4 = m.WorkerSending(
+        from_collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        to_collector_id=1,
+        amount=1000,
+        purge_at=current_ts - timedelta(days=1),
+    )
+    db.session.add(ws1)
+    db.session.add(ws2)
+    db.session.add(ws3)
+    db.session.add(ws4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE worker_sending"))
+
+    assert len(m.WorkerSending.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_worker_sendings",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wss = m.WorkerSending.query.all()
+    assert len(wss) == 1
+    assert wss[0].from_collector_id == 888
+
+
 def test_process_pristine_collectors(
         app,
         db_session,

@@ -1,17 +1,16 @@
-import time
 from typing import TypeVar, Callable
 from datetime import datetime, timezone
+from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
 from sqlalchemy.sql.expression import tuple_
 from swpt_trade.extensions import db
 from swpt_trade.models import WorkerCollecting
-from .common import ParentRecordsCleaner
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
 
-class WorkerCollectingsScanner(ParentRecordsCleaner):
+class WorkerCollectingsScanner(TableScanner):
     table = WorkerCollecting.__table__
     pk = tuple_(
         table.c.collector_id,
@@ -24,6 +23,7 @@ class WorkerCollectingsScanner(ParentRecordsCleaner):
         WorkerCollecting.turn_id,
         WorkerCollecting.debtor_id,
         WorkerCollecting.creditor_id,
+        WorkerCollecting.purge_at,
     ]
 
     def __init__(self):
@@ -44,8 +44,12 @@ class WorkerCollectingsScanner(ParentRecordsCleaner):
 
     @atomic
     def process_rows(self, rows):
-        assert current_app.config["DELETE_PARENT_SHARD_RECORDS"]
-        self._delete_parent_shard_records(rows, datetime.now(tz=timezone.utc))
+        current_ts = datetime.now(tz=timezone.utc)
+
+        if current_app.config["DELETE_PARENT_SHARD_RECORDS"]:
+            self._delete_parent_shard_records(rows, current_ts)
+
+        self._delete_stale_records(rows, current_ts)
 
     def _delete_parent_shard_records(self, rows, current_ts):
         c = self.table.c
@@ -70,6 +74,39 @@ class WorkerCollectingsScanner(ParentRecordsCleaner):
             )
             for row in rows
             if belongs_to_parent_shard(row)
+        ]
+        if pks_to_delete:
+            to_delete = (
+                WorkerCollecting.query.filter(self.pk.in_(pks_to_delete))
+                .with_for_update(skip_locked=True)
+                .all()
+            )
+
+            for record in to_delete:
+                db.session.delete(record)
+
+            db.session.commit()
+
+    def _delete_stale_records(self, rows, current_ts):
+        c = self.table.c
+        c_collector_id = c.collector_id
+        c_turn_id = c.turn_id
+        c_debtor_id = c.debtor_id
+        c_creditor_id = c.creditor_id
+        c_purge_at = c.purge_at
+
+        def is_stale(row) -> bool:
+            return row[c_purge_at] < current_ts
+
+        pks_to_delete = [
+            (
+                row[c_collector_id],
+                row[c_turn_id],
+                row[c_debtor_id],
+                row[c_creditor_id]
+            )
+            for row in rows
+            if is_stale(row)
         ]
         if pks_to_delete:
             to_delete = (

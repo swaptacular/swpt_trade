@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: eb12f1e61e9e
+Revision ID: bcb5a5b98779
 Revises: 5aafeb2c295f
-Create Date: 2024-05-27 19:10:48.520053
+Create Date: 2024-05-28 13:46:04.433590
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'eb12f1e61e9e'
+revision = 'bcb5a5b98779'
 down_revision = '5aafeb2c295f'
 branch_labels = None
 depends_on = None
@@ -44,6 +44,7 @@ def upgrade_():
     sa.Column('turn_id', sa.Integer(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('inserted_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('purge_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('amount_to_collect', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_collecting" table.'),
     sa.Column('amount_to_send', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_sending" table.'),
     sa.Column('started_sending', sa.BOOLEAN(), nullable=False),
@@ -63,6 +64,7 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('purge_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 0'),
     sa.PrimaryKeyConstraint('collector_id', 'turn_id', 'debtor_id', 'creditor_id'),
     comment='Indicates that the given amount will be withdrawn (collected) from the given creditor\'s account, as part of the given trading turn, and will be transferred to the given collector. During the phase 3 of each turn, "worker" servers will move the records from the "collector_collecting" solver table to this table.'
@@ -73,6 +75,7 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('purge_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 0'),
     sa.PrimaryKeyConstraint('collector_id', 'turn_id', 'debtor_id', 'creditor_id'),
     comment='Indicates that the given amount must be deposited (dispatched) to the given customer account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_dispatching" solver table to this table.'
@@ -84,6 +87,7 @@ def upgrade_():
     sa.Column('from_collector_id', sa.BigInteger(), nullable=False),
     sa.Column('expected_amount', sa.BigInteger(), nullable=False),
     sa.Column('received_amount', sa.BigInteger(), nullable=False, comment='The received amount will be equal to the expected amount minus the accumulated negative interest (that is: when the interest rate is negative).'),
+    sa.Column('purge_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('expected_amount > 1'),
     sa.CheckConstraint('received_amount >= 0'),
     sa.PrimaryKeyConstraint('to_collector_id', 'turn_id', 'debtor_id', 'from_collector_id'),
@@ -98,6 +102,7 @@ def upgrade_():
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('to_collector_id', sa.BigInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
+    sa.Column('purge_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 0'),
     sa.PrimaryKeyConstraint('from_collector_id', 'turn_id', 'debtor_id', 'to_collector_id'),
     comment='Indicates that the given amount must be transferred (sent) to another collector account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_sending" solver table to this table.'

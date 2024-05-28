@@ -251,7 +251,7 @@ def scan_creditor_participations(days, quit_early):
     single pass through the creditor participations table. If the
     number of days is not specified, the value of the environment
     variable APP_CREDITOR_PARTICIPATIONS_DAYS is taken. If it is not
-    set, the default number of days is 1.
+    set, the default number of days is 7.
     """
     from swpt_trade.table_scanners import CreditorParticipationsScanner
 
@@ -279,7 +279,7 @@ def scan_dispatching_statuses(days, quit_early):
     single pass through the dispatching status table. If the number of
     days is not specified, the value of the environment variable
     APP_DISPATCHING_STATUSES_DAYS is taken. If it is not set, the
-    default number of days is 1.
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import DispatchingStatusesScanner
 
@@ -307,7 +307,7 @@ def scan_worker_collectings(days, quit_early):
     single pass through the worker collecting table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_COLLECTINGS_DAYS is taken. If it is not set, the
-    default number of days is 1.
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerCollectingsScanner
 
@@ -335,7 +335,7 @@ def scan_worker_sendings(days, quit_early):
     single pass through the worker sending table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_SENDINGS_DAYS is taken. If it is not set, the default
-    number of days is 1.
+    number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerSendingsScanner
 
@@ -363,7 +363,7 @@ def scan_worker_receivings(days, quit_early):
     single pass through the worker receiving table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_RECEIVINGS_DAYS is taken. If it is not set, the default
-    number of days is 1.
+    number of days is 7.
 
     """
     from swpt_trade.table_scanners import WorkerReceivingsScanner
@@ -392,7 +392,7 @@ def scan_worker_dispatchings(days, quit_early):
     single pass through the worker dispatching table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_DISPATCHINGS_DAYS is taken. If it is not set, the
-    default number of days is 1.
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerDispatchingsScanner
 

@@ -61,6 +61,12 @@ def db_session(app):
         "TRUNCATE TABLE active_collector",
         "TRUNCATE TABLE interest_rate_change",
         "DELETE FROM worker_turn",
+        "TRUNCATE TABLE creditor_participation",
+        "TRUNCATE TABLE dispatching_status",
+        "TRUNCATE TABLE worker_collecting",
+        "TRUNCATE TABLE worker_sending",
+        "TRUNCATE TABLE worker_receiving",
+        "TRUNCATE TABLE worker_dispatching",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
 

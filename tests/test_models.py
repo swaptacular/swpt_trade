@@ -327,3 +327,23 @@ def test_account_lock_is_in_force(current_ts):
     assert al.is_in_force(date(2024, 5, 1), 320)
     assert al.is_in_force(date(2024, 5, 1), 321)
     assert al.is_in_force(date(2024, 5, 1), 322)
+
+
+def test_dispatching_status_properties(current_ts):
+    ds = m.DispatchingStatus(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        purge_at=current_ts + timedelta(days=1000),
+        amount_to_collect=50000,
+        amount_to_send=5000,
+        started_sending=True,
+        all_sent=True,
+        total_received_amount=None,
+    )
+    assert not ds.all_received
+    assert ds.available_amount == 45000
+
+    ds.total_received_amount = 10000
+    assert ds.all_received
+    assert ds.available_amount == 55000
