@@ -314,7 +314,7 @@ class DispatchingStatus(db.Model):
         return self.total_collected_amount == self.amount_to_collect
 
     @property
-    def amount_for_sending(self) -> int:
+    def available_amount_to_send(self) -> int:
         collected_amount = self.total_collected_amount or 0
         missing_amount = self.amount_to_collect - collected_amount
         assert missing_amount >= 0
@@ -326,11 +326,11 @@ class DispatchingStatus(db.Model):
         return self.total_received_amount is not None
 
     @property
-    def amount_for_dispatching(self) -> int:
+    def available_amount_to_dispatch(self) -> int:
         return (
             + (self.total_collected_amount or 0)
             + (self.total_received_amount or 0)
-            - self.amount_for_sending
+            - self.available_amount_to_send
         )
 
 
