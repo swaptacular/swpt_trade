@@ -318,7 +318,7 @@ class DispatchingStatus(db.Model):
         return self.total_received_amount is not None
 
     @property
-    def available_amount(self) -> int:
+    def amount_for_dispatching(self) -> int:
         return (
             + (self.total_collected_amount or 0)
             + (self.total_received_amount or 0)

@@ -354,4 +354,4 @@ def test_dispatching_status_properties(current_ts):
     ds.total_received_amount = 10000
     ds.all_received = True
     assert ds.all_received
-    assert ds.available_amount == 46000 - 1000 + 10000
+    assert ds.amount_for_dispatching == 46000 - 1000 + 10000
