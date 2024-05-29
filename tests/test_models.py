@@ -334,16 +334,25 @@ def test_dispatching_status_properties(current_ts):
         collector_id=666,
         turn_id=1,
         debtor_id=1,
-        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=50000,
+        total_collected_amount=None,
         amount_to_send=5000,
         started_sending=True,
         all_sent=True,
+        number_to_receive=1,
         total_received_amount=None,
     )
+    assert not ds.finished_collecting
+    assert not ds.all_collected
+    assert not ds.finished_receiving
     assert not ds.all_received
-    assert ds.available_amount == 45000
+    assert ds.amount_for_sending == 0
+
+    ds.total_collected_amount = 46000
+    assert ds.finished_collecting
+    assert ds.amount_for_sending == 1000
 
     ds.total_received_amount = 10000
+    ds.all_received = True
     assert ds.all_received
-    assert ds.available_amount == 55000
+    assert ds.available_amount == 46000 - 1000 + 10000

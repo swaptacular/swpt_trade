@@ -842,44 +842,35 @@ def test_delete_dispatching_statuses(
         collector_id=666,
         turn_id=1,
         debtor_id=1,
-        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
+        number_to_receive=0,
         amount_to_send=0,
     )
     ds2 = m.DispatchingStatus(
         collector_id=777,
         turn_id=1,
         debtor_id=1,
-        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
+        number_to_receive=0,
         amount_to_send=0,
     )
     ds3 = m.DispatchingStatus(
         collector_id=888,
         turn_id=1,
         debtor_id=1,
-        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
-        amount_to_send=0,
-    )
-    ds4 = m.DispatchingStatus(
-        collector_id=999,
-        turn_id=1,
-        debtor_id=1,
-        purge_after=current_ts - timedelta(days=1),
-        amount_to_collect=0,
+        number_to_receive=0,
         amount_to_send=0,
     )
     db.session.add(ds1)
     db.session.add(ds2)
     db.session.add(ds3)
-    db.session.add(ds4)
     db.session.commit()
 
     with db.engine.connect() as conn:
         conn.execute(sqlalchemy.text("ANALYZE dispatching_status"))
 
-    assert len(m.DispatchingStatus.query.all()) == 4
+    assert len(m.DispatchingStatus.query.all()) == 3
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[

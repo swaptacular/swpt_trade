@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from .common import get_now_utc
-from sqlalchemy.sql.expression import null, or_, and_
+from sqlalchemy.sql.expression import null, false, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -230,13 +230,21 @@ class DispatchingStatus(db.Model):
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
-    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     amount_to_collect = db.Column(
         db.BigInteger,
         nullable=False,
         comment=(
             'The sum of all amounts from the corresponding records in the'
-            ' "worker_collecting" table.'
+            ' "worker_collecting" table, at the moment the'
+            ' "dispatching_status" record has been created.'
+        ),
+    )
+    total_collected_amount = db.Column(
+        db.BigInteger,
+        comment=(
+            "A non-NULL value indicates that no more transfers for"
+            ' corresponding records in the "worker_collecting" table will'
+            ' be collected.'
         ),
     )
     amount_to_send = db.Column(
@@ -244,25 +252,42 @@ class DispatchingStatus(db.Model):
         nullable=False,
         comment=(
             'The sum of all amounts from the corresponding records in the'
-            ' "worker_sending" table.'
+            ' "worker_sending" table, at the moment the "dispatching_status"'
+            ' record has been created.'
         ),
     )
     started_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
     all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
+    number_to_receive = db.Column(
+        db.Integer,
+        nullable=False,
+        comment=(
+            'The number of corresponding records in the "worker_receiving"'
+            ' table, at the moment the "dispatching_status" record has'
+            ' created.'
+        ),
+    )
     total_received_amount = db.Column(
         db.BigInteger,
         comment=(
-            "A non-NULL value (including zero) indicates that all transfers"
-            ' for the corresponding records in the "worker_receiving" table'
-            ' have been received.'
+            "A non-NULL value indicates that no more transfers for"
+            ' corresponding records in the "worker_receiving" table will'
+            ' be received.'
         ),
     )
+    all_received = db.Column(db.BOOLEAN, nullable=False, default=False)
     started_dispatching = db.Column(db.BOOLEAN, nullable=False, default=False)
     __table_args__ = (
         db.CheckConstraint(amount_to_collect >= 0),
+        db.CheckConstraint(total_collected_amount >= 0),
+        db.CheckConstraint(total_collected_amount <= amount_to_collect),
         db.CheckConstraint(amount_to_send >= 0),
         db.CheckConstraint(amount_to_send <= amount_to_collect),
+        db.CheckConstraint(number_to_receive >= 0),
         db.CheckConstraint(total_received_amount >= 0),
+        db.CheckConstraint(
+            or_(all_received == false(), total_received_amount != null())
+        ),
         {
             "comment": (
                 'Represents the status of the process of collecting, sending,'
@@ -273,14 +298,30 @@ class DispatchingStatus(db.Model):
     )
 
     @property
-    def all_received(self) -> bool:
+    def finished_collecting(self) -> bool:
+        return self.total_collected_amount is not None
+
+    @property
+    def all_collected(self) -> bool:
+        return self.total_collected_amount == self.amount_to_collect
+
+    @property
+    def finished_receiving(self) -> bool:
         return self.total_received_amount is not None
+
+    @property
+    def amount_for_sending(self) -> int:
+        collected_amount = self.total_collected_amount or 0
+        missing_amount = self.amount_to_collect - collected_amount
+        assert missing_amount >= 0
+
+        return max(self.amount_to_send - missing_amount, 0)
 
     @property
     def available_amount(self) -> int:
         return (
-            + self.amount_to_collect
-            - self.amount_to_send
+            + (self.total_collected_amount or 0)
+            - self.amount_for_sending
             + (self.total_received_amount or 0)
         )
 
@@ -291,9 +332,18 @@ class WorkerCollecting(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
+    collected = db.Column(db.BOOLEAN, nullable=False, default=False)
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
+        db.Index(
+            "idx_worker_collecting_not_collected",
+            collector_id,
+            turn_id,
+            debtor_id,
+            creditor_id,
+            postgresql_where=collected == false(),
+        ),
         {
             "comment": (
                 'Indicates that the given amount will be withdrawn (collected)'
@@ -304,10 +354,6 @@ class WorkerCollecting(db.Model):
                 ' table to this table.'
             ),
         },
-        # NOTE: Normally, there should be a foreign key constraint
-        # connecting each row in this table to a row in the
-        # "dispatching_status" table. For performance reasons,
-        # however, this foreign key is not declared.
     )
 
 
@@ -374,10 +420,6 @@ class WorkerReceiving(db.Model):
                 ' to this table.'
             ),
         },
-        # NOTE: Normally, there should be a foreign key constraint
-        # connecting each row in this table to a row in the
-        # "dispatching_status" table. For performance reasons,
-        # however, this foreign key is not declared.
     )
 
 

@@ -23,6 +23,7 @@ class WorkerReceivingsScanner(TableScanner):
         WorkerReceiving.turn_id,
         WorkerReceiving.debtor_id,
         WorkerReceiving.from_collector_id,
+        WorkerReceiving.received_amount,
         WorkerReceiving.purge_after,
     ]
 
@@ -95,10 +96,14 @@ class WorkerReceivingsScanner(TableScanner):
         c_turn_id = c.turn_id
         c_debtor_id = c.debtor_id
         c_from_collector_id = c.from_collector_id
+        c_received_amount = c.received_amount
         c_purge_after = c.purge_after
 
         def is_stale(row) -> bool:
-            return row[c_purge_after] < current_ts
+            return (
+                row[c_purge_after] < current_ts
+                and row[c_received_amount] == 0
+            )
 
         pks_to_delete = [
             (
@@ -112,7 +117,9 @@ class WorkerReceivingsScanner(TableScanner):
         ]
         if pks_to_delete:
             to_delete = (
-                WorkerReceiving.query.filter(self.pk.in_(pks_to_delete))
+                WorkerReceiving.query
+                .filter(self.pk.in_(pks_to_delete))
+                .filter(WorkerReceiving.received_amount == 0)
                 .with_for_update(skip_locked=True)
                 .all()
             )
