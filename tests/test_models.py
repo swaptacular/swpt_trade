@@ -337,7 +337,6 @@ def test_dispatching_status_properties(current_ts):
         amount_to_collect=50000,
         total_collected_amount=None,
         amount_to_send=5000,
-        started_sending=True,
         all_sent=True,
         number_to_receive=1,
         total_received_amount=None,
