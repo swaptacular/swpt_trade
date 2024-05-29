@@ -334,7 +334,7 @@ def test_dispatching_status_properties(current_ts):
         collector_id=666,
         turn_id=1,
         debtor_id=1,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=50000,
         amount_to_send=5000,
         started_sending=True,

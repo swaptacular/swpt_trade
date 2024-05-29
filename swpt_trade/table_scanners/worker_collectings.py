@@ -23,7 +23,7 @@ class WorkerCollectingsScanner(TableScanner):
         WorkerCollecting.turn_id,
         WorkerCollecting.debtor_id,
         WorkerCollecting.creditor_id,
-        WorkerCollecting.purge_at,
+        WorkerCollecting.purge_after,
     ]
 
     def __init__(self):
@@ -93,10 +93,10 @@ class WorkerCollectingsScanner(TableScanner):
         c_turn_id = c.turn_id
         c_debtor_id = c.debtor_id
         c_creditor_id = c.creditor_id
-        c_purge_at = c.purge_at
+        c_purge_after = c.purge_after
 
         def is_stale(row) -> bool:
-            return row[c_purge_at] < current_ts
+            return row[c_purge_after] < current_ts
 
         pks_to_delete = [
             (

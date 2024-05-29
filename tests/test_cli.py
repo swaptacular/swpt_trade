@@ -842,7 +842,7 @@ def test_delete_dispatching_statuses(
         collector_id=666,
         turn_id=1,
         debtor_id=1,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
         amount_to_send=0,
     )
@@ -850,7 +850,7 @@ def test_delete_dispatching_statuses(
         collector_id=777,
         turn_id=1,
         debtor_id=1,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
         amount_to_send=0,
     )
@@ -858,7 +858,7 @@ def test_delete_dispatching_statuses(
         collector_id=888,
         turn_id=1,
         debtor_id=1,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
         amount_to_collect=0,
         amount_to_send=0,
     )
@@ -866,7 +866,7 @@ def test_delete_dispatching_statuses(
         collector_id=999,
         turn_id=1,
         debtor_id=1,
-        purge_at=current_ts - timedelta(days=1),
+        purge_after=current_ts - timedelta(days=1),
         amount_to_collect=0,
         amount_to_send=0,
     )
@@ -911,7 +911,7 @@ def test_delete_worker_collectings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wc2 = m.WorkerCollecting(
         collector_id=777,
@@ -919,7 +919,7 @@ def test_delete_worker_collectings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wc3 = m.WorkerCollecting(
         collector_id=888,
@@ -927,7 +927,7 @@ def test_delete_worker_collectings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wc4 = m.WorkerCollecting(
         collector_id=999,
@@ -935,7 +935,7 @@ def test_delete_worker_collectings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts - timedelta(days=1),
+        purge_after=current_ts - timedelta(days=1),
     )
     db.session.add(wc1)
     db.session.add(wc2)
@@ -978,7 +978,7 @@ def test_delete_worker_dispatchings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wd2 = m.WorkerDispatching(
         collector_id=777,
@@ -986,7 +986,7 @@ def test_delete_worker_dispatchings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wd3 = m.WorkerDispatching(
         collector_id=888,
@@ -994,7 +994,7 @@ def test_delete_worker_dispatchings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wd4 = m.WorkerDispatching(
         collector_id=999,
@@ -1002,7 +1002,7 @@ def test_delete_worker_dispatchings(
         debtor_id=1,
         creditor_id=1,
         amount=1000,
-        purge_at=current_ts - timedelta(days=1),
+        purge_after=current_ts - timedelta(days=1),
     )
     db.session.add(wd1)
     db.session.add(wd2)
@@ -1045,7 +1045,7 @@ def test_delete_worker_receivings(
         debtor_id=1,
         from_collector_id=1,
         expected_amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wr2 = m.WorkerReceiving(
         to_collector_id=777,
@@ -1053,7 +1053,7 @@ def test_delete_worker_receivings(
         debtor_id=1,
         from_collector_id=1,
         expected_amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wr3 = m.WorkerReceiving(
         to_collector_id=888,
@@ -1061,7 +1061,7 @@ def test_delete_worker_receivings(
         debtor_id=1,
         from_collector_id=1,
         expected_amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     wr4 = m.WorkerReceiving(
         to_collector_id=999,
@@ -1069,7 +1069,7 @@ def test_delete_worker_receivings(
         debtor_id=1,
         from_collector_id=1,
         expected_amount=1000,
-        purge_at=current_ts - timedelta(days=1),
+        purge_after=current_ts - timedelta(days=1),
     )
     db.session.add(wr1)
     db.session.add(wr2)
@@ -1112,7 +1112,7 @@ def test_delete_worker_sendings(
         debtor_id=1,
         to_collector_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     ws2 = m.WorkerSending(
         from_collector_id=777,
@@ -1120,7 +1120,7 @@ def test_delete_worker_sendings(
         debtor_id=1,
         to_collector_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     ws3 = m.WorkerSending(
         from_collector_id=888,
@@ -1128,7 +1128,7 @@ def test_delete_worker_sendings(
         debtor_id=1,
         to_collector_id=1,
         amount=1000,
-        purge_at=current_ts + timedelta(days=1000),
+        purge_after=current_ts + timedelta(days=1000),
     )
     ws4 = m.WorkerSending(
         from_collector_id=999,
@@ -1136,7 +1136,7 @@ def test_delete_worker_sendings(
         debtor_id=1,
         to_collector_id=1,
         amount=1000,
-        purge_at=current_ts - timedelta(days=1),
+        purge_after=current_ts - timedelta(days=1),
     )
     db.session.add(ws1)
     db.session.add(ws2)

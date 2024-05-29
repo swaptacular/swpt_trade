@@ -230,7 +230,7 @@ class DispatchingStatus(db.Model):
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc
     )
-    purge_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     amount_to_collect = db.Column(
         db.BigInteger,
         nullable=False,
@@ -291,7 +291,7 @@ class WorkerCollecting(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
-    purge_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
         {
@@ -317,7 +317,7 @@ class WorkerSending(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     to_collector_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
-    purge_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
         {
@@ -353,7 +353,7 @@ class WorkerReceiving(db.Model):
         # Therefore, we can expect to receive only amounts greater
         # than `1`.
     )
-    purge_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(expected_amount > 1),
         db.CheckConstraint(received_amount >= 0),
@@ -387,7 +387,7 @@ class WorkerDispatching(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     creditor_id = db.Column(db.BigInteger, primary_key=True)
     amount = db.Column(db.BigInteger, nullable=False)
-    purge_at = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
+    purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
         {
