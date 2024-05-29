@@ -256,7 +256,6 @@ class DispatchingStatus(db.Model):
             ' record has been created.'
         ),
     )
-    started_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
     all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
     number_to_receive = db.Column(
         db.Integer,
@@ -276,7 +275,15 @@ class DispatchingStatus(db.Model):
         ),
     )
     all_received = db.Column(db.BOOLEAN, nullable=False, default=False)
-    started_dispatching = db.Column(db.BOOLEAN, nullable=False, default=False)
+    amount_to_dispatch = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all amounts from the corresponding records in the'
+            ' "worker_dispatching" table, at the moment the'
+            ' "dispatching_status" record has been created.'
+        ),
+    )
     __table_args__ = (
         db.CheckConstraint(amount_to_collect >= 0),
         db.CheckConstraint(total_collected_amount >= 0),
@@ -288,6 +295,7 @@ class DispatchingStatus(db.Model):
         db.CheckConstraint(
             or_(all_received == false(), total_received_amount != null())
         ),
+        db.CheckConstraint(amount_to_dispatch >= 0),
         {
             "comment": (
                 'Represents the status of the process of collecting, sending,'
@@ -327,6 +335,13 @@ class DispatchingStatus(db.Model):
 
 
 class WorkerCollecting(db.Model):
+    # NOTE: The `amount` column is not be part of the primary key, but
+    # it probably is a good idea to include it in the primary key
+    # index to allow index-only scans. Because SQLAlchemy does not
+    # support this yet (2024-01-19), the migration file should be
+    # edited so as not to create a "normal" index, but create a
+    # "covering" index instead.
+
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -358,6 +373,13 @@ class WorkerCollecting(db.Model):
 
 
 class WorkerSending(db.Model):
+    # NOTE: The `amount` column is not be part of the primary key, but
+    # it probably is a good idea to include it in the primary key
+    # index to allow index-only scans. Because SQLAlchemy does not
+    # support this yet (2024-01-19), the migration file should be
+    # edited so as not to create a "normal" index, but create a
+    # "covering" index instead.
+
     from_collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -424,6 +446,13 @@ class WorkerReceiving(db.Model):
 
 
 class WorkerDispatching(db.Model):
+    # NOTE: The `amount` column is not be part of the primary key, but
+    # it probably is a good idea to include it in the primary key
+    # index to allow index-only scans. Because SQLAlchemy does not
+    # support this yet (2024-01-19), the migration file should be
+    # edited so as not to create a "normal" index, but create a
+    # "covering" index instead.
+
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)

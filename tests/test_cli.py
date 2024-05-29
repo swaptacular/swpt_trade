@@ -845,6 +845,7 @@ def test_delete_dispatching_statuses(
         amount_to_collect=0,
         number_to_receive=0,
         amount_to_send=0,
+        amount_to_dispatch=0,
     )
     ds2 = m.DispatchingStatus(
         collector_id=777,
@@ -853,6 +854,7 @@ def test_delete_dispatching_statuses(
         amount_to_collect=0,
         number_to_receive=0,
         amount_to_send=0,
+        amount_to_dispatch=0,
     )
     ds3 = m.DispatchingStatus(
         collector_id=888,
@@ -861,6 +863,7 @@ def test_delete_dispatching_statuses(
         amount_to_collect=0,
         number_to_receive=0,
         amount_to_send=0,
+        amount_to_dispatch=0,
     )
     db.session.add(ds1)
     db.session.add(ds2)
