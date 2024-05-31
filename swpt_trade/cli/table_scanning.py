@@ -250,14 +250,14 @@ def scan_creditor_participations(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the creditor participations table. If the
     number of days is not specified, the value of the environment
-    variable APP_CREDITOR_PARTICIPATIONS_DAYS is taken. If it is not
-    set, the default number of days is 7.
+    variable APP_CREDITOR_PARTICIPATIONS_SCAN_DAYS is taken. If it is
+    not set, the default number of days is 7.
     """
     from swpt_trade.table_scanners import CreditorParticipationsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started creditor participation records scanner.")
-    days = days or current_app.config["APP_CREDITOR_PARTICIPATIONS_DAYS"]
+    days = days or current_app.config["APP_CREDITOR_PARTICIPATIONS_SCAN_DAYS"]
     assert days > 0.0
     scanner = CreditorParticipationsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
@@ -278,14 +278,14 @@ def scan_dispatching_statuses(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the dispatching status table. If the number of
     days is not specified, the value of the environment variable
-    APP_DISPATCHING_STATUSES_DAYS is taken. If it is not set, the
+    APP_DISPATCHING_STATUSES_SCAN_DAYS is taken. If it is not set, the
     default number of days is 7.
     """
     from swpt_trade.table_scanners import DispatchingStatusesScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started dispatching status records scanner.")
-    days = days or current_app.config["APP_DISPATCHING_STATUSES_DAYS"]
+    days = days or current_app.config["APP_DISPATCHING_STATUSES_SCAN_DAYS"]
     assert days > 0.0
     scanner = DispatchingStatusesScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
@@ -306,14 +306,14 @@ def scan_worker_collectings(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the worker collecting table. If the number of
     days is not specified, the value of the environment variable
-    APP_WORKER_COLLECTINGS_DAYS is taken. If it is not set, the
+    APP_WORKER_COLLECTINGS_SCAN_DAYS is taken. If it is not set, the
     default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerCollectingsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started worker collecting records scanner.")
-    days = days or current_app.config["APP_WORKER_COLLECTINGS_DAYS"]
+    days = days or current_app.config["APP_WORKER_COLLECTINGS_SCAN_DAYS"]
     assert days > 0.0
     scanner = WorkerCollectingsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
@@ -334,14 +334,14 @@ def scan_worker_sendings(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the worker sending table. If the number of
     days is not specified, the value of the environment variable
-    APP_WORKER_SENDINGS_DAYS is taken. If it is not set, the default
-    number of days is 7.
+    APP_WORKER_SENDINGS_SCAN_DAYS is taken. If it is not set, the
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerSendingsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started worker sending records scanner.")
-    days = days or current_app.config["APP_WORKER_SENDINGS_DAYS"]
+    days = days or current_app.config["APP_WORKER_SENDINGS_SCAN_DAYS"]
     assert days > 0.0
     scanner = WorkerSendingsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
@@ -362,15 +362,14 @@ def scan_worker_receivings(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the worker receiving table. If the number of
     days is not specified, the value of the environment variable
-    APP_WORKER_RECEIVINGS_DAYS is taken. If it is not set, the default
-    number of days is 7.
-
+    APP_WORKER_RECEIVINGS_SCAN_DAYS is taken. If it is not set, the
+    default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerReceivingsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started worker receiving records scanner.")
-    days = days or current_app.config["APP_WORKER_RECEIVINGS_DAYS"]
+    days = days or current_app.config["APP_WORKER_RECEIVINGS_SCAN_DAYS"]
     assert days > 0.0
     scanner = WorkerReceivingsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
@@ -391,14 +390,14 @@ def scan_worker_dispatchings(days, quit_early):
     The specified number of days determines the intended duration of a
     single pass through the worker dispatching table. If the number of
     days is not specified, the value of the environment variable
-    APP_WORKER_DISPATCHINGS_DAYS is taken. If it is not set, the
+    APP_WORKER_DISPATCHINGS_SCAN_DAYS is taken. If it is not set, the
     default number of days is 7.
     """
     from swpt_trade.table_scanners import WorkerDispatchingsScanner
 
     logger = logging.getLogger(__name__)
     logger.info("Started worker dispatching records scanner.")
-    days = days or current_app.config["APP_WORKER_DISPATCHINGS_DAYS"]
+    days = days or current_app.config["APP_WORKER_DISPATCHINGS_SCAN_DAYS"]
     assert days > 0.0
     scanner = WorkerDispatchingsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
