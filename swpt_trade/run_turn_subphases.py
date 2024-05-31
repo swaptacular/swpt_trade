@@ -1,13 +1,16 @@
 import logging
 import math
+import array
 from typing import TypeVar, Callable
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 from itertools import groupby
 from sqlalchemy import select, insert, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import null, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
+from swpt_trade.utils import batched, u16_to_i16, contain_principal_overflow
 from swpt_trade.extensions import db
 from swpt_trade.solver import CandidateOfferAuxData, BidProcessor
 from swpt_trade.models import (
@@ -26,9 +29,19 @@ from swpt_trade.models import (
     AccountLock,
     SellOffer,
     BuyOffer,
+    CreditorParticipation,
+    DispatchingStatus,
+    WorkerCollecting,
+    WorkerSending,
+    WorkerReceiving,
+    WorkerDispatching,
+    CreditorTaking,
+    CreditorGiving,
+    CollectorCollecting,
+    CollectorSending,
+    CollectorReceiving,
+    CollectorDispatching,
 )
-from swpt_trade.utils import batched, contain_principal_overflow
-
 
 INSERT_BATCH_SIZE = 50000
 SELECT_BATCH_SIZE = 50000
@@ -38,6 +51,58 @@ DELETION_FLAG = WorkerAccount.CONFIG_SCHEDULED_FOR_DELETION_FLAG
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
+
+
+class DispatchingData:
+    def __init__(self, turn_id):
+        self._turn_id = turn_id
+        self._empty_value_tuple = (0, 0, 0, 0)
+        self._data = defaultdict(self._create_empty_value)
+
+    def _create_empty_value(self):
+        return array.array("q", self._empty_value_tuple)
+
+    def _get_value(self, *args):
+        return self._data[*args]
+
+    def register_collecting(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[0] = contain_principal_overflow(value[0] + amount)
+
+    def register_sending(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[1] = contain_principal_overflow(value[1] + amount)
+
+    def register_receiving(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[2] += 1
+
+    def register_dispatching(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[3] = contain_principal_overflow(value[3] + amount)
+
+    def dispatching_statuses(self):
+        current_ts = datetime.now(tz=timezone.utc)
+
+        for key, value in self._data.items():
+            yield dict(
+                collector_id=key[0],
+                turn_id=key[1],
+                debtor_id=key[2],
+                inserted_at=current_ts,
+                amount_to_collect=value[0],
+                total_collected_amount=None,
+                amount_to_send=value[1],
+                all_sent=False,
+                number_to_receive=value[2],
+                total_received_amount=None,
+                all_received=False,
+                amount_to_dispatch=value[3],
+            )
 
 
 @atomic
@@ -484,5 +549,347 @@ def _populate_buy_offers(w_conn, s_conn, turn_id):
 
 @atomic
 def run_phase3_subphase0(turn_id: int) -> None:
-    # TODO: implement
+    # TODO: remove records from the solver at the end.
+
+    worker_turn = (
+        WorkerTurn.query
+        .filter_by(
+            turn_id=turn_id,
+            phase=3,
+            worker_turn_subphase=0,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if worker_turn:
+        statuses = DispatchingData(worker_turn.turn_id)
+
+        with db.engines["solver"].connect() as s_conn:
+            _move_creditor_takings(s_conn, worker_turn)
+            _move_creditor_givings(s_conn, worker_turn)
+            _move_collector_collectings(s_conn, worker_turn, statuses)
+            _move_collector_sendings(s_conn, worker_turn, statuses)
+            _move_collector_receivings(s_conn, worker_turn, statuses)
+            _move_collector_dispatchings(s_conn, worker_turn, statuses)
+            _create_dispatching_statuses(worker_turn, statuses)
+            _insert_revise_account_lock_signals(worker_turn)
+
+        worker_turn.worker_turn_subphase = 10
+
+
+def _move_creditor_takings(s_conn, worker_turn):
+    turn_id = worker_turn.turn_id
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CreditorTaking.turn_id,
+                CreditorTaking.creditor_id,
+                CreditorTaking.debtor_id,
+                CreditorTaking.amount,
+                CreditorTaking.collector_id,
+            )
+            .where(
+                and_(
+                    CreditorTaking.turn_id == turn_id,
+                    CreditorTaking.creditor_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": row.creditor_id,
+                    "debtor_id": row.debtor_id,
+                    "amount": (- row.amount),
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(CreditorParticipation).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+
+
+def _move_creditor_givings(s_conn, worker_turn):
+    turn_id = worker_turn.turn_id
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CreditorGiving.turn_id,
+                CreditorGiving.creditor_id,
+                CreditorGiving.debtor_id,
+                CreditorGiving.amount,
+                CreditorGiving.collector_id,
+            )
+            .where(
+                and_(
+                    CreditorGiving.turn_id == turn_id,
+                    CreditorGiving.creditor_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "turn_id": turn_id,
+                    "creditor_id": row.creditor_id,
+                    "debtor_id": row.debtor_id,
+                    "amount": row.amount,
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(CreditorParticipation).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+
+
+def _move_collector_collectings(s_conn, worker_turn, statuses):
+    turn_id = worker_turn.turn_id
+    collection_deadline = worker_turn.collection_deadline
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CollectorCollecting.turn_id,
+                CollectorCollecting.debtor_id,
+                CollectorCollecting.creditor_id,
+                CollectorCollecting.amount,
+                CollectorCollecting.collector_id,
+            )
+            .where(
+                and_(
+                    CollectorCollecting.turn_id == turn_id,
+                    CollectorCollecting.collector_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "collector_id": row.collector_id,
+                    "turn_id": turn_id,
+                    "debtor_id": row.debtor_id,
+                    "creditor_id": row.creditor_id,
+                    "amount": row.amount,
+                    "collected": False,
+                    "purge_after": collection_deadline,
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(WorkerCollecting).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+                for d in dicts_to_insert:
+                    statuses.register_collecting(
+                        d["collector_id"],
+                        d["turn_id"],
+                        d["debtor_id"],
+                    )
+
+
+def _move_collector_sendings(s_conn, worker_turn, statuses):
+    turn_id = worker_turn.turn_id
+    cfg = current_app.config
+    purge_after = (
+        worker_turn.collection_deadline
+        + timedelta(days=2 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+    )
+    sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CollectorSending.turn_id,
+                CollectorSending.debtor_id,
+                CollectorSending.from_collector_id,
+                CollectorSending.to_collector_id,
+                CollectorSending.amount,
+            )
+            .where(
+                and_(
+                    CollectorSending.turn_id == turn_id,
+                    CollectorSending.from_collector_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                    CollectorSending.amount > 1,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "from_collector_id": row.from_collector_id,
+                    "turn_id": turn_id,
+                    "debtor_id": row.debtor_id,
+                    "to_collector_id": row.to_collector_id,
+                    "amount": row.amount,
+                    "purge_after": purge_after,
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(WorkerSending).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+                for d in dicts_to_insert:
+                    statuses.register_sending(
+                        d["from_collector_id"],
+                        d["turn_id"],
+                        d["debtor_id"],
+                    )
+
+
+def _move_collector_receivings(s_conn, worker_turn, statuses):
+    turn_id = worker_turn.turn_id
+    cfg = current_app.config
+    purge_after = (
+        worker_turn.collection_deadline
+        + timedelta(days=4 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+    )
+    sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CollectorReceiving.turn_id,
+                CollectorReceiving.debtor_id,
+                CollectorReceiving.to_collector_id,
+                CollectorReceiving.from_collector_id,
+                CollectorReceiving.amount,
+            )
+            .where(
+                and_(
+                    CollectorReceiving.turn_id == turn_id,
+                    CollectorReceiving.to_collector_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                    CollectorReceiving.amount > 1,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "to_collector_id": row.to_collector_id,
+                    "turn_id": turn_id,
+                    "debtor_id": row.debtor_id,
+                    "from_collector_id": row.from_collector_id,
+                    "expected_amount": row.amount,
+                    "received_amount": 0,
+                    "purge_after": purge_after,
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(WorkerReceiving).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+                for d in dicts_to_insert:
+                    statuses.register_receiving(
+                        d["to_collector_id"],
+                        d["turn_id"],
+                        d["debtor_id"],
+                    )
+
+
+def _move_collector_dispatchings(s_conn, worker_turn, statuses):
+    turn_id = worker_turn.turn_id
+    cfg = current_app.config
+    purge_after = (
+        worker_turn.collection_deadline
+        + timedelta(days=6 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+    )
+    sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
+    hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+    hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
+
+    with s_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+            select(
+                CollectorDispatching.turn_id,
+                CollectorDispatching.debtor_id,
+                CollectorDispatching.creditor_id,
+                CollectorDispatching.amount,
+                CollectorDispatching.collector_id,
+            )
+            .where(
+                and_(
+                    CollectorDispatching.turn_id == turn_id,
+                    CollectorDispatching.collector_hash.op("&")(hash_mask)
+                    == hash_prefix,
+                )
+            )
+    ) as result:
+        for rows in batched(result, INSERT_BATCH_SIZE):
+            dicts_to_insert = [
+                {
+                    "collector_id": row.collector_id,
+                    "turn_id": turn_id,
+                    "debtor_id": row.debtor_id,
+                    "creditor_id": row.creditor_id,
+                    "amount": row.amount,
+                    "purge_after": purge_after,
+                }
+                for row in rows
+            ]
+            if dicts_to_insert:
+                db.session.execute(
+                    insert(WorkerDispatching).execution_options(
+                        insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                    ),
+                    dicts_to_insert,
+                )
+                for d in dicts_to_insert:
+                    statuses.register_receiving(
+                        d["collector_id"],
+                        d["turn_id"],
+                        d["debtor_id"],
+                    )
+
+
+def _create_dispatching_statuses(worker_turn, statuses):
+    for dicts in batched(statuses.dispatching_statuses(), INSERT_BATCH_SIZE):
+        dicts_to_insert = list(dicts)
+
+        if dicts_to_insert:
+            db.session.execute(
+                insert(DispatchingStatus).execution_options(
+                    insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                ),
+                dicts_to_insert,
+            )
+
+
+def _insert_revise_account_lock_signals(worker_turn):
+    # TODO: implement!
+
+    # TODO: re-create migrations!
     pass

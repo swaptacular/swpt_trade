@@ -387,7 +387,12 @@ class WorkerSending(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
-        db.CheckConstraint(amount > 0),
+        # NOTE: When the amount is `1`, after applying the possibly
+        # negative interest rate, and rounding down, the received
+        # amount would have to be zero, which is impossible to be
+        # sent. Therefore, we can try to send only amounts greater
+        # than `1`.
+        db.CheckConstraint(amount > 1),
         {
             "comment": (
                 'Indicates that the given amount must be transferred (sent)'
