@@ -1,8 +1,6 @@
 import logging
 import math
-import array
 from typing import TypeVar, Callable
-from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from itertools import groupby
 from sqlalchemy import select, insert, text
@@ -10,7 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import null, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
-from swpt_trade.utils import batched, u16_to_i16, contain_principal_overflow
+from swpt_trade.utils import (
+    batched,
+    u16_to_i16,
+    contain_principal_overflow,
+    DispatchingData,
+)
 from swpt_trade.extensions import db
 from swpt_trade.solver import CandidateOfferAuxData, BidProcessor
 from swpt_trade.models import (
@@ -51,58 +54,6 @@ DELETION_FLAG = WorkerAccount.CONFIG_SCHEDULED_FOR_DELETION_FLAG
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
-
-
-class DispatchingData:
-    def __init__(self, turn_id):
-        self._turn_id = turn_id
-        self._empty_value_tuple = (0, 0, 0, 0)
-        self._data = defaultdict(self._create_empty_value)
-
-    def _create_empty_value(self):
-        return array.array("q", self._empty_value_tuple)
-
-    def _get_value(self, *args):
-        return self._data[*args]
-
-    def register_collecting(self, collector_id, turn_id, debtor_id, amount):
-        assert turn_id == self._turn_id
-        value = self._get_value(collector_id, turn_id, debtor_id)
-        value[0] = contain_principal_overflow(value[0] + amount)
-
-    def register_sending(self, collector_id, turn_id, debtor_id, amount):
-        assert turn_id == self._turn_id
-        value = self._get_value(collector_id, turn_id, debtor_id)
-        value[1] = contain_principal_overflow(value[1] + amount)
-
-    def register_receiving(self, collector_id, turn_id, debtor_id, amount):
-        assert turn_id == self._turn_id
-        value = self._get_value(collector_id, turn_id, debtor_id)
-        value[2] += 1
-
-    def register_dispatching(self, collector_id, turn_id, debtor_id, amount):
-        assert turn_id == self._turn_id
-        value = self._get_value(collector_id, turn_id, debtor_id)
-        value[3] = contain_principal_overflow(value[3] + amount)
-
-    def dispatching_statuses(self):
-        current_ts = datetime.now(tz=timezone.utc)
-
-        for key, value in self._data.items():
-            yield dict(
-                collector_id=key[0],
-                turn_id=key[1],
-                debtor_id=key[2],
-                inserted_at=current_ts,
-                amount_to_collect=value[0],
-                total_collected_amount=None,
-                amount_to_send=value[1],
-                all_sent=False,
-                number_to_receive=value[2],
-                total_received_amount=None,
-                all_received=False,
-                amount_to_dispatch=value[3],
-            )
 
 
 @atomic
@@ -661,8 +612,12 @@ def _move_creditor_givings(s_conn, worker_turn):
 
 def _move_collector_collectings(s_conn, worker_turn, statuses):
     turn_id = worker_turn.turn_id
-    collection_deadline = worker_turn.collection_deadline
-    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+    cfg = current_app.config
+    purge_after = (
+        worker_turn.collection_deadline
+        + timedelta(days=cfg["APP_WORKER_COLLECTING_SLACK_DAYS"])
+    )
+    sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
     hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
 
@@ -691,7 +646,7 @@ def _move_collector_collectings(s_conn, worker_turn, statuses):
                     "creditor_id": row.creditor_id,
                     "amount": row.amount,
                     "collected": False,
-                    "purge_after": collection_deadline,
+                    "purge_after": purge_after,
                 }
                 for row in rows
             ]
@@ -715,7 +670,7 @@ def _move_collector_sendings(s_conn, worker_turn, statuses):
     cfg = current_app.config
     purge_after = (
         worker_turn.collection_deadline
-        + timedelta(days=2 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+        + timedelta(days=cfg["APP_WORKER_SENDING_SLACK_DAYS"])
     )
     sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
@@ -770,7 +725,7 @@ def _move_collector_receivings(s_conn, worker_turn, statuses):
     cfg = current_app.config
     purge_after = (
         worker_turn.collection_deadline
-        + timedelta(days=4 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+        + timedelta(days=cfg["APP_WORKER_SENDING_SLACK_DAYS"])
     )
     sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
@@ -826,7 +781,7 @@ def _move_collector_dispatchings(s_conn, worker_turn, statuses):
     cfg = current_app.config
     purge_after = (
         worker_turn.collection_deadline
-        + timedelta(days=6 * cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+        + timedelta(days=6 * cfg["APP_WORKER_DISPATCHING_SLACK_DAYS"])
     )
     sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
@@ -876,8 +831,8 @@ def _move_collector_dispatchings(s_conn, worker_turn, statuses):
 
 
 def _create_dispatching_statuses(worker_turn, statuses):
-    for dicts in batched(statuses.dispatching_statuses(), INSERT_BATCH_SIZE):
-        dicts_to_insert = list(dicts)
+    for status_dicts in batched(statuses.statuses_iter(), INSERT_BATCH_SIZE):
+        dicts_to_insert = list(status_dicts)
 
         if dicts_to_insert:
             db.session.execute(
@@ -890,6 +845,4 @@ def _create_dispatching_statuses(worker_turn, statuses):
 
 def _insert_revise_account_lock_signals(worker_turn):
     # TODO: implement!
-
-    # TODO: re-create migrations!
     pass

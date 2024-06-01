@@ -1,9 +1,11 @@
 import re
 import math
+import array
 from typing import Tuple
 from hashlib import md5
 from datetime import datetime, timedelta, timezone
 from itertools import islice
+from collections import defaultdict
 from swpt_pythonlib.utils import i64_to_u64, u64_to_i64
 
 RE_PERIOD = re.compile(r"^([\d.eE+-]+)([smhdw]?)\s*$")
@@ -179,3 +181,55 @@ def parse_transfer_note(s: str) -> Tuple[int, str, int]:
         return u32_to_i32(int(m[1])), m[2], u64_to_i64(int(m[3], 16))
 
     raise ValueError
+
+
+class DispatchingData:
+    def __init__(self, turn_id):
+        self._turn_id = turn_id
+        self._empty_value_tuple = (0, 0, 0, 0)
+        self._data = defaultdict(self._create_empty_value)
+
+    def _create_empty_value(self):
+        return array.array("q", self._empty_value_tuple)
+
+    def _get_value(self, *args):
+        return self._data[*args]
+
+    def register_collecting(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[0] = contain_principal_overflow(value[0] + amount)
+
+    def register_sending(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[1] = contain_principal_overflow(value[1] + amount)
+
+    def register_receiving(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[2] += 1
+
+    def register_dispatching(self, collector_id, turn_id, debtor_id, amount):
+        assert turn_id == self._turn_id
+        value = self._get_value(collector_id, turn_id, debtor_id)
+        value[3] = contain_principal_overflow(value[3] + amount)
+
+    def statuses_iter(self):
+        current_ts = datetime.now(tz=timezone.utc)
+
+        for key, value in self._data.items():
+            yield {
+                "collector_id": key[0],
+                "turn_id": key[1],
+                "debtor_id": key[2],
+                "inserted_at": current_ts,
+                "amount_to_collect": value[0],
+                "total_collected_amount": None,
+                "amount_to_send": value[1],
+                "all_sent": False,
+                "number_to_receive": value[2],
+                "total_received_amount": None,
+                "all_received": False,
+                "amount_to_dispatch": value[3],
+            }
