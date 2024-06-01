@@ -1939,7 +1939,11 @@ def test_run_phase3_subphase0(
         app,
         db_session,
         current_ts,
+        restore_sharding_realm,
 ):
+    app.config["SHARDING_REALM"] = ShardingRealm("1.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
     mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
     mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
 
@@ -1985,7 +1989,7 @@ def test_run_phase3_subphase0(
     )
     db.session.add(
         m.AccountLock(
-            creditor_id=124,
+            creditor_id=125,
             debtor_id=666,
             turn_id=t1.turn_id,
             collector_id=789,
@@ -2004,11 +2008,33 @@ def test_run_phase3_subphase0(
         )
     )
     db.session.add(
+        # belongs to another shard
+        m.CreditorTaking(
+            turn_id=wt1.turn_id,
+            creditor_id=12300,
+            debtor_id=666,
+            creditor_hash=calc_hash(12300),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
         m.CreditorGiving(
             turn_id=wt1.turn_id,
-            creditor_id=124,
+            creditor_id=125,
             debtor_id=666,
-            creditor_hash=calc_hash(124),
+            creditor_hash=calc_hash(125),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
+        # belongs to another shard
+        m.CreditorGiving(
+            turn_id=wt1.turn_id,
+            creditor_id=12500,
+            debtor_id=666,
+            creditor_hash=calc_hash(12500),
             amount=10000,
             collector_id=789,
         )
@@ -2024,12 +2050,34 @@ def test_run_phase3_subphase0(
         )
     )
     db.session.add(
+        # belongs to another shard
+        m.CollectorCollecting(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=124,
+            amount=10000,
+            collector_id=78901,
+            collector_hash=calc_hash(78901),
+        )
+    )
+    db.session.add(
         m.CollectorSending(
             turn_id=wt1.turn_id,
             debtor_id=666,
             from_collector_id=789,
             to_collector_id=890,
             from_collector_hash=calc_hash(789),
+            amount=10000,
+        )
+    )
+    db.session.add(
+        # belongs to another shard
+        m.CollectorSending(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            from_collector_id=78901,
+            to_collector_id=890,
+            from_collector_hash=calc_hash(78901),
             amount=10000,
         )
     )
@@ -2044,25 +2092,47 @@ def test_run_phase3_subphase0(
         )
     )
     db.session.add(
+        # belongs to another shard
+        m.CollectorReceiving(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            to_collector_id=89001,
+            from_collector_id=789,
+            to_collector_hash=calc_hash(89001),
+            amount=10000,
+        )
+    )
+    db.session.add(
         m.CollectorDispatching(
             turn_id=wt1.turn_id,
             debtor_id=666,
-            creditor_id=124,
+            creditor_id=125,
             amount=10000,
             collector_id=890,
             collector_hash=calc_hash(890),
+        )
+    )
+    db.session.add(
+        # belongs to another shard
+        m.CollectorDispatching(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=12300,
+            amount=10000,
+            collector_id=89001,
+            collector_hash=calc_hash(89001),
         )
     )
     db.session.commit()
 
     assert len(m.WorkerTurn.query.all()) == 1
     assert len(m.AccountLock.query.all()) == 2
-    assert len(m.CreditorTaking.query.all()) == 1
-    assert len(m.CreditorGiving.query.all()) == 1
-    assert len(m.CollectorCollecting.query.all()) == 1
-    assert len(m.CollectorSending.query.all()) == 1
-    assert len(m.CollectorReceiving.query.all()) == 1
-    assert len(m.CollectorDispatching.query.all()) == 1
+    assert len(m.CreditorTaking.query.all()) == 2
+    assert len(m.CreditorGiving.query.all()) == 2
+    assert len(m.CollectorCollecting.query.all()) == 2
+    assert len(m.CollectorSending.query.all()) == 2
+    assert len(m.CollectorReceiving.query.all()) == 2
+    assert len(m.CollectorDispatching.query.all()) == 2
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
@@ -2077,12 +2147,12 @@ def test_run_phase3_subphase0(
     assert wt.phase == t1.phase
     assert wt.worker_turn_subphase == 5
     assert len(m.AccountLock.query.all()) == 2
-    assert len(m.CreditorTaking.query.all()) == 1
-    assert len(m.CreditorGiving.query.all()) == 1
-    assert len(m.CollectorCollecting.query.all()) == 1
-    assert len(m.CollectorSending.query.all()) == 1
-    assert len(m.CollectorReceiving.query.all()) == 1
-    assert len(m.CollectorDispatching.query.all()) == 1
+    assert len(m.CreditorTaking.query.all()) == 2
+    assert len(m.CreditorGiving.query.all()) == 2
+    assert len(m.CollectorCollecting.query.all()) == 2
+    assert len(m.CollectorSending.query.all()) == 2
+    assert len(m.CollectorReceiving.query.all()) == 2
+    assert len(m.CollectorDispatching.query.all()) == 2
 
     cps = m.CreditorParticipation.query.all()
     cps.sort(key=lambda x: x.creditor_id)
@@ -2092,7 +2162,7 @@ def test_run_phase3_subphase0(
     assert cps[0].turn_id == t1.turn_id
     assert cps[0].amount == -10000
     assert cps[0].collector_id == 789
-    assert cps[1].creditor_id == 124
+    assert cps[1].creditor_id == 125
     assert cps[1].debtor_id == 666
     assert cps[1].turn_id == t1.turn_id
     assert cps[1].amount == 10000
@@ -2128,7 +2198,7 @@ def test_run_phase3_subphase0(
     assert wr.collector_id == 890
     assert wr.turn_id == t1.turn_id
     assert wr.debtor_id == 666
-    assert wr.creditor_id == 124
+    assert wr.creditor_id == 125
     assert wr.amount == 10000
     assert wr.purge_after > current_ts
 
@@ -2165,7 +2235,7 @@ def test_run_phase3_subphase0(
     assert rals[0].creditor_id == 123
     assert rals[0].debtor_id == 666
     assert rals[0].turn_id == wt.turn_id
-    assert rals[1].creditor_id == 124
+    assert rals[1].creditor_id == 125
     assert rals[1].turn_id == wt.turn_id
     assert rals[1].debtor_id == 666
 
