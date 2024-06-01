@@ -368,3 +368,31 @@ class NeededCollectorSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_FLUSH_NEEDED_COLLECTOR_BURST_COUNT"]
+
+
+class ReviseAccountLockSignal(Signal):
+    """A call for resolving the given account lock.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("ReviseAccountLock")
+        creditor_id = fields.Integer()
+        debtor_id = fields.Integer()
+        turn_id = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    creditor_id = db.Column(db.BigInteger, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.creditor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_REVISE_ACCOUNT_LOCK_BURST_COUNT"]

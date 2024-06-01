@@ -464,6 +464,19 @@ def _on_needed_collector_signal(
         procedures.mark_as_recently_needed_collector(debtor_id, ts)
 
 
+def _on_revise_account_lock_signal(
+    creditor_id: int,
+    debtor_id: int,
+    turn_id: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement!
+
+    pass
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -520,6 +533,10 @@ _MESSAGE_TYPES = {
     "NeededCollector": (
         schemas.NeededCollectorMessageSchema(),
         _on_needed_collector_signal,
+    ),
+    "ReviseAccountLock": (
+        schemas.ReviseAccountLockMessageSchema(),
+        _on_revise_account_lock_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),

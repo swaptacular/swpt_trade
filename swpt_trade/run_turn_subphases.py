@@ -27,6 +27,7 @@ from swpt_trade.models import (
     WorkerAccount,
     CandidateOfferSignal,
     NeededCollectorSignal,
+    ReviseAccountLockSignal,
     CollectorAccount,
     ActiveCollector,
     AccountLock,
@@ -844,5 +845,31 @@ def _create_dispatching_statuses(worker_turn, statuses):
 
 
 def _insert_revise_account_lock_signals(worker_turn):
-    # TODO: implement!
-    pass
+    turn_id = worker_turn.turn_id
+    current_ts = datetime.now(tz=timezone.utc)
+
+    with db.engine.connect() as w_conn:
+        with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
+                select(
+                    AccountLock.creditor_id,
+                    AccountLock.debtor_id,
+                )
+                .where(AccountLock.turn_id == turn_id)
+        ) as result:
+            for rows in batched(result, INSERT_BATCH_SIZE):
+                dicts_to_insert = [
+                    {
+                        "creditor_id": row.creditor_id,
+                        "debtor_id": row.debtor_id,
+                        "turn_id": turn_id,
+                        "inserted_at": current_ts,
+                    }
+                    for row in rows
+                ]
+                if dicts_to_insert:
+                    db.session.execute(
+                        insert(ReviseAccountLockSignal).execution_options(
+                            insertmanyvalues_page_size=INSERT_BATCH_SIZE
+                        ),
+                        dicts_to_insert,
+                    )

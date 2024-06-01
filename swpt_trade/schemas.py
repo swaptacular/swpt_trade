@@ -180,6 +180,30 @@ class NeededCollectorMessageSchema(ValidateTypeMixin, Schema):
             raise ValidationError("Invalid debtor ID.")
 
 
+class ReviseAccountLockMessageSchema(ValidateTypeMixin, Schema):
+    """``ReviseAccountLock`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    turn_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    ts = fields.DateTime(required=True)
+
+    @validates("debtor_id")
+    def validate_debtor_id(self, value):
+        if value == 0:
+            raise ValidationError("Invalid debtor ID.")
+
+
 class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):
     """``UpdatedLedger`` message schema."""
 

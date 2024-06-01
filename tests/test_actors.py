@@ -225,6 +225,15 @@ def test_on_needed_collector_signal(db_session, actors):
     )
 
 
+def test_on_revise_account_lock_signal(db_session, actors):
+    actors._on_revise_account_lock_signal(
+        creditor_id=C_ID,
+        debtor_id=D_ID,
+        turn_id=1,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
 def test_consumer(db_session, app, actors, restore_sharding_realm):
     consumer = actors.SmpConsumer()
 
