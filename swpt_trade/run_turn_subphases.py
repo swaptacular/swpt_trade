@@ -893,31 +893,70 @@ def run_phase3_subphase5(turn_id: int) -> None:
     )
     if worker_turn:
         turn_id = worker_turn.turn_id
+        sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
+        hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
+        hash_mask = u16_to_i16(sharding_realm.realm_mask >> 16)
 
         with db.engines["solver"].connect() as s_conn:
             s_conn.execute(
                 delete(CreditorTaking)
-                .where(CreditorTaking.turn_id == turn_id)
+                .where(
+                    and_(
+                        CreditorTaking.turn_id == turn_id,
+                        CreditorTaking.creditor_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.execute(
                 delete(CreditorGiving)
-                .where(CreditorGiving.turn_id == turn_id)
+                .where(
+                    and_(
+                        CreditorGiving.turn_id == turn_id,
+                        CreditorGiving.creditor_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.execute(
                 delete(CollectorCollecting)
-                .where(CollectorCollecting.turn_id == turn_id)
+                .where(
+                    and_(
+                        CollectorCollecting.turn_id == turn_id,
+                        CollectorCollecting.collector_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.execute(
                 delete(CollectorSending)
-                .where(CollectorSending.turn_id == turn_id)
+                .where(
+                    and_(
+                        CollectorSending.turn_id == turn_id,
+                        CollectorSending.from_collector_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.execute(
                 delete(CollectorReceiving)
-                .where(CollectorReceiving.turn_id == turn_id)
+                .where(
+                    and_(
+                        CollectorReceiving.turn_id == turn_id,
+                        CollectorReceiving.to_collector_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.execute(
                 delete(CollectorDispatching)
-                .where(CollectorDispatching.turn_id == turn_id)
+                .where(
+                    and_(
+                        CollectorDispatching.turn_id == turn_id,
+                        CollectorDispatching.collector_hash.op("&")(hash_mask)
+                        == hash_prefix,
+                    )
+                )
             )
             s_conn.commit()
 
