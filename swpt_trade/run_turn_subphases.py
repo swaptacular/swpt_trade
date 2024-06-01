@@ -3,7 +3,7 @@ import math
 from typing import TypeVar, Callable
 from datetime import datetime, timezone, timedelta
 from itertools import groupby
-from sqlalchemy import select, insert, text
+from sqlalchemy import select, insert, delete, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import null, and_
 from flask import current_app
@@ -501,8 +501,6 @@ def _populate_buy_offers(w_conn, s_conn, turn_id):
 
 @atomic
 def run_phase3_subphase0(turn_id: int) -> None:
-    # TODO: remove records from the solver at the end.
-
     worker_turn = (
         WorkerTurn.query
         .filter_by(
@@ -517,19 +515,19 @@ def run_phase3_subphase0(turn_id: int) -> None:
         statuses = DispatchingData(worker_turn.turn_id)
 
         with db.engines["solver"].connect() as s_conn:
-            _move_creditor_takings(s_conn, worker_turn)
-            _move_creditor_givings(s_conn, worker_turn)
-            _move_collector_collectings(s_conn, worker_turn, statuses)
-            _move_collector_sendings(s_conn, worker_turn, statuses)
-            _move_collector_receivings(s_conn, worker_turn, statuses)
-            _move_collector_dispatchings(s_conn, worker_turn, statuses)
+            _copy_creditor_takings(s_conn, worker_turn)
+            _copy_creditor_givings(s_conn, worker_turn)
+            _copy_collector_collectings(s_conn, worker_turn, statuses)
+            _copy_collector_sendings(s_conn, worker_turn, statuses)
+            _copy_collector_receivings(s_conn, worker_turn, statuses)
+            _copy_collector_dispatchings(s_conn, worker_turn, statuses)
             _create_dispatching_statuses(worker_turn, statuses)
             _insert_revise_account_lock_signals(worker_turn)
 
-        worker_turn.worker_turn_subphase = 10
+        worker_turn.worker_turn_subphase = 5
 
 
-def _move_creditor_takings(s_conn, worker_turn):
+def _copy_creditor_takings(s_conn, worker_turn):
     turn_id = worker_turn.turn_id
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
@@ -558,6 +556,7 @@ def _move_creditor_takings(s_conn, worker_turn):
                     "creditor_id": row.creditor_id,
                     "debtor_id": row.debtor_id,
                     "amount": (- row.amount),
+                    "collector_id": row.collector_id,
                 }
                 for row in rows
             ]
@@ -570,7 +569,7 @@ def _move_creditor_takings(s_conn, worker_turn):
                 )
 
 
-def _move_creditor_givings(s_conn, worker_turn):
+def _copy_creditor_givings(s_conn, worker_turn):
     turn_id = worker_turn.turn_id
     sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
@@ -599,6 +598,7 @@ def _move_creditor_givings(s_conn, worker_turn):
                     "creditor_id": row.creditor_id,
                     "debtor_id": row.debtor_id,
                     "amount": row.amount,
+                    "collector_id": row.collector_id,
                 }
                 for row in rows
             ]
@@ -611,7 +611,7 @@ def _move_creditor_givings(s_conn, worker_turn):
                 )
 
 
-def _move_collector_collectings(s_conn, worker_turn, statuses):
+def _copy_collector_collectings(s_conn, worker_turn, statuses):
     turn_id = worker_turn.turn_id
     cfg = current_app.config
     purge_after = (
@@ -663,10 +663,11 @@ def _move_collector_collectings(s_conn, worker_turn, statuses):
                         d["collector_id"],
                         d["turn_id"],
                         d["debtor_id"],
+                        d["amount"],
                     )
 
 
-def _move_collector_sendings(s_conn, worker_turn, statuses):
+def _copy_collector_sendings(s_conn, worker_turn, statuses):
     turn_id = worker_turn.turn_id
     cfg = current_app.config
     purge_after = (
@@ -718,10 +719,11 @@ def _move_collector_sendings(s_conn, worker_turn, statuses):
                         d["from_collector_id"],
                         d["turn_id"],
                         d["debtor_id"],
+                        d["amount"],
                     )
 
 
-def _move_collector_receivings(s_conn, worker_turn, statuses):
+def _copy_collector_receivings(s_conn, worker_turn, statuses):
     turn_id = worker_turn.turn_id
     cfg = current_app.config
     purge_after = (
@@ -774,10 +776,11 @@ def _move_collector_receivings(s_conn, worker_turn, statuses):
                         d["to_collector_id"],
                         d["turn_id"],
                         d["debtor_id"],
+                        d["expected_amount"],
                     )
 
 
-def _move_collector_dispatchings(s_conn, worker_turn, statuses):
+def _copy_collector_dispatchings(s_conn, worker_turn, statuses):
     turn_id = worker_turn.turn_id
     cfg = current_app.config
     purge_after = (
@@ -824,10 +827,11 @@ def _move_collector_dispatchings(s_conn, worker_turn, statuses):
                     dicts_to_insert,
                 )
                 for d in dicts_to_insert:
-                    statuses.register_receiving(
+                    statuses.register_dispatching(
                         d["collector_id"],
                         d["turn_id"],
                         d["debtor_id"],
+                        d["amount"],
                     )
 
 
@@ -873,3 +877,48 @@ def _insert_revise_account_lock_signals(worker_turn):
                         ),
                         dicts_to_insert,
                     )
+
+
+@atomic
+def run_phase3_subphase5(turn_id: int) -> None:
+    worker_turn = (
+        WorkerTurn.query
+        .filter_by(
+            turn_id=turn_id,
+            phase=3,
+            worker_turn_subphase=5,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if worker_turn:
+        turn_id = worker_turn.turn_id
+
+        with db.engines["solver"].connect() as s_conn:
+            s_conn.execute(
+                delete(CreditorTaking)
+                .where(CreditorTaking.turn_id == turn_id)
+            )
+            s_conn.execute(
+                delete(CreditorGiving)
+                .where(CreditorGiving.turn_id == turn_id)
+            )
+            s_conn.execute(
+                delete(CollectorCollecting)
+                .where(CollectorCollecting.turn_id == turn_id)
+            )
+            s_conn.execute(
+                delete(CollectorSending)
+                .where(CollectorSending.turn_id == turn_id)
+            )
+            s_conn.execute(
+                delete(CollectorReceiving)
+                .where(CollectorReceiving.turn_id == turn_id)
+            )
+            s_conn.execute(
+                delete(CollectorDispatching)
+                .where(CollectorDispatching.turn_id == turn_id)
+            )
+            s_conn.commit()
+
+        worker_turn.worker_turn_subphase = 10

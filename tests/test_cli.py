@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone, timedelta
 from unittest.mock import Mock
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
+from swpt_trade.utils import calc_hash
 from swpt_trade.extensions import db
 from swpt_trade import models as m
 
@@ -1281,13 +1282,25 @@ def test_update_worker_turns(app, db_session, current_ts):
         phase_deadline=current_ts - timedelta(days=99.1),
         collection_deadline=current_ts - timedelta(days=49),
     )
+    t3 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts - timedelta(days=49),
+    )
     db.session.add(t0)
     db.session.add(t1)
     db.session.add(t2)
+    db.session.add(t3)
     db.session.flush()
     db.session.expunge(t0)
     db.session.expunge(t1)
     db.session.expunge(t2)
+    db.session.expunge(t3)
 
     wt0 = m.WorkerTurn(
         turn_id=t0.turn_id,
@@ -1313,11 +1326,25 @@ def test_update_worker_turns(app, db_session, current_ts):
         phase_deadline=current_ts - timedelta(days=100.1),
         worker_turn_subphase=5,
     )
+    wt3 = m.WorkerTurn(
+        turn_id=t3.turn_id,
+        started_at=t3.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts - timedelta(days=49),
+        worker_turn_subphase=5,
+    )
     db.session.add(wt0)
     db.session.add(wt1)
+    db.session.add(wt3)
     db.session.commit()
 
-    assert len(m.WorkerTurn.query.all()) == 2
+    assert len(m.WorkerTurn.query.all()) == 3
     runner = app.test_cli_runner()
     result = runner.invoke(
         args=[
@@ -1328,38 +1355,52 @@ def test_update_worker_turns(app, db_session, current_ts):
     )
     assert result.exit_code == 0
     wts = m.WorkerTurn.query.all()
-    wts.sort(key=lambda t: t.phase, reverse=True)
-    assert len(wts) == 3
+    wts.sort(key=lambda t: (t.phase, t.worker_turn_subphase), reverse=True)
+    assert len(wts) == 4
     assert wts[0].phase == 3
-    assert wts[0].turn_id == t0.turn_id
-    assert wts[0].started_at == t0.started_at
-    assert wts[0].base_debtor_info_locator == t0.base_debtor_info_locator
-    assert wts[0].base_debtor_id == t0.base_debtor_id
-    assert wts[0].max_distance_to_base == t0.max_distance_to_base
-    assert wts[0].min_trade_amount == t0.min_trade_amount
+    assert wts[0].worker_turn_subphase == 10
+    assert wts[0].turn_id == t3.turn_id
+    assert wts[0].started_at == t3.started_at
+    assert wts[0].base_debtor_info_locator == t3.base_debtor_info_locator
+    assert wts[0].base_debtor_id == t3.base_debtor_id
+    assert wts[0].max_distance_to_base == t3.max_distance_to_base
+    assert wts[0].min_trade_amount == t3.min_trade_amount
     assert wts[0].phase_deadline is None
-    assert wts[0].collection_started_at == t0.collection_started_at
-    assert wts[0].collection_deadline == t0.collection_deadline
-    assert wts[1].phase == t1.phase
-    assert wts[1].turn_id == t1.turn_id
-    assert wts[1].started_at == t1.started_at
-    assert wts[1].base_debtor_info_locator == t1.base_debtor_info_locator
-    assert wts[1].base_debtor_id == t1.base_debtor_id
-    assert wts[1].max_distance_to_base == t1.max_distance_to_base
-    assert wts[1].min_trade_amount == t1.min_trade_amount
-    assert wts[1].phase_deadline == t1.phase_deadline
-    assert wts[1].collection_started_at == t1.collection_started_at
-    assert wts[1].collection_deadline == t1.collection_deadline
-    assert wts[2].phase == t2.phase
-    assert wts[2].turn_id == t2.turn_id
-    assert wts[2].started_at == t2.started_at
-    assert wts[2].base_debtor_info_locator == t2.base_debtor_info_locator
-    assert wts[2].base_debtor_id == t2.base_debtor_id
-    assert wts[2].max_distance_to_base == t2.max_distance_to_base
-    assert wts[2].min_trade_amount == t2.min_trade_amount
-    assert wts[2].phase_deadline == t2.phase_deadline
-    assert wts[2].collection_started_at == t2.collection_started_at
-    assert wts[2].collection_deadline == t2.collection_deadline
+    assert wts[0].collection_started_at == t3.collection_started_at
+    assert wts[0].collection_deadline == t3.collection_deadline
+    assert wts[1].phase == 3
+    assert wts[1].worker_turn_subphase == 5
+    assert wts[1].turn_id == t0.turn_id
+    assert wts[1].started_at == t0.started_at
+    assert wts[1].base_debtor_info_locator == t0.base_debtor_info_locator
+    assert wts[1].base_debtor_id == t0.base_debtor_id
+    assert wts[1].max_distance_to_base == t0.max_distance_to_base
+    assert wts[1].min_trade_amount == t0.min_trade_amount
+    assert wts[1].phase_deadline is None
+    assert wts[1].collection_started_at == t0.collection_started_at
+    assert wts[1].collection_deadline == t0.collection_deadline
+    assert wts[2].phase == t1.phase
+    assert wts[2].worker_turn_subphase == 5
+    assert wts[2].turn_id == t1.turn_id
+    assert wts[2].started_at == t1.started_at
+    assert wts[2].base_debtor_info_locator == t1.base_debtor_info_locator
+    assert wts[2].base_debtor_id == t1.base_debtor_id
+    assert wts[2].max_distance_to_base == t1.max_distance_to_base
+    assert wts[2].min_trade_amount == t1.min_trade_amount
+    assert wts[2].phase_deadline == t1.phase_deadline
+    assert wts[2].collection_started_at == t1.collection_started_at
+    assert wts[2].collection_deadline == t1.collection_deadline
+    assert wts[3].phase == t2.phase
+    assert wts[3].worker_turn_subphase == 10
+    assert wts[3].turn_id == t2.turn_id
+    assert wts[3].started_at == t2.started_at
+    assert wts[3].base_debtor_info_locator == t2.base_debtor_info_locator
+    assert wts[3].base_debtor_id == t2.base_debtor_id
+    assert wts[3].max_distance_to_base == t2.max_distance_to_base
+    assert wts[3].min_trade_amount == t2.min_trade_amount
+    assert wts[3].phase_deadline == t2.phase_deadline
+    assert wts[3].collection_started_at == t2.collection_started_at
+    assert wts[3].collection_deadline == t2.collection_deadline
 
 
 @pytest.mark.parametrize("populated_confirmed_debtors", [True, False])
@@ -1891,3 +1932,239 @@ def test_run_phase2_subphase5(
     assert bos[1].creditor_id == 457
     assert bos[1].debtor_id == 777
     assert bos[1].amount == 30001
+
+
+def test_run_phase3_subphase0(
+        mocker,
+        app,
+        db_session,
+        current_ts,
+):
+    mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
+
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        started_at=current_ts - timedelta(days=10000),
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts + timedelta(days=200),
+    )
+    db.session.add(t1)
+    db.session.flush()
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts + timedelta(days=200),
+        worker_turn_subphase=0,
+    )
+    db.session.add(wt1)
+    db.session.flush()
+
+    db.session.add(
+        m.AccountLock(
+            creditor_id=123,
+            debtor_id=666,
+            turn_id=t1.turn_id,
+            collector_id=789,
+            transfer_id=1234,
+            amount=-10000,
+        )
+    )
+    db.session.add(
+        m.AccountLock(
+            creditor_id=124,
+            debtor_id=666,
+            turn_id=t1.turn_id,
+            collector_id=789,
+            transfer_id=1235,
+            amount=10000,
+        )
+    )
+    db.session.add(
+        m.CreditorTaking(
+            turn_id=wt1.turn_id,
+            creditor_id=123,
+            debtor_id=666,
+            creditor_hash=calc_hash(123),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
+        m.CreditorGiving(
+            turn_id=wt1.turn_id,
+            creditor_id=124,
+            debtor_id=666,
+            creditor_hash=calc_hash(124),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
+        m.CollectorCollecting(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=123,
+            amount=10000,
+            collector_id=789,
+            collector_hash=calc_hash(789),
+        )
+    )
+    db.session.add(
+        m.CollectorSending(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            from_collector_id=789,
+            to_collector_id=890,
+            from_collector_hash=calc_hash(789),
+            amount=10000,
+        )
+    )
+    db.session.add(
+        m.CollectorReceiving(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            to_collector_id=890,
+            from_collector_id=789,
+            to_collector_hash=calc_hash(890),
+            amount=10000,
+        )
+    )
+    db.session.add(
+        m.CollectorDispatching(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=124,
+            amount=10000,
+            collector_id=890,
+            collector_hash=calc_hash(890),
+        )
+    )
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    assert len(m.AccountLock.query.all()) == 2
+    assert len(m.CreditorTaking.query.all()) == 1
+    assert len(m.CreditorGiving.query.all()) == 1
+    assert len(m.CollectorCollecting.query.all()) == 1
+    assert len(m.CollectorSending.query.all()) == 1
+    assert len(m.CollectorReceiving.query.all()) == 1
+    assert len(m.CollectorDispatching.query.all()) == 1
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wt = m.WorkerTurn.query.one()
+    assert wt.turn_id == t1.turn_id
+    assert wt.phase == t1.phase
+    assert wt.worker_turn_subphase == 5
+    assert len(m.AccountLock.query.all()) == 2
+    assert len(m.CreditorTaking.query.all()) == 1
+    assert len(m.CreditorGiving.query.all()) == 1
+    assert len(m.CollectorCollecting.query.all()) == 1
+    assert len(m.CollectorSending.query.all()) == 1
+    assert len(m.CollectorReceiving.query.all()) == 1
+    assert len(m.CollectorDispatching.query.all()) == 1
+
+    cps = m.CreditorParticipation.query.all()
+    cps.sort(key=lambda x: x.creditor_id)
+    assert len(cps) == 2
+    assert cps[0].creditor_id == 123
+    assert cps[0].debtor_id == 666
+    assert cps[0].turn_id == t1.turn_id
+    assert cps[0].amount == -10000
+    assert cps[0].collector_id == 789
+    assert cps[1].creditor_id == 124
+    assert cps[1].debtor_id == 666
+    assert cps[1].turn_id == t1.turn_id
+    assert cps[1].amount == 10000
+    assert cps[1].collector_id == 789
+
+    wc = m.WorkerCollecting.query.one()
+    assert wc.collector_id == 789
+    assert wc.turn_id == t1.turn_id
+    assert wc.debtor_id == 666
+    assert wc.creditor_id == 123
+    assert wc.amount == 10000
+    assert wc.collected is False
+    assert wc.purge_after > current_ts
+
+    ws = m.WorkerSending.query.one()
+    assert ws.from_collector_id == 789
+    assert ws.turn_id == t1.turn_id
+    assert ws.debtor_id == 666
+    assert ws.to_collector_id == 890
+    assert ws.amount == 10000
+    assert ws.purge_after > current_ts
+
+    wr = m.WorkerReceiving.query.one()
+    assert wr.to_collector_id == 890
+    assert wr.turn_id == t1.turn_id
+    assert wr.debtor_id == 666
+    assert wr.from_collector_id == 789
+    assert wr.expected_amount == 10000
+    assert wr.received_amount == 0
+    assert wr.purge_after > current_ts
+
+    wr = m.WorkerDispatching.query.one()
+    assert wr.collector_id == 890
+    assert wr.turn_id == t1.turn_id
+    assert wr.debtor_id == 666
+    assert wr.creditor_id == 124
+    assert wr.amount == 10000
+    assert wr.purge_after > current_ts
+
+    dss = m.DispatchingStatus.query.all()
+    dss.sort(key=lambda x: x.collector_id)
+    assert len(dss) == 2
+    assert dss[0].collector_id == 789
+    assert dss[0].turn_id == t1.turn_id
+    assert dss[0].inserted_at >= current_ts
+    assert dss[0].amount_to_collect == 10000
+    assert dss[0].total_collected_amount is None
+    assert dss[0].amount_to_send == 10000
+    assert dss[0].all_sent is False
+    assert dss[0].number_to_receive == 0
+    assert dss[0].total_received_amount is None
+    assert dss[0].all_received is False
+    assert dss[0].amount_to_dispatch == 0
+
+    assert dss[1].collector_id == 890
+    assert dss[1].turn_id == t1.turn_id
+    assert dss[1].inserted_at >= current_ts
+    assert dss[1].amount_to_collect == 0
+    assert dss[1].total_collected_amount is None
+    assert dss[1].amount_to_send == 0
+    assert dss[1].all_sent is False
+    assert dss[1].number_to_receive == 1
+    assert dss[1].total_received_amount is None
+    assert dss[1].all_received is False
+    assert dss[1].amount_to_dispatch == 10000
+
+    rals = m.ReviseAccountLockSignal.query.all()
+    rals.sort(key=lambda x: x.creditor_id)
+    assert len(rals) == 2
+    assert rals[0].creditor_id == 123
+    assert rals[0].debtor_id == 666
+    assert rals[0].turn_id == wt.turn_id
+    assert rals[1].creditor_id == 124
+    assert rals[1].turn_id == wt.turn_id
+    assert rals[1].debtor_id == 666

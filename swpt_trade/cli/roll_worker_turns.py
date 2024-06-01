@@ -36,6 +36,7 @@ def roll_worker_turns(wait, quit_early):
         run_phase2_subphase0,
         run_phase2_subphase5,
         run_phase3_subphase0,
+        run_phase3_subphase5,
     )
 
     wait_seconds = (
@@ -95,6 +96,8 @@ def roll_worker_turns(wait, quit_early):
                     run_phase2_subphase5(turn_id)
             elif phase == 3 and subphase == 0:
                 run_phase3_subphase0(turn_id)
+            elif phase == 3 and subphase == 5:
+                run_phase3_subphase5(turn_id)
             else:  # pragma: no cover
                 raise RuntimeError(
                     f"Invalid subphase for worker turn {worker_turn.turn_id}."
