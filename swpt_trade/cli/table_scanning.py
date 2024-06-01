@@ -335,7 +335,7 @@ def scan_worker_sendings(days, quit_early):
     single pass through the worker sending table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_SENDINGS_SCAN_DAYS is taken. If it is not set, the
-    default number of days is 7.
+    default number of days is 1.
     """
     from swpt_trade.table_scanners import WorkerSendingsScanner
 
@@ -363,7 +363,7 @@ def scan_worker_receivings(days, quit_early):
     single pass through the worker receiving table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_RECEIVINGS_SCAN_DAYS is taken. If it is not set, the
-    default number of days is 7.
+    default number of days is 1.
     """
     from swpt_trade.table_scanners import WorkerReceivingsScanner
 
