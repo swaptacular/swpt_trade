@@ -2168,3 +2168,133 @@ def test_run_phase3_subphase0(
     assert rals[1].creditor_id == 124
     assert rals[1].turn_id == wt.turn_id
     assert rals[1].debtor_id == 666
+
+
+def test_run_phase3_subphase5(
+        mocker,
+        app,
+        db_session,
+        current_ts,
+):
+    mocker.patch("swpt_trade.run_turn_subphases.INSERT_BATCH_SIZE", new=1)
+    mocker.patch("swpt_trade.run_turn_subphases.SELECT_BATCH_SIZE", new=1)
+
+    t1 = m.Turn(
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        started_at=current_ts - timedelta(days=10000),
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts + timedelta(days=200),
+    )
+    db.session.add(t1)
+    db.session.flush()
+
+    wt1 = m.WorkerTurn(
+        turn_id=t1.turn_id,
+        started_at=t1.started_at,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=10000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts - timedelta(days=1),
+        collection_deadline=current_ts + timedelta(days=200),
+        worker_turn_subphase=5,
+    )
+    db.session.add(wt1)
+    db.session.flush()
+
+    db.session.add(
+        m.CreditorTaking(
+            turn_id=wt1.turn_id,
+            creditor_id=123,
+            debtor_id=666,
+            creditor_hash=calc_hash(123),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
+        m.CreditorGiving(
+            turn_id=wt1.turn_id,
+            creditor_id=124,
+            debtor_id=666,
+            creditor_hash=calc_hash(124),
+            amount=10000,
+            collector_id=789,
+        )
+    )
+    db.session.add(
+        m.CollectorCollecting(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=123,
+            amount=10000,
+            collector_id=789,
+            collector_hash=calc_hash(789),
+        )
+    )
+    db.session.add(
+        m.CollectorSending(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            from_collector_id=789,
+            to_collector_id=890,
+            from_collector_hash=calc_hash(789),
+            amount=10000,
+        )
+    )
+    db.session.add(
+        m.CollectorReceiving(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            to_collector_id=890,
+            from_collector_id=789,
+            to_collector_hash=calc_hash(890),
+            amount=10000,
+        )
+    )
+    db.session.add(
+        m.CollectorDispatching(
+            turn_id=wt1.turn_id,
+            debtor_id=666,
+            creditor_id=124,
+            amount=10000,
+            collector_id=890,
+            collector_hash=calc_hash(890),
+        )
+    )
+    db.session.commit()
+
+    assert len(m.WorkerTurn.query.all()) == 1
+    assert len(m.CreditorTaking.query.all()) == 1
+    assert len(m.CreditorGiving.query.all()) == 1
+    assert len(m.CollectorCollecting.query.all()) == 1
+    assert len(m.CollectorSending.query.all()) == 1
+    assert len(m.CollectorReceiving.query.all()) == 1
+    assert len(m.CollectorDispatching.query.all()) == 1
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_worker_turns",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    wt = m.WorkerTurn.query.one()
+    assert wt.turn_id == t1.turn_id
+    assert wt.phase == t1.phase
+    assert wt.worker_turn_subphase == 10
+
+    assert len(m.CreditorTaking.query.all()) == 0
+    assert len(m.CreditorGiving.query.all()) == 0
+    assert len(m.CollectorCollecting.query.all()) == 0
+    assert len(m.CollectorSending.query.all()) == 0
+    assert len(m.CollectorReceiving.query.all()) == 0
+    assert len(m.CollectorDispatching.query.all()) == 0
