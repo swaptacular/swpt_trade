@@ -851,6 +851,7 @@ def _create_dispatching_statuses(worker_turn, statuses):
 def _insert_revise_account_lock_signals(worker_turn):
     turn_id = worker_turn.turn_id
     current_ts = datetime.now(tz=timezone.utc)
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
 
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
@@ -869,6 +870,7 @@ def _insert_revise_account_lock_signals(worker_turn):
                         "inserted_at": current_ts,
                     }
                     for row in rows
+                    if sharding_realm.match(row.creditor_id)
                 ]
                 if dicts_to_insert:
                     db.session.execute(
