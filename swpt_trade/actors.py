@@ -129,27 +129,9 @@ def _on_account_transfer_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement!
-
-    procedures.process_account_transfer_signal(
-        debtor_id=debtor_id,
-        creditor_id=creditor_id,
-        creation_date=creation_date,
-        transfer_number=transfer_number,
-        coordinator_type=coordinator_type,
-        sender=sender,
-        recipient=recipient,
-        acquired_amount=acquired_amount,
-        transfer_note_format=transfer_note_format,
-        transfer_note=transfer_note,
-        committed_at=committed_at,
-        principal=principal,
-        ts=ts,
-        previous_transfer_number=previous_transfer_number,
-        retention_interval=timedelta(
-            days=current_app.config["APP_LOG_RETENTION_DAYS"]
-        ),
-    )
+    if coordinator_type == CT_AGENT:
+        # TODO: Implement the transfer registration logic!
+        pass
 
 
 def _on_rejected_agent_transfer_signal(
@@ -237,23 +219,12 @@ def _on_finalized_agent_transfer_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement!
-
     if coordinator_type != CT_AGENT:  # pragma: no cover
         raise RuntimeError(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    procedures.process_finalized_agent_transfer_signal(
-        debtor_id=debtor_id,
-        creditor_id=creditor_id,
-        transfer_id=transfer_id,
-        coordinator_id=coordinator_id,
-        coordinator_request_id=coordinator_request_id,
-        committed_amount=committed_amount,
-        status_code=status_code,
-        total_locked_amount=total_locked_amount,
-    )
+    # TODO: Implement the transfer finalisation logic!
 
 
 def _on_updated_ledger_signal(
@@ -472,9 +443,11 @@ def _on_revise_account_lock_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement!
-
-    pass
+    procedures.process_revise_account_lock_signal(
+        creditor_id=creditor_id,
+        debtor_id=debtor_id,
+        turn_id=turn_id,
+    )
 
 
 _MESSAGE_TYPES = {

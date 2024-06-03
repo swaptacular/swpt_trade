@@ -2,6 +2,7 @@ import random
 import math
 from typing import TypeVar, Callable
 from datetime import datetime, date, timezone
+from sqlalchemy.sql.expression import null
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
     TT_BUYER,
@@ -20,6 +21,7 @@ from swpt_trade.models import (
     ActiveCollector,
     PrepareTransferSignal,
     FinalizeTransferSignal,
+    CreditorParticipation,
 )
 
 T = TypeVar("T")
@@ -301,3 +303,74 @@ def put_prepared_transfer_through_account_locks(
 
     dismiss()
     return True
+
+
+@atomic
+def process_revise_account_lock_signal(
+        *,
+        creditor_id: int,
+        debtor_id: int,
+        turn_id: int,
+):
+    lock = (
+        AccountLock.query
+        .filter_by(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            turn_id=turn_id,
+            finalized_at=null(),
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if lock:
+        creditor_participation = (
+            CreditorParticipation.query
+            .filter_by(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                turn_id=turn_id,
+            )
+            .with_for_update()
+            .one_or_none()
+        )
+        if creditor_participation is None:
+            # The account does not participate in this trading turn.
+            db.session.delete(lock)
+
+        else:
+            assert lock.transfer_id is not None
+            amount = creditor_participation.amount
+
+            if amount < 0:
+                # The amount must be taken from the creditor's account.
+                assert lock.amount <= amount
+                assert lock.collector_id == creditor_participation.collector_id
+                lock.finalized_at = datetime.now(tz=timezone.utc)
+                lock.amount = amount
+
+                db.session.add(
+                    FinalizeTransferSignal(
+                        creditor_id=creditor_id,
+                        debtor_id=debtor_id,
+                        transfer_id=lock.transfer_id,
+                        coordinator_id=creditor_id,
+                        coordinator_request_id=lock.coordinator_request_id,
+                        committed_amount=(-amount),
+                        transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
+                        transfer_note=generate_transfer_note(
+                            turn_id, TT_BUYER, lock.collector_id
+                        ),
+                        inserted_at=lock.finalized_at,
+                    )
+                )
+
+            else:
+                # The amount will be transferred to the creditor's
+                # account, and therefore we should not release the
+                # account lock, ensuring that the account will not be
+                # deleted in the meantime.
+                assert 0 < amount <= lock.amount
+                lock.amount = amount
+
+            db.session.delete(creditor_participation)

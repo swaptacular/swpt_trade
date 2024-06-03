@@ -555,7 +555,7 @@ def _copy_creditor_takings(s_conn, worker_turn):
                     "turn_id": turn_id,
                     "creditor_id": row.creditor_id,
                     "debtor_id": row.debtor_id,
-                    "amount": (- row.amount),
+                    "amount": (-row.amount),
                     "collector_id": row.collector_id,
                 }
                 for row in rows
@@ -859,7 +859,12 @@ def _insert_revise_account_lock_signals(worker_turn):
                     AccountLock.creditor_id,
                     AccountLock.debtor_id,
                 )
-                .where(AccountLock.turn_id == turn_id)
+                .where(
+                    and_(
+                        AccountLock.turn_id == turn_id,
+                        AccountLock.finalized_at == null(),
+                    )
+                )
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 dicts_to_insert = [

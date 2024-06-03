@@ -101,7 +101,6 @@ def test_on_rejected_agent_transfer_signal(db_session, actors):
     )
 
 
-@pytest.mark.skip
 def test_on_finalized_agent_transfer_signal(db_session, actors):
     actors._on_finalized_agent_transfer_signal(
         debtor_id=D_ID,
@@ -116,6 +115,25 @@ def test_on_finalized_agent_transfer_signal(db_session, actors):
         committed_amount=100,
         status_code="OK",
         total_locked_amount=0,
+    )
+
+
+def test_on_account_transfer_signal(db_session, actors):
+    actors._on_account_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        creation_date=date.fromisoformat("2020-01-02"),
+        transfer_number=1,
+        coordinator_type="agent",
+        sender="666",
+        recipient=str(C_ID),
+        acquired_amount=1000,
+        transfer_note_format="json",
+        transfer_note='{"message": "test"}',
+        committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        principal=1000,
+        ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
+        previous_transfer_number=0,
     )
 
 
