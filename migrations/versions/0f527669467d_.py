@@ -89,7 +89,7 @@ def upgrade_():
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('purge_after', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.CheckConstraint('amount > 0'),
+    sa.CheckConstraint('amount > 1'),
     comment='Indicates that the given amount must be deposited (dispatched) to the given customer account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_dispatching" solver table to this table.'
     )
     # Create a "covering" index instead of a "normal" index.

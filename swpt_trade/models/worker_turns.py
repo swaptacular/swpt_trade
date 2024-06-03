@@ -465,7 +465,7 @@ class WorkerDispatching(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
-        db.CheckConstraint(amount > 0),
+        db.CheckConstraint(amount > 1),
         {
             "comment": (
                 'Indicates that the given amount must be deposited'
