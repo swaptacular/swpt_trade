@@ -307,7 +307,7 @@ def scan_worker_collectings(days, quit_early):
     single pass through the worker collecting table. If the number of
     days is not specified, the value of the environment variable
     APP_WORKER_COLLECTINGS_SCAN_DAYS is taken. If it is not set, the
-    default number of days is 7.
+    default number of days is 3.
     """
     from swpt_trade.table_scanners import WorkerCollectingsScanner
 

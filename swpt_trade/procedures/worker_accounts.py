@@ -133,7 +133,9 @@ def process_account_update_signal(
                 creditor_id=creditor_id,
                 debtor_id=debtor_id,
                 cutoff_ts=current_ts - interest_rate_history_period,
-                max_number_of_changes=interest_rate_history_period.days + 30,
+                max_number_of_changes=(
+                    interest_rate_history_period.days // 3 + 30
+                ),
             )
 
     if (current_ts - ts).total_seconds() > ttl:
