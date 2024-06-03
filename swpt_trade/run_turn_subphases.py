@@ -859,12 +859,7 @@ def _insert_revise_account_lock_signals(worker_turn):
                     AccountLock.creditor_id,
                     AccountLock.debtor_id,
                 )
-                .where(
-                    and_(
-                        AccountLock.turn_id == turn_id,
-                        AccountLock.finalized_at == null(),
-                    )
-                )
+                .where(AccountLock.turn_id == turn_id)
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 dicts_to_insert = [

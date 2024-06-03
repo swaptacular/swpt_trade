@@ -312,6 +312,16 @@ def process_revise_account_lock_signal(
         debtor_id: int,
         turn_id: int,
 ):
+    creditor_participation = (
+        CreditorParticipation.query
+        .filter_by(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            turn_id=turn_id,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
     lock = (
         AccountLock.query
         .filter_by(
@@ -324,17 +334,7 @@ def process_revise_account_lock_signal(
         .one_or_none()
     )
     if lock:
-        creditor_participation = (
-            CreditorParticipation.query
-            .filter_by(
-                creditor_id=creditor_id,
-                debtor_id=debtor_id,
-                turn_id=turn_id,
-            )
-            .with_for_update()
-            .one_or_none()
-        )
-        if creditor_participation is None:
+        if not creditor_participation:
             # The account does not participate in this trading turn.
             db.session.delete(lock)
 
@@ -373,4 +373,5 @@ def process_revise_account_lock_signal(
                 assert 0 < amount <= lock.amount
                 lock.amount = amount
 
-            db.session.delete(creditor_participation)
+    if creditor_participation:
+        db.session.delete(creditor_participation)
