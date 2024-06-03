@@ -12,6 +12,7 @@ from swpt_trade.utils import (
 )
 from swpt_trade.extensions import db
 from swpt_trade.models import (
+    ROOT_CREDITOR_ID,
     MAX_INT32,
     T_INFINITY,
     AGENT_TRANSFER_NOTE_FORMAT,
@@ -330,11 +331,12 @@ def process_revise_account_lock_signal(
             turn_id=turn_id,
             finalized_at=null(),
         )
+        .filter(AccountLock.collector_id != ROOT_CREDITOR_ID)
         .with_for_update()
         .one_or_none()
     )
     if lock:
-        if not creditor_participation:
+        if not creditor_participation or lock.is_self_lock:
             # The account does not participate in this trading turn.
             db.session.delete(lock)
 
@@ -343,12 +345,13 @@ def process_revise_account_lock_signal(
             amount = creditor_participation.amount
 
             if amount < 0:
-                # The amount must be taken from the creditor's account.
-                assert lock.amount <= amount
+                # The amount must be taken from the account.
                 assert lock.collector_id == creditor_participation.collector_id
-                lock.finalized_at = datetime.now(tz=timezone.utc)
+                assert lock.amount <= amount < 0
                 lock.amount = amount
 
+                # Finalize the already prepared transfer.
+                lock.finalized_at = datetime.now(tz=timezone.utc)
                 db.session.add(
                     FinalizeTransferSignal(
                         creditor_id=creditor_id,
@@ -366,12 +369,16 @@ def process_revise_account_lock_signal(
                 )
 
             else:
-                # The amount will be transferred to the creditor's
-                # account, and therefore we should not release the
-                # account lock, ensuring that the account will not be
-                # deleted in the meantime.
+                # The amount will eventually be transferred to the account.
+                assert lock.collector_id != ROOT_CREDITOR_ID
                 assert 0 < amount <= lock.amount
                 lock.amount = amount
+
+                # The value of the `collector_id` field is irrelevant
+                # in this case, and here we change it to
+                # `ROOT_CREDITOR_ID`, just to ensure that this
+                # procedure is idempotent.
+                lock.collector_id = ROOT_CREDITOR_ID
 
     if creditor_participation:
         db.session.delete(creditor_participation)
