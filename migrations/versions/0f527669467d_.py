@@ -73,6 +73,7 @@ def upgrade_():
     sa.Column('collected', sa.BOOLEAN(), nullable=False),
     sa.Column('purge_after', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 0'),
+    sa.CheckConstraint('collector_id != creditor_id'),
     comment='Indicates that the given amount will be withdrawn (collected) from the given creditor\'s account, as part of the given trading turn, and will be transferred to the given collector. During the phase 3 of each turn, "worker" servers will move the records from the "collector_collecting" solver table to this table.'
     )
     # Create a "covering" index instead of a "normal" index.
@@ -90,6 +91,7 @@ def upgrade_():
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('purge_after', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 1'),
+    sa.CheckConstraint('collector_id != creditor_id'),
     comment='Indicates that the given amount must be deposited (dispatched) to the given customer account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_dispatching" solver table to this table.'
     )
     # Create a "covering" index instead of a "normal" index.
@@ -106,6 +108,7 @@ def upgrade_():
     sa.Column('purge_after', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('expected_amount > 1'),
     sa.CheckConstraint('received_amount >= 0'),
+    sa.CheckConstraint('from_collector_id != to_collector_id'),
     sa.PrimaryKeyConstraint('to_collector_id', 'turn_id', 'debtor_id', 'from_collector_id'),
     comment='Indicates that some amount will be transferred (received) from another collector account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_receiving" solver table to this table.'
     )
@@ -120,6 +123,7 @@ def upgrade_():
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('purge_after', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.CheckConstraint('amount > 1'),
+    sa.CheckConstraint('from_collector_id != to_collector_id'),
     comment='Indicates that the given amount must be transferred (sent) to another collector account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_sending" solver table to this table.'
     )
     # Create a "covering" index instead of a "normal" index.

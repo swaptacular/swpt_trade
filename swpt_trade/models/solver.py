@@ -316,6 +316,7 @@ class CollectorSending(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
+        db.CheckConstraint(from_collector_id != to_collector_id),
         {
             "comment": (
                 'Informs the "worker" server responsible for the given'
@@ -339,6 +340,7 @@ class CollectorReceiving(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
+        db.CheckConstraint(from_collector_id != to_collector_id),
         {
             "comment": (
                 'Informs the "worker" server responsible for the given'

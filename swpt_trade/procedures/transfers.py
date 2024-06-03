@@ -336,8 +336,12 @@ def process_revise_account_lock_signal(
         .one_or_none()
     )
     if lock:
-        if not creditor_participation or lock.is_self_lock:
+        if not creditor_participation:
             # The account does not participate in this trading turn.
+            db.session.delete(lock)
+
+        elif lock.is_self_lock:
+            # TODO: Is there anything else that needs to be done here?
             db.session.delete(lock)
 
         else:

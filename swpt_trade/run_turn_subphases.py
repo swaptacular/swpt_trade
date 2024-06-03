@@ -635,6 +635,8 @@ def _copy_collector_collectings(s_conn, worker_turn, statuses):
                     CollectorCollecting.turn_id == turn_id,
                     CollectorCollecting.collector_hash.op("&")(hash_mask)
                     == hash_prefix,
+                    CollectorCollecting.creditor_id
+                    != CollectorCollecting.collector_id,
                 )
             )
     ) as result:
@@ -804,6 +806,9 @@ def _copy_collector_dispatchings(s_conn, worker_turn, statuses):
                     CollectorDispatching.turn_id == turn_id,
                     CollectorDispatching.collector_hash.op("&")(hash_mask)
                     == hash_prefix,
+                    CollectorDispatching.amount > 1,
+                    CollectorDispatching.creditor_id
+                    != CollectorDispatching.collector_id,
                 )
             )
     ) as result:

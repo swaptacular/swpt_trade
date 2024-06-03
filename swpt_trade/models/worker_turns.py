@@ -351,6 +351,7 @@ class WorkerCollecting(db.Model):
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 0),
+        db.CheckConstraint(collector_id != creditor_id),
         db.Index(
             "idx_worker_collecting_not_collected",
             collector_id,
@@ -393,6 +394,7 @@ class WorkerSending(db.Model):
         # sent. Therefore, we can try to send only amounts greater
         # than `1`.
         db.CheckConstraint(amount > 1),
+        db.CheckConstraint(from_collector_id != to_collector_id),
         {
             "comment": (
                 'Indicates that the given amount must be transferred (sent)'
@@ -430,6 +432,7 @@ class WorkerReceiving(db.Model):
     __table_args__ = (
         db.CheckConstraint(expected_amount > 1),
         db.CheckConstraint(received_amount >= 0),
+        db.CheckConstraint(from_collector_id != to_collector_id),
         db.Index(
             "idx_worker_receiving_not_received",
             to_collector_id,
@@ -466,6 +469,7 @@ class WorkerDispatching(db.Model):
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
         db.CheckConstraint(amount > 1),
+        db.CheckConstraint(collector_id != creditor_id),
         {
             "comment": (
                 'Indicates that the given amount must be deposited'

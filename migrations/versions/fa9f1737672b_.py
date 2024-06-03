@@ -368,6 +368,7 @@ def upgrade_solver():
     sa.Column('to_collector_hash', sa.SmallInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
+    sa.CheckConstraint('from_collector_id != to_collector_id'),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'to_collector_id', 'from_collector_id'),
     comment='Informs the "worker" server responsible for the given "to collector" account, that the given amount will be transferred (received) from another collector account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
@@ -379,6 +380,7 @@ def upgrade_solver():
     sa.Column('from_collector_hash', sa.SmallInteger(), nullable=False),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.CheckConstraint('amount > 0'),
+    sa.CheckConstraint('from_collector_id != to_collector_id'),
     sa.PrimaryKeyConstraint('turn_id', 'debtor_id', 'from_collector_id', 'to_collector_id'),
     comment='Informs the "worker" server responsible for the given "from collector" account, that the given amount must be transferred (sent) to another collector account, as part of the given trading turn. During the phase 3 of each turn, "Worker" servers should make their own copy of the records in this table, and then delete the original records.'
     )
