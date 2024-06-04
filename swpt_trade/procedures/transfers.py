@@ -380,7 +380,7 @@ def process_revise_account_lock_signal(
             )
 
         else:
-            assert amount > 0
+            assert amount > 1
 
             # The creditor's account is the recipient. In this case
             # the value of the `collector_id` field is irrelevant.
