@@ -336,9 +336,9 @@ def process_revise_account_lock_signal(
             creditor_id=creditor_id,
             debtor_id=debtor_id,
             turn_id=turn_id,
+            finalized_at=null(),
+            has_been_revised=False,
         )
-        .filter(AccountLock.finalized_at == null())
-        .filter(AccountLock.collector_id != ROOT_CREDITOR_ID)
         .with_for_update()
         .one_or_none()
     )
@@ -378,7 +378,7 @@ def process_revise_account_lock_signal(
             )
 
         if participation:
-            amount = lock.amount = participation.amount
+            amount = participation.amount
 
             if creditor_id == participation.collector_id:
                 # The sender and the recipient is the same account. In
@@ -391,22 +391,22 @@ def process_revise_account_lock_signal(
                 dismiss()
 
             elif amount < 0:
-                # The account is the sender.
+                # The account is the sender. The amount must be taken
+                # from the account, and transferred to the collector.
+                assert lock.amount <= amount < 0
                 lock.finalized_at = current_ts
                 commit(-amount)
 
             else:
-                # The account is the receiver.
-                assert amount > 1
+                # The account is the receiver. We expect the amount to
+                # be transferred to the account at a later stage. In
+                # order to guarantee that the account will not be
+                # deleted in the meantime, we should not release the
+                # account lock yet.
+                assert 1 < amount <= lock.amount
 
-                # We expect the amount to be transferred to the
-                # account at a later stage. We should not release the
-                # account lock yet, so that it is guaranteed that the
-                # account will not be deleted in the meantime. In this
-                # case, the value of the `collector_id` field is
-                # irrelevant. Here we change it to `ROOT_CREDITOR_ID`,
-                # just to ensure that this procedure is idempotent.
-                lock.collector_id = ROOT_CREDITOR_ID
+            lock.amount = amount
+            lock.has_been_revised = True
 
         else:
             dismiss()

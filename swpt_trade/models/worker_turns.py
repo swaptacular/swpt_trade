@@ -146,6 +146,7 @@ class AccountLock(db.Model):
     released_at = db.Column(db.TIMESTAMP(timezone=True))
     account_creation_date = db.Column(db.DATE)
     account_last_transfer_number = db.Column(db.BigInteger)
+    has_been_revised = db.Column(db.BOOLEAN, nullable=False, default=False)
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (
         db.CheckConstraint(or_(finalized_at == null(), transfer_id != null())),
