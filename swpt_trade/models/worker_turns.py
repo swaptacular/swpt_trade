@@ -343,6 +343,9 @@ class DispatchingStatus(db.Model):
     @property
     def available_amount_to_send(self) -> int:
         """Amount that we will be sending.
+
+        When the collected amount is smaller than expected, the
+        missing amount will be hoarded instead of being sent.
         """
         amt = max(self.amount_to_send - self.missing_collected_amount, 0)
         assert 0 <= amt <= self.amount_to_send
