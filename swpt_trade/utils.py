@@ -186,7 +186,7 @@ def parse_transfer_note(s: str) -> Tuple[int, str, int]:
 class DispatchingData:
     def __init__(self, turn_id):
         self._turn_id = turn_id
-        self._empty_value_tuple = (0, 0, 0, 0)
+        self._empty_value_tuple = (0, 0, 0, 0, 0)
         self._data = defaultdict(self._create_empty_value)
 
     def _create_empty_value(self):
@@ -208,12 +208,13 @@ class DispatchingData:
     def register_receiving(self, collector_id, turn_id, debtor_id, amount):
         assert turn_id == self._turn_id
         value = self._get_value(collector_id, turn_id, debtor_id)
-        value[2] += 1
+        value[2] = contain_principal_overflow(value[2] + amount)
+        value[3] += 1
 
     def register_dispatching(self, collector_id, turn_id, debtor_id, amount):
         assert turn_id == self._turn_id
         value = self._get_value(collector_id, turn_id, debtor_id)
-        value[3] = contain_principal_overflow(value[3] + amount)
+        value[4] = contain_principal_overflow(value[4] + amount)
 
     def statuses_iter(self):
         current_ts = datetime.now(tz=timezone.utc)
@@ -228,8 +229,9 @@ class DispatchingData:
                 "total_collected_amount": None,
                 "amount_to_send": value[1],
                 "all_sent": False,
-                "number_to_receive": value[2],
+                "amount_to_receive": value[2],
+                "number_to_receive": value[3],
                 "total_received_amount": None,
                 "all_received": False,
-                "amount_to_dispatch": value[3],
+                "amount_to_dispatch": value[4],
             }

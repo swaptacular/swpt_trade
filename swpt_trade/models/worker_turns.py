@@ -262,13 +262,22 @@ class DispatchingStatus(db.Model):
         ),
     )
     all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
+    amount_to_receive = db.Column(
+        db.BigInteger,
+        nullable=False,
+        comment=(
+            'The sum of all expected amounts from the corresponding records'
+            ' in the "worker_receiving" table, at the moment the'
+            ' "dispatching_status" record has been created.'
+        ),
+    )
     number_to_receive = db.Column(
         db.Integer,
         nullable=False,
         comment=(
             'The number of corresponding records in the "worker_receiving"'
             ' table, at the moment the "dispatching_status" record has'
-            ' created.'
+            ' been created.'
         ),
     )
     total_received_amount = db.Column(
@@ -295,6 +304,7 @@ class DispatchingStatus(db.Model):
         db.CheckConstraint(total_collected_amount <= amount_to_collect),
         db.CheckConstraint(amount_to_send >= 0),
         db.CheckConstraint(amount_to_send <= amount_to_collect),
+        db.CheckConstraint(amount_to_receive >= 0),
         db.CheckConstraint(number_to_receive >= 0),
         db.CheckConstraint(total_received_amount >= 0),
         db.CheckConstraint(
@@ -319,24 +329,64 @@ class DispatchingStatus(db.Model):
         return self.total_collected_amount == self.amount_to_collect
 
     @property
-    def available_amount_to_send(self) -> int:
-        collected_amount = self.total_collected_amount or 0
-        missing_amount = self.amount_to_collect - collected_amount
-        assert missing_amount >= 0
+    def collected_amount(self) -> int:
+        return (self.total_collected_amount or 0)
 
-        return max(self.amount_to_send - missing_amount, 0)
+    @property
+    def missing_collected_amount(self) -> int:
+        """Amount that we expected to collect but we did not.
+        """
+        amt = self.amount_to_collect - self.collected_amount
+        assert 0 <= amt <= self.amount_to_collect
+        return amt
+
+    @property
+    def available_amount_to_send(self) -> int:
+        """Amount that we will be sending.
+        """
+        amt = max(self.amount_to_send - self.missing_collected_amount, 0)
+        assert 0 <= amt <= self.amount_to_send
+        return amt
+
+    @property
+    def hoarded_collected_amount(self) -> int:
+        """Amount that we were supposed to send but we will not.
+        """
+        amt = self.amount_to_send - self.available_amount_to_send
+        assert 0 <= amt <= self.amount_to_send
+        return amt
 
     @property
     def finished_receiving(self) -> bool:
         return self.total_received_amount is not None
 
     @property
+    def received_amount(self) -> int:
+        return (self.total_received_amount or 0)
+
+    @property
+    def missing_received_amount(self) -> int:
+        """Amount that we expected to receive but we did not.
+        """
+        amt = max(self.amount_to_receive - self.received_amount, 0)
+        assert 0 <= amt <= self.amount_to_receive
+        return amt
+
+    @property
     def available_amount_to_dispatch(self) -> int:
-        return (
-            + (self.total_collected_amount or 0)
-            + (self.total_received_amount or 0)
-            - self.available_amount_to_send
+        """Amount that we will be dispatching.
+        """
+        amt = max(
+            (
+                + self.amount_to_dispatch
+                - self.missing_collected_amount
+                + self.hoarded_collected_amount
+                - self.missing_received_amount
+            ),
+            0,
         )
+        assert 0 <= amt <= self.amount_to_dispatch
+        return amt
 
 
 class WorkerCollecting(db.Model):

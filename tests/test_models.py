@@ -338,22 +338,29 @@ def test_dispatching_status_properties(current_ts):
         amount_to_collect=50000,
         total_collected_amount=None,
         amount_to_send=5000,
-        all_sent=True,
+        all_sent=False,
+        amount_to_receive=10000,
         number_to_receive=1,
         total_received_amount=None,
+        amount_to_dispatch=(50000 + 10000 - 5000),
     )
     assert not ds.finished_collecting
     assert not ds.all_collected
     assert not ds.finished_receiving
+    assert not ds.all_sent
     assert not ds.all_received
     assert ds.available_amount_to_send == 0
+    assert ds.available_amount_to_dispatch == 0
 
     ds.total_collected_amount = 46000
+    ds.all_sent = True
     assert ds.finished_collecting
+    assert ds.all_sent
     assert ds.available_amount_to_send == 1000
+    assert ds.available_amount_to_dispatch == 45000
 
-    ds.total_received_amount = 10000
+    ds.total_received_amount = 9900
     ds.all_received = True
     assert ds.all_received
     assert ds.available_amount_to_send == 1000
-    assert ds.available_amount_to_dispatch == 46000 - 1000 + 10000
+    assert ds.available_amount_to_dispatch == 46000 - 1000 + 9900

@@ -271,6 +271,7 @@ def test_dispatching_data():
     assert ll[0]["debtor_id"] == 3
     assert ll[0]["amount_to_collect"] == 250
     assert ll[0]["amount_to_send"] == 500
+    assert ll[0]["amount_to_receive"] == 1000
     assert ll[0]["number_to_receive"] == 1
     assert ll[0]["amount_to_dispatch"] == 2000
     assert ll[1]["collector_id"] == 1
