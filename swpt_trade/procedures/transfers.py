@@ -377,6 +377,7 @@ def process_revise_account_lock_signal(
 
         if participation:
             amount = participation.amount
+            assert lock.transfer_id is not None
             assert (
                 0 < abs(amount) <= abs(lock.amount) < abs(amount + lock.amount)
             )
@@ -402,8 +403,8 @@ def process_revise_account_lock_signal(
                 # The account is the receiver. We expect the amount to
                 # be transferred to the account at a later stage. In
                 # order to guarantee that the account will not be
-                # deleted in the meantime, we should not release the
-                # account lock yet.
+                # deleted in the meantime, we should not dismiss the
+                # prepared transfer yet.
                 assert amount > 1
 
             lock.amount = amount
