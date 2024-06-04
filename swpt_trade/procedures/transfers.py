@@ -1,6 +1,6 @@
 import random
 import math
-from typing import TypeVar, Callable, Tuple
+from typing import TypeVar, Callable, Tuple, Optional
 from datetime import datetime, date, timezone
 from sqlalchemy.sql.expression import null
 from sqlalchemy.orm import exc, load_only, Load
@@ -155,7 +155,11 @@ def dismiss_prepared_transfer(
         transfer_id: int,
         coordinator_id: int,
         coordinator_request_id: int,
+        current_ts: Optional[datetime] = None,
 ):
+    if current_ts is None:
+        current_ts = datetime.now(tz=timezone.utc)
+
     db.session.add(
         FinalizeTransferSignal(
             debtor_id=debtor_id,
@@ -166,6 +170,7 @@ def dismiss_prepared_transfer(
             committed_amount=0,
             transfer_note_format="",
             transfer_note="",
+            inserted_at=current_ts,
         )
     )
 
@@ -315,8 +320,7 @@ def process_revise_account_lock_signal(
         turn_id: int,
 ):
     current_ts = datetime.now(tz=timezone.utc)
-
-    creditor_participation = (
+    participation: Optional[CreditorParticipation] = (
         CreditorParticipation.query
         .filter_by(
             creditor_id=creditor_id,
@@ -326,7 +330,7 @@ def process_revise_account_lock_signal(
         .with_for_update()
         .one_or_none()
     )
-    lock = (
+    lock: Optional[AccountLock] = (
         AccountLock.query
         .filter_by(
             creditor_id=creditor_id,
@@ -339,30 +343,22 @@ def process_revise_account_lock_signal(
         .one_or_none()
     )
     if lock:
-        if creditor_participation is None:
-            db.session.delete(lock)
-            return
+        def dismiss():
+            assert lock
+            if not (lock.transfer_id is None or lock.is_self_lock):
+                dismiss_prepared_transfer(
+                    debtor_id=debtor_id,
+                    creditor_id=creditor_id,
+                    transfer_id=lock.transfer_id,
+                    coordinator_id=creditor_id,
+                    coordinator_request_id=lock.coordinator_request_id,
+                    current_ts=current_ts,
+                )
 
-        assert lock.transfer_id is not None
-        assert lock.finalized_at is None
-        assert lock.collector_id != ROOT_CREDITOR_ID
-        amount = lock.amount = creditor_participation.amount
-
-        if creditor_id == creditor_participation.collector_id:
-            acd, altn = _register_collector_participation(creditor_id, amount)
-
-            # When the sender and the recipient accounts are the same,
-            # transferring the amount is neither possible nor needed.
-            # Instead, we simply release the account lock.
-            lock.released_at = lock.finalized_at = current_ts
-            lock.account_creation_date = acd
-            lock.account_last_transfer_number = altn
-
-        elif amount < 0:
-            assert lock.collector_id == creditor_participation.collector_id
-
-            # Send the amount to the collector.
-            lock.finalized_at = current_ts
+        def commit(committed_amount: int):
+            assert participation
+            assert lock
+            assert lock.collector_id == participation.collector_id
             db.session.add(
                 FinalizeTransferSignal(
                     creditor_id=creditor_id,
@@ -379,20 +375,41 @@ def process_revise_account_lock_signal(
                 )
             )
 
+        if participation:
+            amount = lock.amount = participation.amount
+
+            if creditor_id == participation.collector_id:
+                # The sender and the recipient is the same account. In
+                # this case, transferring the amount is not possible,
+                # and not needed. We release the account lock instead.
+                acd, altn = _register_collector_trade(creditor_id, amount)
+                lock.released_at = lock.finalized_at = current_ts
+                lock.account_creation_date = acd
+                lock.account_last_transfer_number = altn
+                dismiss()
+
+            elif amount < 0:
+                lock.finalized_at = current_ts
+                commit(-amount)
+
+            else:
+                assert amount > 1
+
+                # The creditor's account is the recipient. In this case
+                # the value of the `collector_id` field is irrelevant.
+                # Here we change it to `ROOT_CREDITOR_ID`, just to ensure
+                # that this procedure is idempotent.
+                lock.collector_id = ROOT_CREDITOR_ID
+
         else:
-            assert amount > 1
+            dismiss()
+            db.session.delete(lock)
 
-            # The creditor's account is the recipient. In this case
-            # the value of the `collector_id` field is irrelevant.
-            # Here we change it to `ROOT_CREDITOR_ID`, just to ensure
-            # that this procedure is idempotent.
-            lock.collector_id = ROOT_CREDITOR_ID
-
-    if creditor_participation:
-        db.session.delete(creditor_participation)
+    if participation:
+        db.session.delete(participation)
 
 
-def _register_collector_participation(
+def _register_collector_trade(
         collector_id: int,
         amount: int,
 ) -> Tuple[date, int]:
