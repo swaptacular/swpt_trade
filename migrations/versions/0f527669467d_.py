@@ -33,9 +33,9 @@ def upgrade_():
     sa.Column('creditor_id', sa.BigInteger(), nullable=False),
     sa.Column('debtor_id', sa.BigInteger(), nullable=False),
     sa.Column('turn_id', sa.Integer(), nullable=False),
-    sa.Column('amount', sa.BigInteger(), nullable=False, comment='Can be positive or negative, but can not be zero. A positive number indicates that this amount should be given to the creditor. A negative number indicates that this amount should be taken from the creditor.'),
+    sa.Column('amount', sa.BigInteger(), nullable=False, comment='Can be positive or negative, but can not be zero or one. A positive number indicates that this amount should be given to the creditor. A negative number indicates that this amount should be taken from the creditor.'),
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
-    sa.CheckConstraint('amount != 0'),
+    sa.CheckConstraint('amount < 0 OR amount > 1'),
     sa.PrimaryKeyConstraint('creditor_id', 'debtor_id', 'turn_id'),
     comment='Indicates that the given amount must be given or taken to/from the given creditor as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "creditor_giving" and and "creditor_taking" solver tables to this table.'
     )

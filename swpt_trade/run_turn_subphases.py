@@ -588,6 +588,7 @@ def _copy_creditor_givings(s_conn, worker_turn):
                     CreditorGiving.turn_id == turn_id,
                     CreditorGiving.creditor_hash.op("&")(hash_mask)
                     == hash_prefix,
+                    CreditorGiving.amount > 1,
                 )
             )
     ) as result:

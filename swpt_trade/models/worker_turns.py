@@ -202,15 +202,20 @@ class CreditorParticipation(db.Model):
         db.BigInteger,
         nullable=False,
         comment=(
-            "Can be positive or negative, but can not be zero. A positive"
-            " number indicates that this amount should be given to the"
-            " creditor. A negative number indicates that this amount should"
-            " be taken from the creditor."
+            "Can be positive or negative, but can not be zero or one. A"
+            " positive number indicates that this amount should be given to"
+            " the creditor. A negative number indicates that this amount"
+            " should be taken from the creditor."
         ),
+        # NOTE: When the amount is `1`, after applying the possibly
+        # negative interest rate, and rounding down, the transferred
+        # amount would have to be zero, which is impossible to be
+        # transferred. Therefore, we can try to give only amounts
+        # greater than `1`.
     )
     collector_id = db.Column(db.BigInteger, nullable=False)
     __table_args__ = (
-        db.CheckConstraint(amount != 0),
+        db.CheckConstraint(or_(amount < 0, amount > 1)),
         {
             "comment": (
                 'Indicates that the given amount must be given or taken'
@@ -388,11 +393,6 @@ class WorkerSending(db.Model):
     amount = db.Column(db.BigInteger, nullable=False)
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
-        # NOTE: When the amount is `1`, after applying the possibly
-        # negative interest rate, and rounding down, the received
-        # amount would have to be zero, which is impossible to be
-        # sent. Therefore, we can try to send only amounts greater
-        # than `1`.
         db.CheckConstraint(amount > 1),
         db.CheckConstraint(from_collector_id != to_collector_id),
         {
@@ -422,11 +422,6 @@ class WorkerReceiving(db.Model):
             ' minus the accumulated negative interest (that is: when'
             ' the interest rate is negative).'
         ),
-        # NOTE: When the expected amount is `1`, after applying the
-        # possibly negative interest rate, and rounding down, the
-        # received amount would have to be zero, which is impossible.
-        # Therefore, we can expect to receive only amounts greater
-        # than `1`.
     )
     purge_after = db.Column(db.TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (

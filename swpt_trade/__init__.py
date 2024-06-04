@@ -336,6 +336,13 @@ def _check_config_sanity(c):  # pragma: nocover
             " too many shards."
         )
 
+    if c["MIN_TRADE_AMOUNT"] < 10:
+        raise RuntimeError(
+            "The configured value for MIN_TRADE_AMOUNT so too small. This"
+            " will lead to high rounding errors. Choose a more appropriate"
+            " value."
+        )
+
     if c["APP_LOCATOR_CLAIM_EXPIRY_DAYS"] < 30.0:
         raise RuntimeError(
             "The configured value for APP_LOCATOR_CLAIM_EXPIRY_DAYS is"

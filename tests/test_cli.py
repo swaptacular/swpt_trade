@@ -797,13 +797,13 @@ def test_delete_parent_creditor_participations(
     app.config["DELETE_PARENT_SHARD_RECORDS"] = True
 
     cp1 = m.CreditorParticipation(
-        creditor_id=666, debtor_id=1, turn_id=1, amount=1, collector_id=1
+        creditor_id=666, debtor_id=1, turn_id=1, amount=100, collector_id=1
     )
     cp2 = m.CreditorParticipation(
-        creditor_id=777, debtor_id=1, turn_id=1, amount=1, collector_id=1
+        creditor_id=777, debtor_id=1, turn_id=1, amount=100, collector_id=1
     )
     cp3 = m.CreditorParticipation(
-        creditor_id=888, debtor_id=1, turn_id=1, amount=1, collector_id=1
+        creditor_id=888, debtor_id=1, turn_id=1, amount=100, collector_id=1
     )
     db.session.add(cp1)
     db.session.add(cp2)
