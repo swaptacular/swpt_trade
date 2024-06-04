@@ -358,6 +358,8 @@ def process_revise_account_lock_signal(
         def commit(committed_amount: int):
             assert participation
             assert lock
+            assert lock.transfer_id is not None
+            assert lock.collector_id != creditor_id
             assert lock.collector_id == participation.collector_id
             db.session.add(
                 FinalizeTransferSignal(
@@ -366,7 +368,7 @@ def process_revise_account_lock_signal(
                     transfer_id=lock.transfer_id,
                     coordinator_id=creditor_id,
                     coordinator_request_id=lock.coordinator_request_id,
-                    committed_amount=(-amount),
+                    committed_amount=committed_amount,
                     transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
                     transfer_note=generate_transfer_note(
                         turn_id, TT_BUYER, lock.collector_id
@@ -389,16 +391,21 @@ def process_revise_account_lock_signal(
                 dismiss()
 
             elif amount < 0:
+                # The account is the sender.
                 lock.finalized_at = current_ts
                 commit(-amount)
 
             else:
+                # The account is the receiver.
                 assert amount > 1
 
-                # The creditor's account is the recipient. In this case
-                # the value of the `collector_id` field is irrelevant.
-                # Here we change it to `ROOT_CREDITOR_ID`, just to ensure
-                # that this procedure is idempotent.
+                # We expect the amount to be transferred to the
+                # account at a later stage. We should not release the
+                # account lock yet, so that it is guaranteed that the
+                # account will not be deleted in the meantime. In this
+                # case, the value of the `collector_id` field is
+                # irrelevant. Here we change it to `ROOT_CREDITOR_ID`,
+                # just to ensure that this procedure is idempotent.
                 lock.collector_id = ROOT_CREDITOR_ID
 
         else:
