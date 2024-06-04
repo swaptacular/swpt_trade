@@ -13,7 +13,6 @@ from swpt_trade.utils import (
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DATE0,
-    ROOT_CREDITOR_ID,
     MAX_INT32,
     T_INFINITY,
     AGENT_TRANSFER_NOTE_FORMAT,
@@ -320,7 +319,8 @@ def process_revise_account_lock_signal(
         turn_id: int,
 ):
     current_ts = datetime.now(tz=timezone.utc)
-    participation: Optional[CreditorParticipation] = (
+
+    participation = (
         CreditorParticipation.query
         .filter_by(
             creditor_id=creditor_id,
@@ -330,7 +330,7 @@ def process_revise_account_lock_signal(
         .with_for_update()
         .one_or_none()
     )
-    lock: Optional[AccountLock] = (
+    lock = (
         AccountLock.query
         .filter_by(
             creditor_id=creditor_id,
@@ -344,7 +344,6 @@ def process_revise_account_lock_signal(
     )
     if lock:
         def dismiss():
-            assert lock
             if not (lock.transfer_id is None or lock.is_self_lock):
                 dismiss_prepared_transfer(
                     debtor_id=debtor_id,
@@ -357,7 +356,6 @@ def process_revise_account_lock_signal(
 
         def commit(committed_amount: int):
             assert participation
-            assert lock
             assert lock.transfer_id is not None
             assert lock.collector_id != creditor_id
             assert lock.collector_id == participation.collector_id
@@ -379,11 +377,15 @@ def process_revise_account_lock_signal(
 
         if participation:
             amount = participation.amount
+            assert (
+                0 < abs(amount) <= abs(lock.amount) < abs(amount + lock.amount)
+            )
 
             if creditor_id == participation.collector_id:
-                # The sender and the recipient is the same account. In
-                # this case, transferring the amount is not possible,
-                # and not needed. We release the account lock instead.
+                # The sender and the recipient is the same collector
+                # account. In this case, transferring the amount is
+                # neither possible nor needed. Instead, we simply
+                # release the account lock.
                 acd, altn = _register_collector_trade(creditor_id, amount)
                 lock.released_at = lock.finalized_at = current_ts
                 lock.account_creation_date = acd
@@ -393,7 +395,6 @@ def process_revise_account_lock_signal(
             elif amount < 0:
                 # The account is the sender. The amount must be taken
                 # from the account, and transferred to the collector.
-                assert lock.amount <= amount < 0
                 lock.finalized_at = current_ts
                 commit(-amount)
 
@@ -403,7 +404,7 @@ def process_revise_account_lock_signal(
                 # order to guarantee that the account will not be
                 # deleted in the meantime, we should not release the
                 # account lock yet.
-                assert 1 < amount <= lock.amount
+                assert amount > 1
 
             lock.amount = amount
             lock.has_been_revised = True
