@@ -2079,7 +2079,7 @@ def test_process_revise_account_lock_signal_delete_lock(
         assert fts.transfer_note == ""
 
 
-def test_process_revise_account_lock_signal_commit(
+def test_process_revise_account_lock_signal_seller(
         db_session,
         current_ts,
         wt_2_5,
