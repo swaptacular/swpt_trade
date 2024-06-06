@@ -2033,12 +2033,14 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
 
 
 @pytest.mark.parametrize("amount", [80000, -80000])
+@pytest.mark.parametrize("transfer_id", [None, 123])
 def test_process_revise_account_lock_signal_delete_lock(
         db_session,
         current_ts,
         wt_2_5,
         collector_id,
         amount,
+        transfer_id,
 ):
     turn_id = wt_2_5.turn_id
     db_session.add(
@@ -2048,7 +2050,7 @@ def test_process_revise_account_lock_signal_delete_lock(
             turn_id=turn_id,
             collector_id=collector_id,
             coordinator_request_id=7890,
-            transfer_id=123,
+            transfer_id=transfer_id,
             amount=amount,
         )
     )
@@ -2062,18 +2064,22 @@ def test_process_revise_account_lock_signal_delete_lock(
     )
     assert len(CreditorParticipation.query.all()) == 0
     assert len(AccountLock.query.all()) == 0
-    fts = FinalizeTransferSignal.query.one()
-    assert fts.debtor_id == 666
-    assert fts.creditor_id == 777
-    assert fts.transfer_id == 123
-    assert fts.coordinator_id == 777
-    assert fts.committed_amount == 0
-    assert fts.coordinator_request_id == 7890
-    assert fts.transfer_note_format == ""
-    assert fts.transfer_note == ""
+
+    if transfer_id is None:
+        assert len(FinalizeTransferSignal.query.all()) == 0
+    else:
+        fts = FinalizeTransferSignal.query.one()
+        assert fts.debtor_id == 666
+        assert fts.creditor_id == 777
+        assert fts.transfer_id == transfer_id
+        assert fts.coordinator_id == 777
+        assert fts.committed_amount == 0
+        assert fts.coordinator_request_id == 7890
+        assert fts.transfer_note_format == ""
+        assert fts.transfer_note == ""
 
 
-def test_process_revise_account_lock_signal_delete_commit(
+def test_process_revise_account_lock_signal_commit(
         db_session,
         current_ts,
         wt_2_5,
@@ -2130,7 +2136,10 @@ def test_process_revise_account_lock_signal_delete_commit(
     assert fts.committed_amount == 50000
     assert fts.coordinator_request_id == 7890
     assert fts.transfer_note_format == AGENT_TRANSFER_NOTE_FORMAT
-    assert utils.TT_BUYER in fts.transfer_note
+    assert (
+        utils.parse_transfer_note(fts.transfer_note)
+        == (turn_id, utils.TT_BUYER, collector_id)
+    )
 
     # process again (must be a noop)
     p.process_revise_account_lock_signal(
@@ -2143,7 +2152,7 @@ def test_process_revise_account_lock_signal_delete_commit(
     assert len(AccountLock.query.all()) == 1
 
 
-def test_process_revise_account_lock_signal_delete_buyer(
+def test_process_revise_account_lock_signal_buyer(
         db_session,
         current_ts,
         wt_2_5,
