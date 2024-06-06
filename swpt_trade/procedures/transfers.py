@@ -408,7 +408,7 @@ def process_revise_account_lock_signal(
                 assert amount > 1
 
             lock.amount = amount
-            lock.has_been_revised = True
+            lock.has_been_revised = True  # ensure idempotency
 
         else:
             dismiss()

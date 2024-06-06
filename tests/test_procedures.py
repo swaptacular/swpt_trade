@@ -1,6 +1,7 @@
 import pytest
 from datetime import timedelta, date
 from swpt_trade import procedures as p
+from swpt_trade import utils
 from swpt_trade.models import (
     Turn,
     DebtorInfo,
@@ -25,9 +26,11 @@ from swpt_trade.models import (
     WorkerTurn,
     AccountLock,
     ActiveCollector,
+    CreditorParticipation,
     TS0,
     DATE0,
     MAX_INT32,
+    AGENT_TRANSFER_NOTE_FORMAT,
 )
 
 
@@ -2027,3 +2030,240 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     assert al.released_at is None
     assert al.account_creation_date is None
     assert al.account_last_transfer_number is None
+
+
+@pytest.mark.parametrize("amount", [80000, -80000])
+def test_process_revise_account_lock_signal_delete_lock(
+        db_session,
+        current_ts,
+        wt_2_5,
+        collector_id,
+        amount,
+):
+    turn_id = wt_2_5.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=collector_id,
+            coordinator_request_id=7890,
+            transfer_id=123,
+            amount=amount,
+        )
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.process_revise_account_lock_signal(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    assert len(AccountLock.query.all()) == 0
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.debtor_id == 666
+    assert fts.creditor_id == 777
+    assert fts.transfer_id == 123
+    assert fts.coordinator_id == 777
+    assert fts.committed_amount == 0
+    assert fts.coordinator_request_id == 7890
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+
+def test_process_revise_account_lock_signal_delete_commit(
+        db_session,
+        current_ts,
+        wt_2_5,
+        collector_id,
+):
+    turn_id = wt_2_5.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=collector_id,
+            coordinator_request_id=7890,
+            transfer_id=123,
+            amount=-80000,
+        )
+    )
+    db_session.add(
+        CreditorParticipation(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            amount=-50000,
+            collector_id=collector_id,
+        )
+    )
+    assert len(CreditorParticipation.query.all()) == 1
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.process_revise_account_lock_signal(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    al = AccountLock.query.one()
+    assert al.creditor_id == 777
+    assert al.debtor_id == 666
+    assert al.turn_id == turn_id
+    assert al.collector_id == collector_id
+    assert al.coordinator_request_id == 7890
+    assert al.amount == -50000
+    assert al.transfer_id == 123
+    assert al.finalized_at >= current_ts
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+    assert al.has_been_revised is True
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.debtor_id == 666
+    assert fts.creditor_id == 777
+    assert fts.transfer_id == 123
+    assert fts.coordinator_id == 777
+    assert fts.committed_amount == 50000
+    assert fts.coordinator_request_id == 7890
+    assert fts.transfer_note_format == AGENT_TRANSFER_NOTE_FORMAT
+    assert utils.TT_BUYER in fts.transfer_note
+
+    # process again (must be a noop)
+    p.process_revise_account_lock_signal(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    assert len(FinalizeTransferSignal.query.all()) == 1
+    assert len(AccountLock.query.all()) == 1
+
+
+def test_process_revise_account_lock_signal_delete_buyer(
+        db_session,
+        current_ts,
+        wt_2_5,
+        collector_id,
+):
+    turn_id = wt_2_5.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=collector_id,
+            coordinator_request_id=7890,
+            transfer_id=123,
+            amount=80000,
+        )
+    )
+    db_session.add(
+        CreditorParticipation(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            amount=50000,
+            collector_id=collector_id,
+        )
+    )
+    assert len(CreditorParticipation.query.all()) == 1
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.process_revise_account_lock_signal(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    al = AccountLock.query.one()
+    assert al.creditor_id == 777
+    assert al.debtor_id == 666
+    assert al.turn_id == turn_id
+    assert al.collector_id == collector_id
+    assert al.coordinator_request_id == 7890
+    assert al.amount == 50000
+    assert al.transfer_id == 123
+    assert al.finalized_at is None
+    assert al.released_at is None
+    assert al.account_creation_date is None
+    assert al.account_last_transfer_number is None
+    assert al.has_been_revised is True
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    # process again (must be a noop)
+    p.process_revise_account_lock_signal(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    assert len(AccountLock.query.all()) == 1
+
+
+@pytest.mark.parametrize("amount", [80000, -80000])
+def test_process_revise_account_lock_signal_self_lock(
+        db_session,
+        current_ts,
+        wt_2_5,
+        collector_id,
+        amount,
+):
+    turn_id = wt_2_5.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=collector_id,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=collector_id,
+            coordinator_request_id=7890,
+            transfer_id=123,
+            amount=amount,
+        )
+    )
+    db_session.add(
+        CreditorParticipation(
+            creditor_id=collector_id,
+            debtor_id=666,
+            turn_id=turn_id,
+            amount=amount,
+            collector_id=collector_id,
+        )
+    )
+    assert len(CreditorParticipation.query.all()) == 1
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.process_revise_account_lock_signal(
+        creditor_id=collector_id,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    al = AccountLock.query.one()
+    assert al.creditor_id == collector_id
+    assert al.debtor_id == 666
+    assert al.turn_id == turn_id
+    assert al.collector_id == collector_id
+    assert al.coordinator_request_id == 7890
+    assert al.amount == amount
+    assert al.transfer_id == 123
+    assert al.finalized_at >= current_ts
+    assert al.released_at >= current_ts
+    assert al.account_creation_date is not None
+    assert al.account_last_transfer_number is not None
+    assert al.has_been_revised is True
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    # process again (must be a noop)
+    p.process_revise_account_lock_signal(
+        creditor_id=collector_id,
+        debtor_id=666,
+        turn_id=turn_id,
+    )
+    assert len(CreditorParticipation.query.all()) == 0
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    assert len(AccountLock.query.all()) == 1
