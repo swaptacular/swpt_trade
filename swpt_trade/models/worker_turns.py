@@ -180,9 +180,20 @@ class AccountLock(db.Model):
 
     @property
     def is_self_lock(self):
+        """Return `True` if this account lock is a preparation to make
+        a transfer from one account to the same account. This can
+        happen when a collector account ties to participate in a
+        trading turn.
+        """
         return self.creditor_id == self.collector_id
 
     def is_in_force(self, acd: date, altn: int) -> bool:
+        """Determine whether the account lock is in effect, by
+        checking if the lock has been released, and if it has been,
+        comparing the passed `acd` and `altn` parameters to the
+        `self.account_creation_date` and
+        `self.account_last_transfer_number` attributes.
+        """
         return not (
             self.released_at is not None
             and (

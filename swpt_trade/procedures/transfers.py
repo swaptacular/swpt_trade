@@ -422,5 +422,22 @@ def _register_collector_trade(
         collector_id: int,
         amount: int,
 ) -> Tuple[date, int]:
-    # TODO: Implement.
-    return DATE0, 0
+    # TODO: Consider implementing this function.
+    #
+    # This function will be called when a collector account
+    # participates in a trading turn. The `amount` will be negative
+    # when the collector account is the seller, and will be positive
+    # when the collector account is the buyer.
+    #
+    # It can be very useful to make a collector account participate in
+    # circular trades like any "normal" creditor account, because this
+    # allows exchanging accumulated (collected) useless surpluses for
+    # useful currencies.
+    #
+    # The implementation of this function should update the amount
+    # that is available on the collector account.
+
+    account_creation_date = DATE0  # currently, a made-up date
+    account_last_transfer_number = 0  # currently, a made-up number
+
+    return account_creation_date, account_last_transfer_number
