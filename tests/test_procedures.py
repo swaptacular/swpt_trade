@@ -2015,6 +2015,7 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     assert fts.transfer_note == (
         f"Trading session: {account_lock.turn_id}\n"
         f"Buyer: {account_lock.collector_id:x}\n"
+        f"Seller: {account_lock.creditor_id:x}\n"
     )
 
     al = AccountLock.query.one()
@@ -2136,9 +2137,12 @@ def test_process_revise_account_lock_signal_seller(
     assert fts.committed_amount == 50000
     assert fts.coordinator_request_id == 7890
     assert fts.transfer_note_format == AGENT_TRANSFER_NOTE_FORMAT
+    print(fts.transfer_note)
     assert (
-        utils.parse_transfer_note(fts.transfer_note)
-        == (turn_id, utils.TT_BUYER, collector_id)
+        utils.TransferNote.parse(fts.transfer_note)
+        == utils.TransferNote(
+            turn_id, utils.TransferNote.Kind.COLLECTING, collector_id, 777
+        )
     )
 
     # process again (must be a noop)

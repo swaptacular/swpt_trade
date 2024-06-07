@@ -5,9 +5,8 @@ from datetime import datetime, date, timezone
 from sqlalchemy.sql.expression import null
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
-    TT_BUYER,
+    TransferNote,
     calc_demurrage,
-    generate_transfer_note,
     contain_principal_overflow,
 )
 from swpt_trade.extensions import db
@@ -300,8 +299,13 @@ def put_prepared_transfer_through_account_locks(
                         coordinator_request_id=coordinator_request_id,
                         committed_amount=(-lock.amount),
                         transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
-                        transfer_note=generate_transfer_note(
-                            lock.turn_id, TT_BUYER, lock.collector_id
+                        transfer_note=str(
+                            TransferNote(
+                                lock.turn_id,
+                                TransferNote.Kind.COLLECTING,
+                                lock.collector_id,
+                                creditor_id,
+                            )
                         ),
                     )
                 )
@@ -368,8 +372,13 @@ def process_revise_account_lock_signal(
                     coordinator_request_id=lock.coordinator_request_id,
                     committed_amount=committed_amount,
                     transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
-                    transfer_note=generate_transfer_note(
-                        turn_id, TT_BUYER, lock.collector_id
+                    transfer_note=str(
+                        TransferNote(
+                            turn_id,
+                            TransferNote.Kind.COLLECTING,
+                            lock.collector_id,
+                            creditor_id,
+                        )
                     ),
                     inserted_at=current_ts,
                 )

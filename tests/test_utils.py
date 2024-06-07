@@ -5,9 +5,7 @@ from flask import current_app
 from swpt_trade.utils import (
     SECONDS_IN_DAY,
     SECONDS_IN_YEAR,
-    TT_BUYER,
-    TT_COLLECTOR,
-    TT_SELLER,
+    TransferNote,
     parse_timedelta,
     can_start_new_turn,
     batched,
@@ -19,8 +17,6 @@ from swpt_trade.utils import (
     contain_principal_overflow,
     calc_k,
     calc_demurrage,
-    parse_transfer_note,
-    generate_transfer_note,
     DispatchingData,
 )
 
@@ -201,57 +197,105 @@ def test_calc_demurrage():
 
 
 @pytest.mark.parametrize("turn_id", [0, 1, -1, 2147483647, -2147483648])
-@pytest.mark.parametrize("trader_type", [TT_BUYER, TT_COLLECTOR, TT_SELLER])
+@pytest.mark.parametrize("note_kind", [x for x in TransferNote.Kind])
 @pytest.mark.parametrize(
-    "trader_id", [0, 1, -1, 9223372036854775807, -9223372036854775808]
+    "first_id", [0, 1, -1, 9223372036854775807, -9223372036854775808]
 )
-def test_generate_and_parse_transfer_note(trader_type, turn_id, trader_id):
-    s = generate_transfer_note(turn_id, trader_type, trader_id)
-    assert parse_transfer_note(s) == (turn_id, trader_type, trader_id)
+@pytest.mark.parametrize(
+    "second_id", [0, 1, -1, 9223372036854775807, -9223372036854775808]
+)
+def test_generate_and_parse_transfer_note(
+        turn_id,
+        note_kind,
+        first_id,
+        second_id,
+):
+    s = str(TransferNote(turn_id, note_kind, first_id, second_id))
+    assert TransferNote.parse(s) == TransferNote(
+        turn_id, note_kind, first_id, second_id
+    )
 
 
 def test_generate_transfer_note_failure():
     for params in [
-            (2147483648, TT_BUYER, 0),
-            (-2147483649, TT_BUYER, 0),
-            (0, TT_BUYER, 9223372036854775808),
-            (0, TT_BUYER, -9223372036854775809),
-            (0, "INVALID", 0),
+            (2147483648, TransferNote.Kind.COLLECTING, 0, 0),
+            (-2147483649, TransferNote.Kind.COLLECTING, 0, 0),
+            (0, TransferNote.Kind.COLLECTING, 9223372036854775808, 0),
+            (0, TransferNote.Kind.COLLECTING, 0, 9223372036854775808),
+            (0, TransferNote.Kind.COLLECTING, -9223372036854775809, 0),
+            (0, TransferNote.Kind.COLLECTING, 0, -9223372036854775809),
     ]:
         with pytest.raises(ValueError):
-            generate_transfer_note(*params)
+            str(TransferNote(*params))
 
 
 def test_transfer_note_max_length(app):
-    tt = sorted([TT_BUYER, TT_COLLECTOR, TT_SELLER], key=lambda x: len(x))[-1]
-    s = generate_transfer_note(-1, tt, -1)
+    nk = sorted(
+        [x for x in TransferNote.Kind],
+        key=lambda x: len(x.value[0]) + len(x.value[1]),
+    )[-1]
+    s = str(TransferNote(-1, nk, -1, -1))
     min_bytes = current_app.config["APP_MIN_TRANSFER_NOTE_MAX_BYTES"]
     assert len(s.encode('utf-8')) <= min_bytes
 
 
 def test_parse_transfer_note():
     assert (
-        parse_transfer_note("Trading session: 1\nBuyer: b\n")
-        == (1, "Buyer", 11)
+        TransferNote.parse("Trading session: 1\nBuyer: b\nSeller: a\n")
+        == TransferNote(1, TransferNote.Kind.COLLECTING, 11, 10)
     )
     assert (
-        parse_transfer_note("Trading session: 4294967295\r\nBuyer: B\r\n")
-        == (-1, "Buyer", 11)
+        TransferNote.parse(
+            "Trading session: 4294967295\r\nSeller: A\r\nBuyer: B\r\n"
+        ) == TransferNote(-1, TransferNote.Kind.DISPATCHING, 10, 11)
     )
     assert (
-        parse_transfer_note("Trading session: 0\r\nBuyer: Ffffffffffffffff")
-        == (0, "Buyer", -1)
+        TransferNote.parse(
+            "Trading session: 0\r\nFrom: Ffffffffffffffff\nTo: 0"
+        ) == TransferNote(0, TransferNote.Kind.SENDING, -1, 0)
     )
     with pytest.raises(ValueError):
-        parse_transfer_note("")
+        TransferNote.parse("")
     with pytest.raises(ValueError):
-        parse_transfer_note("Trading session: 0\nBuyer: 0Ffffffffffffffff\n")
+        TransferNote.parse(
+            "Trading session: 4294967295\nSeller: 0\nBuyer: 0Ffffffffffffffff"
+        )
     with pytest.raises(ValueError):
-        parse_transfer_note("Trading session: 0\nBuyer: -0fffffffffffffff\n")
+        TransferNote.parse(
+            "Trading session: 4294967295\nSeller: 0\nBuyer: -0fffffffffffffff"
+        )
     with pytest.raises(ValueError):
-        parse_transfer_note("Trading session: -1\nBuyer: f\n")
+        TransferNote.parse(
+            "Trading session: -1\nSeller: 0\nBuyer: 0fffffffffffffff"
+        )
     with pytest.raises(ValueError):
-        parse_transfer_note("Trading session: 1\nINVALID: 1\n")
+        TransferNote.parse("Trading session: 1\nINVALID1: 1\nINVALID2: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nTo: 1\nFrom: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nTo: 1\nTo: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nTo: 1\nSeller: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nTo: 1\nBuyer: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nFrom: 1\nFrom: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nFrom: 1\nBuyer: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nFrom: 1\nSeller: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nSeller: 1\nTo: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nSeller: 1\nFrom: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nSeller: 1\nSeller: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nBuyer: 1\nTo: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nBuyer: 1\nFrom: 2\n")
+    with pytest.raises(ValueError):
+        TransferNote.parse("Trading session: 1\nBuyer: 1\nBuyer: 2\n")
 
 
 def test_dispatching_data():
