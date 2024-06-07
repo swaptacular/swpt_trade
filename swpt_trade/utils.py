@@ -41,7 +41,7 @@ class TransferNote:
             for enum_instance in cls:
                 if enum_instance.value == (first, second):
                     return enum_instance
-            raise ValueError("invalid values")
+            raise ValueError
 
     @classmethod
     def parse(cls, s: str) -> Self:
