@@ -6,8 +6,12 @@ from marshmallow import ValidationError
 from flask import current_app
 import swpt_pythonlib.protocol_schemas as ps
 from swpt_pythonlib import rabbitmq
-from swpt_trade import procedures, schemas
-from swpt_trade.models import CT_AGENT, message_belongs_to_this_shard
+from swpt_trade import procedures, schemas, utils
+from swpt_trade.models import (
+    AGENT_TRANSFER_NOTE_FORMAT,
+    CT_AGENT,
+    message_belongs_to_this_shard,
+)
 
 
 def _on_rejected_config_signal(
@@ -23,8 +27,7 @@ def _on_rejected_config_signal(
     *args,
     **kwargs
 ) -> None:
-    logger = logging.getLogger(__name__)
-    logger.warning(
+    _LOGGER.warning(
         "Received RejectedConfig message"
         " for WorkerAccount(creditor_id=%d, debtor_id=%d).",
         creditor_id,
@@ -102,8 +105,7 @@ def _on_account_purge_signal(
         creation_date=creation_date,
     )
     if is_needed_account:  # pragma: no cover
-        logger = logging.getLogger(__name__)
-        logger.warning(
+        _LOGGER.warning(
             "Received AccountPurge message"
             " for NeededWorkerAccount(creditor_id=%d, debtor_id=%d).",
             creditor_id,
@@ -130,8 +132,86 @@ def _on_account_transfer_signal(
     **kwargs
 ) -> None:
     if coordinator_type == CT_AGENT:
-        # TODO: Implement the transfer registration logic!
-        pass
+        if transfer_note_format != AGENT_TRANSFER_NOTE_FORMAT:
+            _LOGGER.warning(
+                'Unexpected transfer note format ("%s") for an agent transfer'
+                ' (debtor_id=%d).',
+                transfer_note_format,
+                debtor_id,
+            )
+            return
+
+        try:
+            note = utils.TransferNote.parse(transfer_note)
+            note.validate(creditor_id, acquired_amount)
+        except ValueError:
+            _LOGGER.warning(
+                'Invalid "%s" agent transfer note (debtor_id=%d).',
+                transfer_note_format,
+                debtor_id,
+            )
+            return
+
+        note_kind = note.note_kind
+        K = utils.TransferNote.Kind
+
+        if note_kind == K.COLLECTING:
+            if acquired_amount < 0:
+                procedures.release_seller_account_lock(
+                    creditor_id=creditor_id,
+                    debtor_id=debtor_id,
+                    turn_id=note.turn_id,
+                    acquired_amount=acquired_amount,
+                    account_creation_date=creation_date,
+                    account_transfer_number=transfer_number,
+                )
+            else:
+                assert acquired_amount > 0
+                procedures.update_worker_collecting_status(
+                    collector_id=creditor_id,
+                    turn_id=note.turn_id,
+                    debtor_id=debtor_id,
+                    creditor_id=note.second_id,
+                    acquired_amount=acquired_amount,
+                )
+
+        elif note_kind == K.SENDING:
+            if acquired_amount < 0:
+                procedures.delete_worker_sending_record(
+                    from_collector_id=creditor_id,
+                    turn_id=note.turn_id,
+                    debtor_id=debtor_id,
+                    to_collector_id=note.second_id,
+                )
+            else:
+                assert acquired_amount > 0
+                procedures.update_worker_receiving_record(
+                    to_collector_id=creditor_id,
+                    turn_id=note.turn_id,
+                    debtor_id=debtor_id,
+                    from_collector_id=note.first_id,
+                    acquired_amount=acquired_amount,
+                )
+
+        else:
+            assert note_kind == K.DISPATCHING
+            if acquired_amount < 0:
+                procedures.delete_worker_dispatching_record(
+                    collector_id=creditor_id,
+                    turn_id=note.turn_id,
+                    debtor_id=debtor_id,
+                    creditor_id=note.second_id,
+                )
+            else:
+                assert acquired_amount > 0
+                procedures.release_buyer_account_lock(
+                    creditor_id=creditor_id,
+                    debtor_id=debtor_id,
+                    turn_id=note.turn_id,
+                    acquired_amount=acquired_amount,
+                    account_creation_date=creation_date,
+                    account_transfer_number=transfer_number,
+                )
 
 
 def _on_rejected_agent_transfer_signal(

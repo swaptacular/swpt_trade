@@ -55,6 +55,28 @@ class TransferNote:
             )
         raise ValueError
 
+    def validate(self, creditor_id: int, acquired_amount: int) -> None:
+        """Raise ValueError if the note did not pass the validation.
+        """
+        assert acquired_amount != 0
+        note_kind = self.note_kind
+        K = self.Kind
+        if (
+                note_kind == K.COLLECTING and (
+                    acquired_amount < 0 and creditor_id != self.second_id
+                    or acquired_amount > 0 and creditor_id != self.first_id
+                )
+                or note_kind == K.SENDING and (
+                    acquired_amount < 0 and creditor_id != self.first_id
+                    or acquired_amount > 0 and creditor_id != self.second_id
+                )
+                or note_kind == K.DISPATCHING and (
+                    acquired_amount < 0 and creditor_id != self.first_id
+                    or acquired_amount > 0 and creditor_id != self.second_id
+                )
+        ):
+            raise ValueError
+
     def __str__(self) -> str:
         first_label, second_label = self.note_kind.value
         return (

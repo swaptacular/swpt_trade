@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timezone, date
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_pythonlib.rabbitmq import MessageProperties
+from swpt_trade import utils
 from swpt_trade import models as m
 
 D_ID = -1
@@ -130,6 +131,45 @@ def test_on_account_transfer_signal(db_session, actors):
         acquired_amount=1000,
         transfer_note_format="json",
         transfer_note='{"message": "test"}',
+        committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        principal=1000,
+        ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
+        previous_transfer_number=0,
+    )
+    actors._on_account_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        creation_date=date.fromisoformat("2020-01-02"),
+        transfer_number=1,
+        coordinator_type="agent",
+        sender="666",
+        recipient=str(C_ID),
+        acquired_amount=1000,
+        transfer_note_format=m.AGENT_TRANSFER_NOTE_FORMAT,
+        transfer_note='',
+        committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        principal=1000,
+        ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
+        previous_transfer_number=0,
+    )
+    actors._on_account_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        creation_date=date.fromisoformat("2020-01-02"),
+        transfer_number=1,
+        coordinator_type="agent",
+        sender="666",
+        recipient=str(C_ID),
+        acquired_amount=1000,
+        transfer_note_format=m.AGENT_TRANSFER_NOTE_FORMAT,
+        transfer_note=str(
+            utils.TransferNote(
+                turn_id=1,
+                note_kind=utils.TransferNote.Kind.COLLECTING,
+                first_id=54321,
+                second_id=12345,
+            )
+        ),
         committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
         principal=1000,
         ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
