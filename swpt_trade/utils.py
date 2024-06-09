@@ -38,8 +38,9 @@ class TransferNote:
 
         @classmethod
         def from_strings(cls, first: str, second: str) -> Self:
+            t = (first, second)
             for enum_instance in cls:
-                if enum_instance.value == (first, second):
+                if enum_instance.value == t:
                     return enum_instance
             raise ValueError
 
