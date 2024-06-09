@@ -459,12 +459,13 @@ def release_seller_account_lock(
         .one_or_none()
     )
     if lock:
+        if is_collector_trade:
+            account_creation_date, account_transfer_number = (
+                _register_collector_trade(creditor_id, acquired_amount)
+            )
         lock.released_at = current_ts
         lock.account_creation_date = account_creation_date
         lock.account_last_transfer_number = account_transfer_number
-
-        if is_collector_trade:
-            _register_collector_trade(creditor_id, acquired_amount)
 
 
 @atomic
@@ -586,6 +587,10 @@ def release_buyer_account_lock(
         .one_or_none()
     )
     if lock:
+        if is_collector_trade:
+            account_creation_date, account_transfer_number = (
+                _register_collector_trade(creditor_id, acquired_amount)
+            )
         lock.released_at = lock.finalized_at = current_ts
         lock.account_creation_date = account_creation_date
         lock.account_last_transfer_number = account_transfer_number
@@ -599,9 +604,6 @@ def release_buyer_account_lock(
                 coordinator_request_id=lock.coordinator_request_id,
                 current_ts=current_ts,
             )
-
-        if is_collector_trade:
-            _register_collector_trade(creditor_id, acquired_amount)
 
 
 def _register_collector_trade(

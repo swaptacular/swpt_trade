@@ -2306,7 +2306,13 @@ def test_process_revise_account_lock_signal_self_lock(
     assert len(AccountLock.query.all()) == 1
 
 
-def test_release_seller_account_lock(db_session, wt_3_10, current_ts):
+@pytest.mark.parametrize("is_collector_trade", [True, False])
+def test_release_seller_account_lock(
+        db_session,
+        wt_3_10,
+        current_ts,
+        is_collector_trade,
+):
     turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
@@ -2330,12 +2336,16 @@ def test_release_seller_account_lock(db_session, wt_3_10, current_ts):
         acquired_amount=-80000,
         account_creation_date=current_ts.date(),
         account_transfer_number=7890,
-        is_collector_trade=True,
+        is_collector_trade=is_collector_trade,
     )
     al = AccountLock.query.one()
     assert al.released_at >= current_ts
-    assert al.account_creation_date == current_ts.date()
-    assert al.account_last_transfer_number == 7890
+    if is_collector_trade:
+        assert al.account_creation_date == DATE0
+        assert al.account_last_transfer_number == 0
+    else:
+        assert al.account_creation_date == current_ts.date()
+        assert al.account_last_transfer_number == 7890
     assert len(FinalizeTransferSignal.query.all()) == 0
 
     # release once more
@@ -2346,12 +2356,16 @@ def test_release_seller_account_lock(db_session, wt_3_10, current_ts):
         acquired_amount=-80000,
         account_creation_date=current_ts.date(),
         account_transfer_number=7890,
-        is_collector_trade=True,
+        is_collector_trade=is_collector_trade,
     )
     al = AccountLock.query.one()
     assert al.released_at >= current_ts
-    assert al.account_creation_date == current_ts.date()
-    assert al.account_last_transfer_number == 7890
+    if is_collector_trade:
+        assert al.account_creation_date == DATE0
+        assert al.account_last_transfer_number == 0
+    else:
+        assert al.account_creation_date == current_ts.date()
+        assert al.account_last_transfer_number == 7890
     assert len(FinalizeTransferSignal.query.all()) == 0
 
 
@@ -2495,7 +2509,13 @@ def test_delete_worker_dispatching_record(db_session, current_ts):
     assert len(WorkerSending.query.all()) == 0
 
 
-def test_release_buyer_account_lock(db_session, wt_3_10, current_ts):
+@pytest.mark.parametrize("is_collector_trade", [True, False])
+def test_release_buyer_account_lock(
+        db_session,
+        wt_3_10,
+        current_ts,
+        is_collector_trade,
+):
     turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
@@ -2519,13 +2539,17 @@ def test_release_buyer_account_lock(db_session, wt_3_10, current_ts):
         acquired_amount=80000,
         account_creation_date=current_ts.date(),
         account_transfer_number=7890,
-        is_collector_trade=True,
+        is_collector_trade=is_collector_trade,
     )
     al = AccountLock.query.one()
     assert al.finalized_at >= current_ts
     assert al.released_at >= current_ts
-    assert al.account_creation_date == current_ts.date()
-    assert al.account_last_transfer_number == 7890
+    if is_collector_trade:
+        assert al.account_creation_date == DATE0
+        assert al.account_last_transfer_number == 0
+    else:
+        assert al.account_creation_date == current_ts.date()
+        assert al.account_last_transfer_number == 7890
     fts = FinalizeTransferSignal.query.one()
     assert fts.creditor_id == 777
     assert fts.debtor_id == 666
@@ -2544,11 +2568,15 @@ def test_release_buyer_account_lock(db_session, wt_3_10, current_ts):
         acquired_amount=80000,
         account_creation_date=current_ts.date(),
         account_transfer_number=7890,
-        is_collector_trade=True,
+        is_collector_trade=is_collector_trade,
     )
     al = AccountLock.query.one()
     assert al.finalized_at >= current_ts
     assert al.released_at >= current_ts
-    assert al.account_creation_date == current_ts.date()
-    assert al.account_last_transfer_number == 7890
+    if is_collector_trade:
+        assert al.account_creation_date == DATE0
+        assert al.account_last_transfer_number == 0
+    else:
+        assert al.account_creation_date == current_ts.date()
+        assert al.account_last_transfer_number == 7890
     assert len(FinalizeTransferSignal.query.all()) == 1
