@@ -167,7 +167,7 @@ def _on_account_transfer_signal(
                 )
             else:
                 assert acquired_amount > 0
-                procedures.update_worker_collecting_status(
+                procedures.update_worker_collecting_record(
                     collector_id=creditor_id,
                     turn_id=note.turn_id,
                     debtor_id=debtor_id,

@@ -427,6 +427,78 @@ def process_revise_account_lock_signal(
         db.session.delete(participation)
 
 
+@atomic
+def release_seller_account_lock(
+        creditor_id: int,
+        debtor_id: int,
+        turn_id: int,
+        acquired_amount: int,
+        account_creation_date: int,
+        account_transfer_number: int,
+) -> None:
+    # TODO: implement.
+    assert acquired_amount < 0
+
+
+@atomic
+def update_worker_collecting_record(
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+        acquired_amount: int,
+) -> None:
+    # TODO: implement.
+    assert acquired_amount > 0
+
+
+@atomic
+def delete_worker_sending_record(
+        from_collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        to_collector_id: int,
+) -> None:
+    # TODO: implement.
+    pass
+
+
+@atomic
+def update_worker_receiving_record(
+        to_collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        from_collector_id: int,
+        acquired_amount: int,
+) -> None:
+    # TODO: implement.
+    assert acquired_amount > 0
+
+
+@atomic
+def delete_worker_dispatching_record(
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+) -> None:
+    # TODO: implement.
+    pass
+
+
+@atomic
+def release_buyer_account_lock(
+        creditor_id: int,
+        debtor_id: int,
+        turn_id: int,
+        acquired_amount: int,
+        account_creation_date: int,
+        account_transfer_number: int,
+) -> None:
+    # TODO: implement.
+    assert acquired_amount > 0
+
+
 def _register_collector_trade(
         collector_id: int,
         amount: int,
