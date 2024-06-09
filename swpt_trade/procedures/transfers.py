@@ -2,7 +2,8 @@ import random
 import math
 from typing import TypeVar, Callable, Tuple, Optional
 from datetime import datetime, date, timezone
-from sqlalchemy.sql.expression import null
+from sqlalchemy import delete, update
+from sqlalchemy.sql.expression import and_, null, false
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
     TransferNote,
@@ -22,6 +23,10 @@ from swpt_trade.models import (
     PrepareTransferSignal,
     FinalizeTransferSignal,
     CreditorParticipation,
+    WorkerCollecting,
+    WorkerSending,
+    WorkerReceiving,
+    WorkerDispatching,
 )
 
 T = TypeVar("T")
@@ -435,9 +440,31 @@ def release_seller_account_lock(
         acquired_amount: int,
         account_creation_date: int,
         account_transfer_number: int,
+        is_collector_trade: bool,
 ) -> None:
-    # TODO: implement.
     assert acquired_amount < 0
+    current_ts = datetime.now(tz=timezone.utc)
+
+    lock = (
+        AccountLock.query
+        .filter_by(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            turn_id=turn_id,
+        )
+        .filter(AccountLock.amount == acquired_amount)
+        .filter(AccountLock.finalized_at != null())
+        .filter(AccountLock.released_at == null())
+        .with_for_update()
+        .one_or_none()
+    )
+    if lock:
+        lock.released_at = current_ts
+        lock.account_creation_date = account_creation_date
+        lock.account_last_transfer_number = account_transfer_number
+
+        if is_collector_trade:
+            _register_collector_trade(creditor_id, acquired_amount)
 
 
 @atomic
@@ -448,8 +475,22 @@ def update_worker_collecting_record(
         creditor_id: int,
         acquired_amount: int,
 ) -> None:
-    # TODO: implement.
     assert acquired_amount > 0
+
+    db.session.execute(
+        update(WorkerCollecting)
+        .where(
+            and_(
+                WorkerCollecting.collector_id == collector_id,
+                WorkerCollecting.turn_id == turn_id,
+                WorkerCollecting.debtor_id == debtor_id,
+                WorkerCollecting.creditor_id == creditor_id,
+                WorkerCollecting.amount == acquired_amount,
+                WorkerCollecting.collected == false(),
+            )
+        )
+        .values(collected=True)
+    )
 
 
 @atomic
@@ -459,8 +500,17 @@ def delete_worker_sending_record(
         debtor_id: int,
         to_collector_id: int,
 ) -> None:
-    # TODO: implement.
-    pass
+    db.session.execute(
+        delete(WorkerSending)
+        .where(
+            and_(
+                WorkerSending.from_collector_id == from_collector_id,
+                WorkerSending.turn_id == turn_id,
+                WorkerSending.debtor_id == debtor_id,
+                WorkerSending.to_collector_id == to_collector_id,
+            )
+        )
+    )
 
 
 @atomic
@@ -471,8 +521,21 @@ def update_worker_receiving_record(
         from_collector_id: int,
         acquired_amount: int,
 ) -> None:
-    # TODO: implement.
     assert acquired_amount > 0
+
+    db.session.execute(
+        update(WorkerReceiving)
+        .where(
+            and_(
+                WorkerReceiving.to_collector_id == to_collector_id,
+                WorkerReceiving.turn_id == turn_id,
+                WorkerReceiving.debtor_id == debtor_id,
+                WorkerReceiving.from_collector_id == from_collector_id,
+                WorkerReceiving.received_amount == 0,
+            )
+        )
+        .values(received_amount=acquired_amount)
+    )
 
 
 @atomic
@@ -482,8 +545,17 @@ def delete_worker_dispatching_record(
         debtor_id: int,
         creditor_id: int,
 ) -> None:
-    # TODO: implement.
-    pass
+    db.session.execute(
+        delete(WorkerDispatching)
+        .where(
+            and_(
+                WorkerDispatching.collector_id == collector_id,
+                WorkerDispatching.turn_id == turn_id,
+                WorkerDispatching.debtor_id == debtor_id,
+                WorkerDispatching.creditor_id == creditor_id,
+            )
+        )
+    )
 
 
 @atomic
@@ -494,9 +566,42 @@ def release_buyer_account_lock(
         acquired_amount: int,
         account_creation_date: int,
         account_transfer_number: int,
+        is_collector_trade: bool,
 ) -> None:
-    # TODO: implement.
     assert acquired_amount > 0
+    current_ts = datetime.now(tz=timezone.utc)
+
+    lock = (
+        AccountLock.query
+        .filter_by(
+            creditor_id=creditor_id,
+            debtor_id=debtor_id,
+            turn_id=turn_id,
+        )
+        .filter(AccountLock.amount > 0)
+        .filter(AccountLock.transfer_id != null())
+        .filter(AccountLock.finalized_at == null())
+        .filter(AccountLock.released_at == null())
+        .with_for_update()
+        .one_or_none()
+    )
+    if lock:
+        lock.released_at = lock.finalized_at = current_ts
+        lock.account_creation_date = account_creation_date
+        lock.account_last_transfer_number = account_transfer_number
+
+        if not lock.is_self_lock:
+            dismiss_prepared_transfer(
+                debtor_id=debtor_id,
+                creditor_id=creditor_id,
+                transfer_id=lock.transfer_id,
+                coordinator_id=creditor_id,
+                coordinator_request_id=lock.coordinator_request_id,
+                current_ts=current_ts,
+            )
+
+        if is_collector_trade:
+            _register_collector_trade(creditor_id, acquired_amount)
 
 
 def _register_collector_trade(

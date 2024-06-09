@@ -152,6 +152,10 @@ def _on_account_transfer_signal(
             )
             return
 
+        cfg = current_app.config
+        is_the_creditor_a_collector = (
+            cfg["MIN_COLLECTOR_ID"] <= creditor_id <= cfg["MAX_COLLECTOR_ID"]
+        )
         note_kind = note.note_kind
         K = utils.TransferNote.Kind
 
@@ -164,6 +168,7 @@ def _on_account_transfer_signal(
                     acquired_amount=acquired_amount,
                     account_creation_date=creation_date,
                     account_transfer_number=transfer_number,
+                    is_collector_trade=is_the_creditor_a_collector,
                 )
             else:
                 assert acquired_amount > 0
@@ -211,6 +216,7 @@ def _on_account_transfer_signal(
                     acquired_amount=acquired_amount,
                     account_creation_date=creation_date,
                     account_transfer_number=transfer_number,
+                    is_collector_trade=is_the_creditor_a_collector,
                 )
 
 

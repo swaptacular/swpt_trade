@@ -330,6 +330,13 @@ class Configuration(metaclass=MetaEnvReader):
 
 
 def _check_config_sanity(c):  # pragma: nocover
+    if c["MIN_COLLECTOR_ID"] > c["MAX_COLLECTOR_ID"]:
+        raise RuntimeError(
+            "The configured value for MIN_COLLECTOR_ID is bigger than"
+            " the configured value for MAX_COLLECTOR_ID. Choose more"
+            " appropriate values."
+        )
+
     if (c["SHARDING_REALM"].realm_mask & 0x0000ffff) != 0:
         raise RuntimeError(
             "The configured SHARDING_REALM indicates that there are"

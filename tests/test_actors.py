@@ -119,7 +119,7 @@ def test_on_finalized_agent_transfer_signal(db_session, actors):
     )
 
 
-def test_on_account_transfer_signal(db_session, actors):
+def test_on_account_transfer_signal_invalid(db_session, actors):
     actors._on_account_transfer_signal(
         debtor_id=D_ID,
         creditor_id=C_ID,
@@ -172,6 +172,50 @@ def test_on_account_transfer_signal(db_session, actors):
         ),
         committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
         principal=1000,
+        ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
+        previous_transfer_number=0,
+    )
+
+
+@pytest.mark.parametrize("note_kind", [
+    utils.TransferNote.Kind.COLLECTING,
+    utils.TransferNote.Kind.SENDING,
+    utils.TransferNote.Kind.DISPATCHING,
+])
+@pytest.mark.parametrize("acquired_amount", [1000, -1000])
+def test_on_account_transfer_signal_valid(
+        db_session,
+        actors,
+        acquired_amount,
+        note_kind,
+):
+    sender_id = C_ID if acquired_amount < 0 else 666
+    receiver_id = C_ID if acquired_amount > 0 else 666
+    first_id, second_id = (
+        (receiver_id, sender_id)
+        if note_kind == utils.TransferNote.Kind.COLLECTING else
+        (sender_id, receiver_id)
+    )
+    actors._on_account_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        creation_date=date.fromisoformat("2020-01-02"),
+        transfer_number=1,
+        coordinator_type="agent",
+        sender=str(sender_id),
+        recipient=str(receiver_id),
+        acquired_amount=acquired_amount,
+        transfer_note_format=m.AGENT_TRANSFER_NOTE_FORMAT,
+        transfer_note=str(
+            utils.TransferNote(
+                turn_id=1,
+                note_kind=note_kind,
+                first_id=first_id,
+                second_id=second_id,
+            )
+        ),
+        committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        principal=100000,
         ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
         previous_transfer_number=0,
     )

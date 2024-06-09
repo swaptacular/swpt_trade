@@ -27,6 +27,10 @@ from swpt_trade.models import (
     AccountLock,
     ActiveCollector,
     CreditorParticipation,
+    WorkerCollecting,
+    WorkerReceiving,
+    WorkerSending,
+    WorkerDispatching,
     TS0,
     DATE0,
     MAX_INT32,
@@ -2033,17 +2037,37 @@ def test_process_alpt_already_committed(db_session, current_ts, account_lock):
     assert al.account_last_transfer_number is None
 
 
+@pytest.fixture(scope="function")
+def wt_3_10(db_session, current_ts):
+    wt = WorkerTurn(
+        turn_id=1,
+        started_at=current_ts,
+        base_debtor_info_locator="https://example.com/666",
+        base_debtor_id=666,
+        max_distance_to_base=10,
+        min_trade_amount=1000,
+        phase=3,
+        phase_deadline=None,
+        collection_started_at=current_ts + timedelta(hours=-1),
+        collection_deadline=current_ts + timedelta(days=30),
+        worker_turn_subphase=10,
+    )
+    db_session.add(wt)
+    db_session.commit()
+    return wt
+
+
 @pytest.mark.parametrize("amount", [80000, -80000])
 @pytest.mark.parametrize("transfer_id", [None, 123])
 def test_process_revise_account_lock_signal_delete_lock(
         db_session,
         current_ts,
-        wt_2_5,
+        wt_3_10,
         collector_id,
         amount,
         transfer_id,
 ):
-    turn_id = wt_2_5.turn_id
+    turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
             creditor_id=777,
@@ -2083,10 +2107,10 @@ def test_process_revise_account_lock_signal_delete_lock(
 def test_process_revise_account_lock_signal_seller(
         db_session,
         current_ts,
-        wt_2_5,
+        wt_3_10,
         collector_id,
 ):
-    turn_id = wt_2_5.turn_id
+    turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
             creditor_id=777,
@@ -2159,10 +2183,10 @@ def test_process_revise_account_lock_signal_seller(
 def test_process_revise_account_lock_signal_buyer(
         db_session,
         current_ts,
-        wt_2_5,
+        wt_3_10,
         collector_id,
 ):
-    turn_id = wt_2_5.turn_id
+    turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
             creditor_id=777,
@@ -2222,11 +2246,11 @@ def test_process_revise_account_lock_signal_buyer(
 def test_process_revise_account_lock_signal_self_lock(
         db_session,
         current_ts,
-        wt_2_5,
+        wt_3_10,
         collector_id,
         amount,
 ):
-    turn_id = wt_2_5.turn_id
+    turn_id = wt_3_10.turn_id
     db_session.add(
         AccountLock(
             creditor_id=collector_id,
@@ -2280,3 +2304,251 @@ def test_process_revise_account_lock_signal_self_lock(
     assert len(CreditorParticipation.query.all()) == 0
     assert len(FinalizeTransferSignal.query.all()) == 0
     assert len(AccountLock.query.all()) == 1
+
+
+def test_release_seller_account_lock(db_session, wt_3_10, current_ts):
+    turn_id = wt_3_10.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=999,
+            transfer_id=123,
+            finalized_at=current_ts,
+            amount=-80000,
+        )
+    )
+    db_session.commit()
+
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.release_seller_account_lock(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+        acquired_amount=-80000,
+        account_creation_date=current_ts.date(),
+        account_transfer_number=7890,
+        is_collector_trade=True,
+    )
+    al = AccountLock.query.one()
+    assert al.released_at >= current_ts
+    assert al.account_creation_date == current_ts.date()
+    assert al.account_last_transfer_number == 7890
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    # release once more
+    p.release_seller_account_lock(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+        acquired_amount=-80000,
+        account_creation_date=current_ts.date(),
+        account_transfer_number=7890,
+        is_collector_trade=True,
+    )
+    al = AccountLock.query.one()
+    assert al.released_at >= current_ts
+    assert al.account_creation_date == current_ts.date()
+    assert al.account_last_transfer_number == 7890
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+
+def test_update_worker_collecting_record(db_session, current_ts):
+    db_session.add(
+        WorkerCollecting(
+            collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            amount=1000,
+            purge_after=current_ts + timedelta(days=1000),
+        )
+    )
+    db_session.commit()
+
+    assert len(WorkerCollecting.query.all()) == 1
+    p.update_worker_collecting_record(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        acquired_amount=1000,
+    )
+    wc = WorkerCollecting.query.one()
+    assert wc.amount == 1000
+    assert wc.collected is True
+
+    # update once more
+    p.update_worker_collecting_record(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        acquired_amount=1000,
+    )
+    wc = WorkerCollecting.query.one()
+    assert wc.amount == 1000
+    assert wc.collected is True
+
+
+def test_delete_worker_sending_record(db_session, current_ts):
+    db_session.add(
+        WorkerSending(
+            from_collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            to_collector_id=888,
+            amount=1000,
+            purge_after=current_ts + timedelta(days=1000),
+        )
+    )
+    db_session.commit()
+
+    assert len(WorkerSending.query.all()) == 1
+    p.delete_worker_sending_record(
+        from_collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        to_collector_id=888,
+    )
+    assert len(WorkerSending.query.all()) == 0
+
+    # delete once more
+    p.delete_worker_sending_record(
+        from_collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        to_collector_id=888,
+    )
+    assert len(WorkerSending.query.all()) == 0
+
+
+def test_update_worker_receiving_record(db_session, current_ts):
+    db_session.add(
+        WorkerReceiving(
+            to_collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            from_collector_id=888,
+            expected_amount=1001,
+            purge_after=current_ts + timedelta(days=1000),
+        )
+    )
+    db_session.commit()
+
+    assert len(WorkerReceiving.query.all()) == 1
+    p.update_worker_receiving_record(
+        to_collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        from_collector_id=888,
+        acquired_amount=1000,
+    )
+    wr = WorkerReceiving.query.one()
+    assert wr.expected_amount == 1001
+    assert wr.received_amount == 1000
+
+    # update once more
+    p.update_worker_receiving_record(
+        to_collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        from_collector_id=888,
+        acquired_amount=1000,
+    )
+    wr = WorkerReceiving.query.one()
+    assert wr.expected_amount == 1001
+    assert wr.received_amount == 1000
+
+
+def test_delete_worker_dispatching_record(db_session, current_ts):
+    db_session.add(
+        WorkerDispatching(
+            collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            amount=1000,
+            purge_after=current_ts + timedelta(days=1000),
+        )
+    )
+    db_session.commit()
+
+    assert len(WorkerDispatching.query.all()) == 1
+    p.delete_worker_dispatching_record(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=888,
+    )
+    assert len(WorkerSending.query.all()) == 0
+
+    # delete once more
+    p.delete_worker_dispatching_record(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=888,
+    )
+    assert len(WorkerSending.query.all()) == 0
+
+
+def test_release_buyer_account_lock(db_session, wt_3_10, current_ts):
+    turn_id = wt_3_10.turn_id
+    db_session.add(
+        AccountLock(
+            creditor_id=777,
+            debtor_id=666,
+            turn_id=turn_id,
+            collector_id=999,
+            coordinator_request_id=56789,
+            transfer_id=123,
+            amount=80000,
+        )
+    )
+    db_session.commit()
+
+    assert len(AccountLock.query.all()) == 1
+    assert len(FinalizeTransferSignal.query.all()) == 0
+    p.release_buyer_account_lock(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+        acquired_amount=80000,
+        account_creation_date=current_ts.date(),
+        account_transfer_number=7890,
+        is_collector_trade=True,
+    )
+    al = AccountLock.query.one()
+    assert al.finalized_at >= current_ts
+    assert al.released_at >= current_ts
+    assert al.account_creation_date == current_ts.date()
+    assert al.account_last_transfer_number == 7890
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 777
+    assert fts.debtor_id == 666
+    assert fts.transfer_id == 123
+    assert fts.coordinator_id == 777
+    assert fts.coordinator_request_id == 56789
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""
+
+    # release once more
+    p.release_buyer_account_lock(
+        creditor_id=777,
+        debtor_id=666,
+        turn_id=turn_id,
+        acquired_amount=80000,
+        account_creation_date=current_ts.date(),
+        account_transfer_number=7890,
+        is_collector_trade=True,
+    )
+    al = AccountLock.query.one()
+    assert al.finalized_at >= current_ts
+    assert al.released_at >= current_ts
+    assert al.account_creation_date == current_ts.date()
+    assert al.account_last_transfer_number == 7890
+    assert len(FinalizeTransferSignal.query.all()) == 1
