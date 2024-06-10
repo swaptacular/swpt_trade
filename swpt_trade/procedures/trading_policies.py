@@ -29,10 +29,19 @@ def process_updated_ledger_signal(
         if trading_policy.latest_ledger_update_id < update_id:
             trading_policy.latest_ledger_update_id = update_id
             trading_policy.latest_ledger_update_ts = ts
-            trading_policy.account_id = account_id
             trading_policy.creation_date = creation_date
             trading_policy.principal = principal
             trading_policy.last_transfer_number = last_transfer_number
+            if account_id != "":
+                trading_policy.account_id = account_id
+                trading_policy.account_id_is_obsolete = False
+            else:
+                # NOTE: When the account does not have an ID anymore,
+                # we do our best to not lose the old ID. This allows
+                # us to continue making transfers to the account, even
+                # when the account has been forcefully deleted by the
+                # account's owner.
+                trading_policy.account_id_is_obsolete = True
     else:
         with db.retry_on_integrity_error():
             db.session.add(

@@ -22,6 +22,11 @@ class TradingPolicy(db.Model):
         db.TIMESTAMP(timezone=True), nullable=False, default=TS0
     )
     account_id = db.Column(db.String, nullable=False, default="")
+    account_id_is_obsolete = db.Column(
+        db.BOOLEAN,
+        nullable=False,
+        default=False,
+    )
     creation_date = db.Column(db.DATE, nullable=False, default=DATE0)
     principal = db.Column(db.BigInteger, nullable=False, default=0)
     last_transfer_number = db.Column(db.BigInteger, nullable=False, default=0)
@@ -79,7 +84,7 @@ class TradingPolicy(db.Model):
     @property
     def is_useless(self) -> bool:
         return (
-            self.account_id == ""
+            (self.account_id == "" or self.account_id_is_obsolete)
             and self.creation_date == DATE0
             and self.principal == 0
             and self.last_transfer_number == 0

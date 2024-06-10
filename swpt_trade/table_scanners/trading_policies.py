@@ -81,6 +81,7 @@ class TradingPoliciesScanner(TableScanner):
         c_creditor_id = c.creditor_id
         c_debtor_id = c.debtor_id
         c_account_id = c.account_id
+        c_account_id_is_obsolete = c.account_id_is_obsolete
         c_creation_date = c.creation_date
         c_principal = c.principal
         c_last_transfer_number = c.last_transfer_number
@@ -97,7 +98,7 @@ class TradingPoliciesScanner(TableScanner):
 
         def is_useless(row) -> bool:
             return (
-                row[c_account_id] == ""
+                (row[c_account_id] == "" or row[c_account_id_is_obsolete])
                 and row[c_creation_date] == DATE0
                 and row[c_principal] == 0
                 and row[c_last_transfer_number] == 0

@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from itertools import groupby
 from sqlalchemy import select, insert, delete, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import null, and_
+from sqlalchemy.sql.expression import null, false, and_
 from flask import current_app
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.utils import (
@@ -233,8 +233,9 @@ def _generate_candidate_offers(bp, turn_id):
                     TradingPolicy.max_principal,
                     TradingPolicy.peg_debtor_id,
                     TradingPolicy.peg_exchange_rate,
-                    (
-                        TradingPolicy.account_id != ""
+                    and_(
+                        TradingPolicy.account_id != "",
+                        TradingPolicy.account_id_is_obsolete == false(),
                     ).label("has_account_id"),
                     (
                         TradingPolicy.config_flags.op("&")(DELETION_FLAG) != 0
