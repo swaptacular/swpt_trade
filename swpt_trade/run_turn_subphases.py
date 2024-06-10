@@ -788,7 +788,7 @@ def _copy_collector_dispatchings(s_conn, worker_turn, statuses):
     cfg = current_app.config
     purge_after = (
         worker_turn.collection_deadline
-        + timedelta(days=6 * cfg["APP_WORKER_DISPATCHING_SLACK_DAYS"])
+        + timedelta(days=cfg["APP_WORKER_DISPATCHING_SLACK_DAYS"])
     )
     sharding_realm: ShardingRealm = cfg["SHARDING_REALM"]
     hash_prefix = u16_to_i16(sharding_realm.realm >> 16)
