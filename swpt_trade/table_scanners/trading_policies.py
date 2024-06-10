@@ -1,5 +1,5 @@
 from typing import TypeVar, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from swpt_pythonlib.scan_table import TableScanner
 from flask import current_app
 from sqlalchemy.sql.expression import tuple_
@@ -22,7 +22,13 @@ class TradingPoliciesScanner(TableScanner):
 
     def __init__(self):
         super().__init__()
-        self.sharding_realm = current_app.config["SHARDING_REALM"]
+        cfg = current_app.config
+        self.sharding_realm = cfg["SHARDING_REALM"]
+        self.useless_policies_retaining_period = (
+            cfg["APP_TURN_MAX_COMMIT_PERIOD"]
+            + timedelta(days=cfg["APP_WORKER_DISPATCHING_SLACK_DAYS"])
+            + timedelta(days=cfg["APP_EXTREME_MESSAGE_DELAY_DAYS"])
+        )
 
     @property
     def blocks_per_query(self) -> int:
@@ -84,6 +90,10 @@ class TradingPoliciesScanner(TableScanner):
         c_peg_debtor_id = c.peg_debtor_id
         c_peg_exchange_rate = c.peg_exchange_rate
         c_config_flags = c.config_flags
+        c_latest_ledger_update_ts = c.latest_ledger_update_ts
+        c_latest_policy_update_ts = c.latest_policy_update_ts
+        c_latest_flags_update_ts = c.latest_flags_update_ts
+        cutoff_ts = current_ts - self.useless_policies_retaining_period
 
         def is_useless(row) -> bool:
             return (
@@ -102,7 +112,12 @@ class TradingPoliciesScanner(TableScanner):
         pks_to_delete = [
             (row[c_creditor_id], row[c_debtor_id])
             for row in rows
-            if is_useless(row)
+            if (
+                    is_useless(row)
+                    and row[c_latest_ledger_update_ts] < cutoff_ts
+                    and row[c_latest_policy_update_ts] < cutoff_ts
+                    and row[c_latest_flags_update_ts] < cutoff_ts
+            )
         ]
         if pks_to_delete:
             to_delete = (
@@ -112,7 +127,12 @@ class TradingPoliciesScanner(TableScanner):
             )
 
             for trading_policy in to_delete:
-                if trading_policy.is_useless:
+                if (
+                        trading_policy.is_useless
+                        and trading_policy.latest_ledger_update_ts < cutoff_ts
+                        and trading_policy.latest_policy_update_ts < cutoff_ts
+                        and trading_policy.latest_flags_update_ts < cutoff_ts
+                ):
                     db.session.delete(trading_policy)
 
             db.session.commit()
