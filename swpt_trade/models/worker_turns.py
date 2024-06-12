@@ -540,3 +540,109 @@ class WorkerDispatching(db.Model):
             ),
         },
     )
+
+
+class TransferAttempt(db.Model):
+    UNSPECIFIED_RETRYABLE_FAILURE = 0
+    TIMEOUT = 1
+    NEWER_INTEREST_RATE = 2
+    RECIPIENT_IS_UNREACHABLE = 3
+    INSUFFICIENT_AVAILABLE_AMOUNT = 4
+
+    from_collector_id = db.Column(db.BigInteger, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    turn_id = db.Column(db.Integer, primary_key=True)
+    to_creditor_id = db.Column(db.BigInteger, primary_key=True)
+    is_dispatching = db.Column(db.BOOLEAN, primary_key=True)
+    nominal_amount = db.Column(db.FLOAT, nullable=False)
+    collection_started_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        nullable=False,
+    )
+    inserted_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_now_utc,
+    )
+    recipient = db.Column(db.String, nullable=False, default="")
+    scheduled_for = db.Column(db.TIMESTAMP(timezone=True))
+    attempted_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        comment="The timestamp of the sent `PrepareTransfer` SMP message.",
+    )
+    coordinator_request_id = db.Column(db.BigInteger)
+    final_interest_rate_ts = db.Column(db.TIMESTAMP(timezone=True))
+    amount = db.Column(db.BigInteger)
+    transfer_id = db.Column(db.BigInteger)
+    finalized_at = db.Column(db.TIMESTAMP(timezone=True))
+    failure_code = db.Column(
+        db.SmallInteger,
+        comment=(
+            "Failure codes for which a retry makes sense:"
+            " 0) An unspecified retryable failure;"
+            " 1) TIMEOUT;"
+            " 2) NEWER_INTEREST_RATE;"
+            " 3) RECIPIENT_IS_UNREACHABLE;"
+            " 4) INSUFFICIENT_AVAILABLE_AMOUNT."
+        ),
+    )
+    failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    __table_args__ = (
+        db.CheckConstraint(nominal_amount >= 2.0),
+        db.CheckConstraint(amount > 0),
+        db.CheckConstraint(failed_attempts >= 0),
+        db.CheckConstraint(
+            or_(
+                and_(
+                    # A transfer attempt has not been made yet.
+                    attempted_at == null(),
+                    coordinator_request_id == null(),
+                    final_interest_rate_ts == null(),
+                    amount == null(),
+                ),
+                and_(
+                    # The description of the latest transfer attempt:
+                    attempted_at != null(),
+                    coordinator_request_id != null(),
+                    final_interest_rate_ts != null(),
+                    amount != null(),
+                    recipient != "",
+                ),
+            )
+        ),
+        db.CheckConstraint(
+            or_(transfer_id == null(), coordinator_request_id != null())
+        ),
+        db.CheckConstraint(
+            or_(finalized_at == null(), transfer_id != null())
+        ),
+        db.CheckConstraint(
+            or_(failure_code == null(), attempted_at != null())
+        ),
+        db.Index(
+            "idx_transfer_coordinator_request_id",
+            coordinator_request_id,
+            postgresql_where=coordinator_request_id != null(),
+            unique=True,
+        ),
+        db.Index(
+            "idx_transfer_scheduled_for",
+            scheduled_for,
+            postgresql_where=scheduled_for != null(),
+        ),
+        {
+            "comment": (
+                "Represents a past or future attempt to transfer some amount"
+                " form a given collector's account to another account, as a"
+                " part of a given trading turn. More than one attempt may be"
+                " made if the first attempt has failed."
+            ),
+        },
+    )
+
+    @property
+    def is_recipient_unknown(self) -> bool:
+        return (
+            self.recipient == ""
+            or self.failure_code == self.RECIPIENT_IS_UNREACHABLE
+        )
