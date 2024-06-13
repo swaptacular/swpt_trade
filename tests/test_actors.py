@@ -336,6 +336,41 @@ def test_on_revise_account_lock_signal(db_session, actors):
     )
 
 
+def test_on_trigger_transfer_signal(db_session, actors):
+    actors._on_trigger_transfer_signal(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        is_dispatching=True,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
+def test_on_account_id_request_signal(db_session, actors):
+    actors._on_account_id_request_signal(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        is_dispatching=True,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
+def test_on_account_id_response_signal(db_session, actors):
+    actors._on_account_id_response_signal(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        is_dispatching=True,
+        account_id=str(C_ID),
+        account_id_version=1,
+        ts=datetime.now(tz=timezone.utc),
+    )
+
+
 def test_consumer(db_session, app, actors, restore_sharding_realm):
     consumer = actors.SmpConsumer()
 

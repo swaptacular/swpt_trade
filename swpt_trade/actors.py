@@ -536,6 +536,50 @@ def _on_revise_account_lock_signal(
     )
 
 
+def _on_trigger_transfer_signal(
+    collector_id: int,
+    turn_id: int,
+    debtor_id: int,
+    creditor_id: int,
+    is_dispatching: bool,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: Implement!
+    pass
+
+
+def _on_account_id_request_signal(
+    collector_id: int,
+    turn_id: int,
+    debtor_id: int,
+    creditor_id: int,
+    is_dispatching: bool,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: Implement!
+    pass
+
+
+def _on_account_id_response_signal(
+    collector_id: int,
+    turn_id: int,
+    debtor_id: int,
+    creditor_id: int,
+    is_dispatching: bool,
+    account_id: str,
+    account_id_version: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: Implement!
+    pass
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -596,6 +640,18 @@ _MESSAGE_TYPES = {
     "ReviseAccountLock": (
         schemas.ReviseAccountLockMessageSchema(),
         _on_revise_account_lock_signal,
+    ),
+    "TriggerTransfer": (
+        schemas.TriggerTransferMessageSchema(),
+        _on_trigger_transfer_signal,
+    ),
+    "AccountIdRequest": (
+        schemas.AccountIdRequestMessageSchema(),
+        _on_account_id_request_signal,
+    ),
+    "AccountIdResponse": (
+        schemas.AccountIdResponseMessageSchema(),
+        _on_account_id_response_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),
