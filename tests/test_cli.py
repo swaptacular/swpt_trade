@@ -1162,6 +1162,77 @@ def test_delete_worker_sendings(
     assert wss[0].from_collector_id == 888
 
 
+def test_delete_transfer_attempts(
+        app,
+        db_session,
+        restore_sharding_realm,
+        current_ts,
+):
+    app.config["SHARDING_REALM"] = ShardingRealm("0.#")
+    app.config["DELETE_PARENT_SHARD_RECORDS"] = True
+
+    ta1 = m.TransferAttempt(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        is_dispatching=True,
+        nominal_amount=1000.0,
+        collection_started_at=current_ts
+    )
+    ta2 = m.TransferAttempt(
+        collector_id=777,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        is_dispatching=True,
+        nominal_amount=1000.0,
+        collection_started_at=current_ts
+    )
+    ta3 = m.TransferAttempt(
+        collector_id=888,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        is_dispatching=True,
+        nominal_amount=1000.0,
+        collection_started_at=current_ts
+    )
+    ta4 = m.TransferAttempt(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=1,
+        creditor_id=1,
+        is_dispatching=True,
+        nominal_amount=1000.0,
+        collection_started_at=current_ts - timedelta(days=1000),
+    )
+    db.session.add(ta1)
+    db.session.add(ta2)
+    db.session.add(ta3)
+    db.session.add(ta4)
+    db.session.commit()
+
+    with db.engine.connect() as conn:
+        conn.execute(sqlalchemy.text("ANALYZE transfer_attempt"))
+
+    assert len(m.TransferAttempt.query.all()) == 4
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "scan_transfer_attempts",
+            "--days",
+            "0.000001",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code == 0
+    tas = m.TransferAttempt.query.all()
+    assert len(tas) == 1
+    assert tas[0].collector_id == 888
+
+
 def test_process_pristine_collectors(
         app,
         db_session,

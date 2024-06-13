@@ -12,3 +12,4 @@ from .worker_collectings import *  # noqa
 from .worker_sendings import *  # noqa
 from .worker_receivings import *  # noqa
 from .worker_dispatchings import *  # noqa
+from .transfer_attempts import *  # noqa

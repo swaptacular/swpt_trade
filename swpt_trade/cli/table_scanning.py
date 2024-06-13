@@ -401,3 +401,31 @@ def scan_worker_dispatchings(days, quit_early):
     assert days > 0.0
     scanner = WorkerDispatchingsScanner()
     scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
+
+
+@swpt_trade.command("scan_transfer_attempts")
+@with_appcontext
+@click.option("-d", "--days", type=float, help="The number of days.")
+@click.option(
+    "--quit-early",
+    is_flag=True,
+    default=False,
+    help="Exit after some time (mainly useful during testing).",
+)
+def scan_transfer_attempts(days, quit_early):
+    """Start a process that garbage collects transfer attempt records.
+
+    The specified number of days determines the intended duration of a
+    single pass through the transfer attempt table. If the number of
+    days is not specified, the value of the environment variable
+    APP_TRANSFER_ATTEMPTS_SCAN_DAYS is taken. If it is not set, the
+    default number of days is 7.
+    """
+    from swpt_trade.table_scanners import TransferAttemptsScanner
+
+    logger = logging.getLogger(__name__)
+    logger.info("Started worker transfer attempts scanner.")
+    days = days or current_app.config["APP_TRANSFER_ATTEMPTS_SCAN_DAYS"]
+    assert days > 0.0
+    scanner = TransferAttemptsScanner()
+    scanner.run(db.engine, timedelta(days=days), quit_early=quit_early)
