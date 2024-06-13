@@ -571,6 +571,7 @@ def test_process_updated_ledger_signal(db_session, current_ts):
     assert tps[0].latest_ledger_update_id == 123
     assert tps[0].latest_ledger_update_ts == current_ts
     assert tps[0].account_id == "test_account"
+    assert tps[0].account_id_is_obsolete is False
     assert tps[0].creation_date == date(2020, 5, 17)
     assert tps[0].principal == 10000
     assert tps[0].last_transfer_number == 456
@@ -593,6 +594,7 @@ def test_process_updated_ledger_signal(db_session, current_ts):
     assert tps[0].latest_ledger_update_id == 123
     assert tps[0].latest_ledger_update_ts == current_ts
     assert tps[0].account_id == "test_account"
+    assert tps[0].account_id_is_obsolete is False
     assert tps[0].creation_date == date(2020, 5, 17)
     assert tps[0].principal == 10000
     assert tps[0].last_transfer_number == 456
@@ -615,6 +617,30 @@ def test_process_updated_ledger_signal(db_session, current_ts):
     assert tps[0].latest_ledger_update_id == 124
     assert tps[0].latest_ledger_update_ts == current_ts + timedelta(hours=1)
     assert tps[0].account_id == "new_account_id"
+    assert tps[0].account_id_is_obsolete is False
+    assert tps[0].creation_date == date(2021, 6, 18)
+    assert tps[0].principal == 20000
+    assert tps[0].last_transfer_number == 457
+
+    # Receiving an newer signal with empty account ID.
+    p.process_updated_ledger_signal(
+        creditor_id=-777,
+        debtor_id=666,
+        update_id=125,
+        account_id="",
+        creation_date=date(2021, 6, 18),
+        principal=20000,
+        last_transfer_number=457,
+        ts=current_ts + timedelta(hours=1),
+    )
+    tps = TradingPolicy.query.all()
+    assert len(tps) == 1
+    assert tps[0].creditor_id == -777
+    assert tps[0].debtor_id == 666
+    assert tps[0].latest_ledger_update_id == 125
+    assert tps[0].latest_ledger_update_ts == current_ts + timedelta(hours=1)
+    assert tps[0].account_id == "new_account_id"
+    assert tps[0].account_id_is_obsolete is True
     assert tps[0].creation_date == date(2021, 6, 18)
     assert tps[0].principal == 20000
     assert tps[0].last_transfer_number == 457

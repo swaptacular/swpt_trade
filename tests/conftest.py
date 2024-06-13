@@ -51,6 +51,9 @@ def db_session(app):
         "TRUNCATE TABLE candidate_offer_signal",
         "TRUNCATE TABLE needed_collector_signal",
         "TRUNCATE TABLE revise_account_lock_signal",
+        "TRUNCATE TABLE trigger_transfer_signal",
+        "TRUNCATE TABLE account_id_request_signal",
+        "TRUNCATE TABLE account_id_response_signal",
         "TRUNCATE TABLE debtor_info_document",
         "TRUNCATE TABLE debtor_locator_claim",
         "TRUNCATE TABLE debtor_info_fetch",
@@ -68,6 +71,7 @@ def db_session(app):
         "TRUNCATE TABLE worker_sending",
         "TRUNCATE TABLE worker_receiving",
         "TRUNCATE TABLE worker_dispatching",
+        "TRUNCATE TABLE transfer_attempt",
     ]:
         db.session.execute(sqlalchemy.text(cmd))
 

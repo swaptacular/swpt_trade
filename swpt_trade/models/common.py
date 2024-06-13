@@ -45,11 +45,16 @@ CREDITOR_ID_SHARDED_MESSAGE_TYPES = SMP_MESSAGE_TYPES | set([
     "ActivateCollector",
     "CandidateOffer",
     "ReviseAccountLock",
+    "AccountIdRequest",
 ])
 DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
     "DiscoverDebtor",
     "ConfirmDebtor",
     "NeededCollector",
+])
+COLLECTOR_ID_SHARDED_MESSAGE_TYPES = set([
+    "TriggerTransfer",
+    "AccountIdResponse",
 ])
 IRI_SHARDED_MESSAGE_TYPES = set([
     "FetchDebtorInfo",
@@ -75,11 +80,16 @@ def message_belongs_to_this_shard(
     message_type = data["type"]
 
     if message_type in CREDITOR_ID_SHARDED_MESSAGE_TYPES:
-        creditor_id = data["creditor_id"]
-        return sharding_realm.match(creditor_id, match_parent=match_parent)
+        return sharding_realm.match(
+            data["creditor_id"], match_parent=match_parent
+        )
     elif message_type in DEBTOR_ID_SHARDED_MESSAGE_TYPES:
         return sharding_realm.match(
             data["debtor_id"], match_parent=match_parent
+        )
+    elif message_type in COLLECTOR_ID_SHARDED_MESSAGE_TYPES:
+        return sharding_realm.match(
+            data["collector_id"], match_parent=match_parent
         )
     elif message_type in IRI_SHARDED_MESSAGE_TYPES:
         return sharding_realm.match_str(

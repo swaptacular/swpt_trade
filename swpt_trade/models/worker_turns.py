@@ -549,11 +549,27 @@ class TransferAttempt(db.Model):
     RECIPIENT_IS_UNREACHABLE = 3
     INSUFFICIENT_AVAILABLE_AMOUNT = 4
 
-    from_collector_id = db.Column(db.BigInteger, primary_key=True)
-    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    collector_id = db.Column(
+        db.BigInteger,
+        primary_key=True,
+        comment="This is the creditor ID of the sender.",
+    )
     turn_id = db.Column(db.Integer, primary_key=True)
-    to_creditor_id = db.Column(db.BigInteger, primary_key=True)
-    is_dispatching = db.Column(db.BOOLEAN, primary_key=True)
+    debtor_id = db.Column(db.BigInteger, primary_key=True)
+    creditor_id = db.Column(
+        db.BigInteger,
+        primary_key=True,
+        comment="This is the creditor ID of the recipient.",
+    )
+    is_dispatching = db.Column(
+        db.BOOLEAN,
+        primary_key=True,
+        comment=(
+            "Will be TRUE when the collector is dispatching some amount to"
+            " a buyer, and FALSE when the collector is sending some amount"
+            " to another collector."
+        ),
+    )
     nominal_amount = db.Column(db.FLOAT, nullable=False)
     collection_started_at = db.Column(
         db.TIMESTAMP(timezone=True),
@@ -565,6 +581,15 @@ class TransferAttempt(db.Model):
         default=get_now_utc,
     )
     recipient = db.Column(db.String, nullable=False, default="")
+    recipient_version = db.Column(
+        db.BigInteger,
+        nullable=False,
+        default=0,
+        comment=(
+            "In very rare cases the recipient may be change. This column"
+            " allows us to tell which recipient value is newer."
+        ),
+    )
     scheduled_for = db.Column(db.TIMESTAMP(timezone=True))
     attempted_at = db.Column(
         db.TIMESTAMP(timezone=True),
@@ -618,6 +643,9 @@ class TransferAttempt(db.Model):
         ),
         db.CheckConstraint(
             or_(failure_code == null(), attempted_at != null())
+        ),
+        db.CheckConstraint(
+            or_(scheduled_for == null(), failure_code != null())
         ),
         db.Index(
             "idx_transfer_coordinator_request_id",

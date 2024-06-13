@@ -396,3 +396,107 @@ class ReviseAccountLockSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_FLUSH_REVISE_ACCOUNT_LOCK_BURST_COUNT"]
+
+
+class TriggerTransferSignal(Signal):
+    """Triggers a transfer attempt.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("TriggerTransfer")
+        collector_id = fields.Integer()
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        creditor_id = fields.Integer()
+        is_dispatching = fields.Boolean()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    creditor_id = db.Column(db.BigInteger, nullable=False)
+    is_dispatching = db.Column(db.BOOLEAN, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.collector_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_FLUSH_TRIGGER_TRANSFER_BURST_COUNT"]
+
+
+class AccountIdRequestSignal(Signal):
+    """Requests the account ID of a given creditor.
+
+    This signal is sent when a transfer attempt must be performed (see
+    the `TransferAttempt` model), but the recipient's account ID is
+    unknown.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("AccountIdRequest")
+        collector_id = fields.Integer()
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        creditor_id = fields.Integer()
+        is_dispatching = fields.Boolean()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    creditor_id = db.Column(db.BigInteger, nullable=False)
+    is_dispatching = db.Column(db.BOOLEAN, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.creditor_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_ACCOUNT_ID_REQUEST_BURST_COUNT"]
+
+
+class AccountIdResponseSignal(Signal):
+    """A response to an `AccountIdRequestSignal`.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("AccountIdResponse")
+        collector_id = fields.Integer()
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        creditor_id = fields.Integer()
+        is_dispatching = fields.Boolean()
+        account_id = fields.String()
+        account_id_version = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+    creditor_id = db.Column(db.BigInteger, nullable=False)
+    is_dispatching = db.Column(db.BOOLEAN, nullable=False)
+    account_id = db.Column(db.String, nullable=False)
+    account_id_version = db.Column(db.BigInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.collector_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_ACCOUNT_ID_RESPONSE_BURST_COUNT"]

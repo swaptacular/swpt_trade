@@ -323,6 +323,9 @@ class Configuration(metaclass=MetaEnvReader):
     APP_FLUSH_CANDIDATE_OFFER_BURST_COUNT = 10000
     APP_FLUSH_NEEDED_COLLECTOR_BURST_COUNT = 10000
     APP_FLUSH_REVISE_ACCOUNT_LOCK_BURST_COUNT = 10000
+    APP_FLUSH_TRIGGER_TRANSFER_BURST_COUNT = 10000
+    APP_ACCOUNT_ID_REQUEST_BURST_COUNT = 10000
+    APP_ACCOUNT_ID_RESPONSE_BURST_COUNT = 10000
     APP_DEBTOR_INFO_FETCH_BURST_COUNT = 2000
     APP_SUPERUSER_SUBJECT_REGEX = "^creditors-superuser$"
     APP_SUPERVISOR_SUBJECT_REGEX = "^creditors-supervisor$"
@@ -330,11 +333,14 @@ class Configuration(metaclass=MetaEnvReader):
 
 
 def _check_config_sanity(c):  # pragma: nocover
-    if c["MIN_COLLECTOR_ID"] > c["MAX_COLLECTOR_ID"]:
+    if (
+            c["MIN_COLLECTOR_ID"] is None
+            or c["MAX_COLLECTOR_ID"] is None
+            or c["MIN_COLLECTOR_ID"] * c["MAX_COLLECTOR_ID"] <= 0
+            or c["MIN_COLLECTOR_ID"] > c["MAX_COLLECTOR_ID"]
+    ):
         raise RuntimeError(
-            "The configured value for MIN_COLLECTOR_ID is bigger than"
-            " the configured value for MAX_COLLECTOR_ID. Choose more"
-            " appropriate values."
+            "Invalid values for MIN_COLLECTOR_ID and MAX_COLLECTOR_ID."
         )
 
     if (c["SHARDING_REALM"].realm_mask & 0x0000ffff) != 0:

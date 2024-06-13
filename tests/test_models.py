@@ -23,6 +23,9 @@ def test_sibnalbus_burst_count(app):
     assert isinstance(m.StoreDocumentSignal.signalbus_burst_count, int)
     assert isinstance(m.NeededCollectorSignal.signalbus_burst_count, int)
     assert isinstance(m.ReviseAccountLockSignal.signalbus_burst_count, int)
+    assert isinstance(m.TriggerTransferSignal.signalbus_burst_count, int)
+    assert isinstance(m.AccountIdRequestSignal.signalbus_burst_count, int)
+    assert isinstance(m.AccountIdResponseSignal.signalbus_burst_count, int)
 
 
 def test_sharding_realm(app, restore_sharding_realm, db_session, current_ts):
@@ -42,6 +45,28 @@ def test_sharding_realm(app, restore_sharding_realm, db_session, current_ts):
         "signal_id": 123,
         "debtor_id": 3,
         "iri": "https://example.com",
+        "ts": "2024-01-01T10:00:00Z",
+    })
+
+    # Sharded by collector ID
+    assert m.message_belongs_to_this_shard({
+        "type": "TriggerTransfer",
+        "collector_id": 1,
+        "ts": "2024-01-01T10:00:00Z",
+    })
+    assert not m.message_belongs_to_this_shard({
+        "type": "TriggerTransfer",
+        "collector_id": 3,
+        "ts": "2024-01-01T10:00:00Z",
+    })
+    assert m.message_belongs_to_this_shard({
+        "type": "AccountIdResponse",
+        "collector_id": 1,
+        "ts": "2024-01-01T10:00:00Z",
+    })
+    assert not m.message_belongs_to_this_shard({
+        "type": "AccountIdResponse",
+        "collector_id": 3,
         "ts": "2024-01-01T10:00:00Z",
     })
 
@@ -364,3 +389,33 @@ def test_dispatching_status_properties(current_ts):
     assert ds.all_received
     assert ds.available_amount_to_send == 1000
     assert ds.available_amount_to_dispatch == 46000 - 1000 + 9900
+
+
+def test_transfer_attempt_properties(current_ts):
+    ta = m.TransferAttempt(
+        collector_id=666,
+        turn_id=1,
+        debtor_id=1,
+        is_dispatching=True,
+        nominal_amount=1000.0,
+        collection_started_at=current_ts,
+        recipient="",
+        recipient_version=0,
+        scheduled_for=None,
+        attempted_at=None,
+        coordinator_request_id=None,
+        final_interest_rate_ts=None,
+        amount=None,
+        transfer_id=None,
+        finalized_at=None,
+        failure_code=None,
+        failed_attempts=0,
+    )
+    assert ta.is_recipient_unknown
+
+    ta.recipient = "123456"
+    ta.recipient_version = 1
+    assert not ta.is_recipient_unknown
+
+    ta.failure_code = m.TransferAttempt.RECIPIENT_IS_UNREACHABLE
+    assert ta.is_recipient_unknown

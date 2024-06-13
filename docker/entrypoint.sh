@@ -138,7 +138,8 @@ case $1 in
     flush_configure_accounts | flush_prepare_transfers | flush_finalize_transfers \
         | flush_fetch_debtor_infos | flush_store_documents | flush_discover_debtors \
         | flush_confirm_debtors | flush_activate_collectors | flush_candidate_offers \
-        | flush_needed_collectors | flush_revise_account_locks | flush_all)
+        | flush_needed_collectors | flush_revise_account_locks | flush_trigger_transfers \
+        | flush_account_id_requests | flush_account_id_responses | flush_all)
 
         flush_configure_accounts=ConfigureAccountSignal
         flush_prepare_transfers=PrepareTransferSignal
@@ -151,6 +152,9 @@ case $1 in
         flush_candidate_offers=CandidateOfferSignal
         flush_needed_collectors=NeededCollectorSignal
         flush_revise_account_locks=ReviseAccountLockSignal
+        flush_trigger_transfers=TriggerTransferSignal
+        flush_account_id_requests=AccountIdRequestSignal
+        flush_account_id_responses=AccountIdResponseSignal
         flush_all=
 
         # For example: if `$1` is "flush_configure_accounts",

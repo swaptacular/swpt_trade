@@ -204,6 +204,96 @@ class ReviseAccountLockMessageSchema(ValidateTypeMixin, Schema):
             raise ValidationError("Invalid debtor ID.")
 
 
+class TriggerTransferMessageSchema(ValidateTypeMixin, Schema):
+    """``TriggerTransfer`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    collector_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    turn_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    is_dispatching = fields.Boolean(required=True)
+    ts = fields.DateTime(required=True)
+
+    @validates("debtor_id")
+    def validate_debtor_id(self, value):
+        if value == 0:
+            raise ValidationError("Invalid debtor ID.")
+
+
+class AccountIdRequestMessageSchema(ValidateTypeMixin, Schema):
+    """``AccountIdRequest`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    collector_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    turn_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    is_dispatching = fields.Boolean(required=True)
+    ts = fields.DateTime(required=True)
+
+    @validates("debtor_id")
+    def validate_debtor_id(self, value):
+        if value == 0:
+            raise ValidationError("Invalid debtor ID.")
+
+
+class AccountIdResponseMessageSchema(ValidateTypeMixin, Schema):
+    """``AccountIdResponse`` message schema."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    type = fields.String(required=True)
+    collector_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    turn_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT32, max=MAX_INT32)
+    )
+    debtor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    creditor_id = fields.Integer(
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
+    )
+    is_dispatching = fields.Boolean(required=True)
+    account_id = fields.String(
+        required=True, validate=validate.Length(max=ACCOUNT_ID_MAX_BYTES)
+    )
+    account_id_version = fields.Integer(
+        required=True, validate=validate.Range(min=1, max=MAX_INT64)
+    )
+    ts = fields.DateTime(required=True)
+
+    @validates("debtor_id")
+    def validate_debtor_id(self, value):
+        if value == 0:
+            raise ValidationError("Invalid debtor ID.")
+
+
 class UpdatedLedgerMessageSchema(ValidateTypeMixin, Schema):
     """``UpdatedLedger`` message schema."""
 
