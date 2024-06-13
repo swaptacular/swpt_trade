@@ -76,7 +76,7 @@ def upgrade_():
     sa.CheckConstraint('amount > 0'),
     sa.CheckConstraint('failed_attempts >= 0'),
     sa.CheckConstraint('failure_code IS NULL OR attempted_at IS NOT NULL'),
-    sa.CheckConstraint('fatal_error IS NULL OR failure_code IS NOT NULL AND rescheduled_for IS NULL'),
+    sa.CheckConstraint('fatal_error IS NULL OR failure_code = 0 AND rescheduled_for IS NULL'),
     sa.CheckConstraint('finalized_at IS NULL OR transfer_id IS NOT NULL'),
     sa.CheckConstraint('nominal_amount >= 2.0'),
     sa.CheckConstraint('rescheduled_for IS NULL OR failure_code IS NOT NULL'),

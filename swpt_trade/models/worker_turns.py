@@ -651,7 +651,10 @@ class TransferAttempt(db.Model):
         db.CheckConstraint(
             or_(
                 fatal_error == null(),
-                and_(failure_code != null(), rescheduled_for == null()),
+                and_(
+                    failure_code == UNSPECIFIED_FAILURE,
+                    rescheduled_for == null(),
+                ),
             )
         ),
         db.Index(
