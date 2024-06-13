@@ -543,7 +543,7 @@ class WorkerDispatching(db.Model):
 
 
 class TransferAttempt(db.Model):
-    UNSPECIFIED_RETRYABLE_FAILURE = 0
+    UNSPECIFIED_FAILURE = 0
     TIMEOUT = 1
     NEWER_INTEREST_RATE = 2
     RECIPIENT_IS_UNREACHABLE = 3
@@ -590,7 +590,7 @@ class TransferAttempt(db.Model):
             " allows us to tell which recipient value is newer."
         ),
     )
-    scheduled_for = db.Column(db.TIMESTAMP(timezone=True))
+    rescheduled_for = db.Column(db.TIMESTAMP(timezone=True))
     attempted_at = db.Column(
         db.TIMESTAMP(timezone=True),
         comment="The timestamp of the sent `PrepareTransfer` SMP message.",
@@ -603,8 +603,8 @@ class TransferAttempt(db.Model):
     failure_code = db.Column(
         db.SmallInteger,
         comment=(
-            "Failure codes for which a retry makes sense:"
-            " 0) An unspecified retryable failure;"
+            "Failure codes:"
+            " 0) An unspecified failure;"
             " 1) TIMEOUT;"
             " 2) NEWER_INTEREST_RATE;"
             " 3) RECIPIENT_IS_UNREACHABLE;"
@@ -612,6 +612,7 @@ class TransferAttempt(db.Model):
         ),
     )
     failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    fatal_error = db.Column(db.String)
     __table_args__ = (
         db.CheckConstraint(nominal_amount >= 2.0),
         db.CheckConstraint(amount > 0),
@@ -645,7 +646,13 @@ class TransferAttempt(db.Model):
             or_(failure_code == null(), attempted_at != null())
         ),
         db.CheckConstraint(
-            or_(scheduled_for == null(), failure_code != null())
+            or_(rescheduled_for == null(), failure_code != null())
+        ),
+        db.CheckConstraint(
+            or_(
+                fatal_error == null(),
+                and_(failure_code != null(), rescheduled_for == null()),
+            )
         ),
         db.Index(
             "idx_transfer_coordinator_request_id",
@@ -654,9 +661,9 @@ class TransferAttempt(db.Model):
             unique=True,
         ),
         db.Index(
-            "idx_transfer_scheduled_for",
-            scheduled_for,
-            postgresql_where=scheduled_for != null(),
+            "idx_transfer_rescheduled_for",
+            rescheduled_for,
+            postgresql_where=rescheduled_for != null(),
         ),
         {
             "comment": (

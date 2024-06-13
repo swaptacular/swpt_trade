@@ -401,7 +401,7 @@ def test_transfer_attempt_properties(current_ts):
         collection_started_at=current_ts,
         recipient="",
         recipient_version=0,
-        scheduled_for=None,
+        rescheduled_for=None,
         attempted_at=None,
         coordinator_request_id=None,
         final_interest_rate_ts=None,
