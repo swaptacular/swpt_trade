@@ -560,8 +560,13 @@ def _on_account_id_request_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: Implement!
-    pass
+    procedures.process_account_id_request_signal(
+        collector_id=collector_id,
+        turn_id=turn_id,
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        is_dispatching=is_dispatching,
+    )
 
 
 def _on_account_id_response_signal(

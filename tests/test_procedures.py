@@ -19,6 +19,7 @@ from swpt_trade.models import (
     ConfigureAccountSignal,
     PrepareTransferSignal,
     FinalizeTransferSignal,
+    AccountIdResponseSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
@@ -34,6 +35,7 @@ from swpt_trade.models import (
     TS0,
     DATE0,
     MAX_INT32,
+    MIN_INT64,
     AGENT_TRANSFER_NOTE_FORMAT,
 )
 
@@ -2606,3 +2608,89 @@ def test_release_buyer_account_lock(
         assert al.account_creation_date == current_ts.date()
         assert al.account_last_transfer_number == 7890
     assert len(FinalizeTransferSignal.query.all()) == 1
+
+
+def test_process_account_id_request_signal(db_session, current_ts):
+    db_session.add(
+        TradingPolicy(
+            creditor_id=666,
+            debtor_id=1,
+            latest_ledger_update_id=123,
+            account_id='account1',
+        )
+    )
+    db_session.add(
+        WorkerAccount(
+            creditor_id=999,
+            debtor_id=1,
+            last_change_ts=current_ts,
+            last_change_seqnum=1,
+            principal=100,
+            interest=31.4,
+            interest_rate=5.0,
+            last_interest_rate_change_ts=current_ts,
+            config_flags=0,
+            account_id="account2",
+            last_transfer_number=2,
+            last_transfer_committed_at=current_ts,
+            demurrage_rate=-50.0,
+            commit_period=1000000,
+            transfer_note_max_bytes=500,
+            debtor_info_iri="https://example.com/666",
+            creation_date=DATE0 + timedelta(days=5),
+        )
+    )
+    db_session.commit()
+
+    p.process_account_id_request_signal(
+        collector_id=888,
+        turn_id=3,
+        debtor_id=1,
+        creditor_id=666,
+        is_dispatching=True
+    )
+    rss = AccountIdResponseSignal.query.all()
+    assert len(rss) == 1
+    assert rss[0].collector_id == 888
+    assert rss[0].turn_id == 3
+    assert rss[0].debtor_id == 1
+    assert rss[0].creditor_id == 666
+    assert rss[0].is_dispatching is True
+    assert rss[0].account_id == "account1"
+    assert rss[0].account_id_version == 123
+    AccountIdResponseSignal.query.delete()
+
+    p.process_account_id_request_signal(
+        collector_id=888,
+        turn_id=3,
+        debtor_id=1,
+        creditor_id=999,
+        is_dispatching=False
+    )
+    rss = AccountIdResponseSignal.query.all()
+    assert len(rss) == 1
+    assert rss[0].collector_id == 888
+    assert rss[0].turn_id == 3
+    assert rss[0].debtor_id == 1
+    assert rss[0].creditor_id == 999
+    assert rss[0].is_dispatching is False
+    assert rss[0].account_id == "account2"
+    assert rss[0].account_id_version == 5
+    AccountIdResponseSignal.query.delete()
+
+    p.process_account_id_request_signal(
+        collector_id=888,
+        turn_id=3,
+        debtor_id=1,
+        creditor_id=555,
+        is_dispatching=False
+    )
+    rss = AccountIdResponseSignal.query.all()
+    assert len(rss) == 1
+    assert rss[0].collector_id == 888
+    assert rss[0].turn_id == 3
+    assert rss[0].debtor_id == 1
+    assert rss[0].creditor_id == 555
+    assert rss[0].is_dispatching is False
+    assert rss[0].account_id == ""
+    assert rss[0].account_id_version == MIN_INT64

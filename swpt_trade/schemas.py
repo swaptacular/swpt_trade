@@ -284,7 +284,7 @@ class AccountIdResponseMessageSchema(ValidateTypeMixin, Schema):
         required=True, validate=validate.Length(max=ACCOUNT_ID_MAX_BYTES)
     )
     account_id_version = fields.Integer(
-        required=True, validate=validate.Range(min=1, max=MAX_INT64)
+        required=True, validate=validate.Range(min=MIN_INT64, max=MAX_INT64)
     )
     ts = fields.DateTime(required=True)
 

@@ -2,7 +2,7 @@ import random
 import math
 from typing import TypeVar, Callable, Tuple, Optional
 from datetime import datetime, date, timezone
-from sqlalchemy import delete, update
+from sqlalchemy import select, delete, update
 from sqlalchemy.sql.expression import and_, null, false
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
@@ -14,6 +14,7 @@ from swpt_trade.extensions import db
 from swpt_trade.models import (
     DATE0,
     MAX_INT32,
+    MIN_INT64,
     T_INFINITY,
     AGENT_TRANSFER_NOTE_FORMAT,
     cr_seq,
@@ -27,6 +28,9 @@ from swpt_trade.models import (
     WorkerSending,
     WorkerReceiving,
     WorkerDispatching,
+    TradingPolicy,
+    WorkerAccount,
+    AccountIdResponseSignal,
 )
 
 T = TypeVar("T")
@@ -629,3 +633,55 @@ def _register_collector_trade(
     account_last_transfer_number = 0  # currently, a made-up number
 
     return account_creation_date, account_last_transfer_number
+
+
+@atomic
+def process_account_id_request_signal(
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+        is_dispatching: bool,
+) -> None:
+    row = (
+        db.session.execute(
+            select(
+                TradingPolicy.account_id,
+                TradingPolicy.latest_ledger_update_id,
+            )
+            .where(
+                and_(
+                    TradingPolicy.creditor_id == creditor_id,
+                    TradingPolicy.debtor_id == debtor_id,
+                )
+            )
+        ).one_or_none()
+
+        or db.session.execute(
+            select(
+                WorkerAccount.account_id,
+                WorkerAccount.creation_date - DATE0,
+            )
+            .where(
+                and_(
+                    WorkerAccount.creditor_id == creditor_id,
+                    WorkerAccount.debtor_id == debtor_id,
+                    WorkerAccount.account_id != "",
+                )
+            )
+        ).one_or_none()
+
+        or ("", MIN_INT64)
+    )
+
+    db.session.add(
+        AccountIdResponseSignal(
+            collector_id=collector_id,
+            turn_id=turn_id,
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            is_dispatching=is_dispatching,
+            account_id=row[0],
+            account_id_version=row[1],
+        )
+    )

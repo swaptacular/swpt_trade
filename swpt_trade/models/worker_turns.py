@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date
-from .common import get_now_utc
+from .common import get_now_utc, MIN_INT64
 from sqlalchemy.sql.expression import null, false, or_, and_
 from swpt_trade.extensions import db
 
@@ -584,7 +584,7 @@ class TransferAttempt(db.Model):
     recipient_version = db.Column(
         db.BigInteger,
         nullable=False,
-        default=0,
+        default=MIN_INT64,
         comment=(
             "In very rare cases the recipient may be change. This column"
             " allows us to tell which recipient value is newer."
