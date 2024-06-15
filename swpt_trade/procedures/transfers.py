@@ -755,6 +755,7 @@ def process_trigger_transfer_signal(
 
 def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
     if attempt.can_be_triggered:
+        assert attempt.fatal_error is None
         current_ts = datetime.now(tz=timezone.utc)
         coordinator_request_id = db.session.scalar(cr_seq)
 
