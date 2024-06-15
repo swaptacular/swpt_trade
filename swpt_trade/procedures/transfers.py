@@ -31,6 +31,7 @@ from swpt_trade.models import (
     TransferAttempt,
     TradingPolicy,
     WorkerAccount,
+    AccountIdRequestSignal,
     AccountIdResponseSignal,
 )
 
@@ -754,5 +755,69 @@ def process_trigger_transfer_signal(
 
 def _trigger_transfer(attempt: TransferAttempt) -> None:
     if attempt.can_be_triggered:
-        # TODO: implement!
-        pass
+        current_ts = datetime.now(tz=timezone.utc)
+        coordinator_request_id = db.session.scalar(cr_seq)
+
+        amount, final_interest_rate_ts = _calc_transfer_amount(
+            collector_id=attempt.collector_id,
+            debtor_id=attempt.debtor_id,
+            nominal_amount=attempt.nominal_amount,
+            collection_started_at=attempt.collection_started_at,
+            current_ts=current_ts,
+        )
+        attempt.attempted_at = current_ts
+        attempt.coordinator_request_id = coordinator_request_id
+        attempt.final_interest_rate_ts = final_interest_rate_ts
+        attempt.amount = amount
+        attempt.transfer_id = None
+        attempt.finalized_at = None
+
+        if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
+            # In this case, we know beforehand that the transfer will
+            # fail. Therefore, we request the new account ID of the
+            # creditor, and reschedule the transfer for a later time.
+            db.session.add(
+                AccountIdRequestSignal(
+                    collector_id=attempt.collector_id,
+                    turn_id=attempt.turn_id,
+                    debtor_id=attempt.debtor_id,
+                    creditor_id=attempt.creditor_id,
+                    is_dispatching=attempt.is_dispatching,
+                )
+            )
+            _reschedule_transfer_attempt(attempt, current_ts)
+
+        else:
+            db.session.add(
+                PrepareTransferSignal(
+                    creditor_id=attempt.collector_id,
+                    coordinator_request_id=coordinator_request_id,
+                    debtor_id=attempt.debtor_id,
+                    recipient=attempt.recipient,
+                    min_locked_amount=0,
+                    max_locked_amount=0,
+                    final_interest_rate_ts=final_interest_rate_ts,
+                    max_commit_delay=MAX_INT32,
+                    inserted_at=current_ts,
+                )
+            )
+            attempt.failure_code = None
+
+
+def _reschedule_transfer_attempt(
+        attempt: TransferAttempt,
+        current_ts: datetime,
+) -> None:
+    # TODO: implement.
+    pass
+
+
+def _calc_transfer_amount(
+        collector_id: int,
+        debtor_id: int,
+        nominal_amount: float,
+        collection_started_at: datetime,
+        current_ts: datetime,
+) -> Tuple[int, datetime]:
+    # TODO: implement.
+    pass
