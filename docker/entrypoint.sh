@@ -64,28 +64,6 @@ setup_rabbitmq_bindings() {
     return 1
 }
 
-# This function tries to create the RabbitMQ queue for trade'
-# chores, with exponential backoff. This is necessary during
-# development, because the RabbitMQ server might not be running yet
-# when this script executes.
-create_chores_queue() {
-    local retry_after=1
-    local time_limit=$(($retry_after << 5))
-    local error_file="$APP_ROOT_DIR/flask-create-queue.error"
-    echo -n 'Creating chores queue ...'
-    while [[ $retry_after -lt $time_limit ]]; do
-        if flask swpt_trade create_chores_queue &>$error_file; then
-            echo ' done.'
-            return 0
-        fi
-        sleep $retry_after
-        retry_after=$((2 * retry_after))
-    done
-    echo
-    cat "$error_file"
-    return 1
-}
-
 # This function is intended to perform additional one-time database
 # initialization. Make sure that it is idempotent.
 # (https://en.wikipedia.org/wiki/Idempotence)
@@ -115,7 +93,6 @@ case $1 in
         ;;
     configure)
         perform_db_upgrade
-        create_chores_queue
         if [[ "$SETUP_RABBITMQ_BINDINGS" == "yes" ]]; then
             setup_rabbitmq_bindings
         fi
@@ -124,7 +101,7 @@ case $1 in
         generate_oathkeeper_configuration
         exec supervisord -c "$APP_ROOT_DIR/supervisord-webserver.conf"
         ;;
-    process_pristine_collectors | consume_messages | consume_chore_messages \
+    process_pristine_collectors | consume_messages \
         | scan_debtor_info_documents | scan_debtor_locator_claims \
         | scan_trading_policies | scan_worker_accounts \
         | scan_interest_rate_changes | scan_account_locks \

@@ -92,31 +92,3 @@ def subscribe():  # pragma: no cover
         queue_name,
         routing_key,
     )
-
-
-@swpt_trade.command("create_chores_queue")
-@with_appcontext
-def create_chores_queue():  # pragma: no cover
-    """Declare a RabbitMQ queue for trade' chores."""
-
-    logger = logging.getLogger(__name__)
-    queue_name = current_app.config["CHORES_BROKER_QUEUE"]
-    dead_letter_queue_name = queue_name + ".XQ"
-    broker_url = current_app.config["CHORES_BROKER_URL"]
-    connection = pika.BlockingConnection(pika.URLParameters(broker_url))
-    channel = connection.channel()
-
-    # declare a corresponding dead-letter queue
-    channel.queue_declare(dead_letter_queue_name, durable=True)
-    logger.info('Declared "%s" dead-letter queue.', dead_letter_queue_name)
-
-    # declare the queue
-    channel.queue_declare(
-        queue_name,
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": dead_letter_queue_name,
-        },
-    )
-    logger.info('Declared "%s" queue.', queue_name)
