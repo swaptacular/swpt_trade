@@ -28,6 +28,7 @@ from swpt_trade.models import (
     WorkerSending,
     WorkerReceiving,
     WorkerDispatching,
+    TransferAttempt,
     TradingPolicy,
     WorkerAccount,
     AccountIdResponseSignal,
@@ -685,3 +686,73 @@ def process_account_id_request_signal(
             account_id_version=row[1],
         )
     )
+
+
+@atomic
+def process_account_id_response_signal(
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+        is_dispatching: bool,
+        account_id: str,
+        account_id_version: int,
+) -> None:
+    attempt = (
+        TransferAttempt.query.
+        filter_by(
+            collector_id=collector_id,
+            turn_id=turn_id,
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            is_dispatching=is_dispatching,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if (
+            attempt
+            and attempt.unknown_recipient
+            and attempt.recipient_version < account_id_version
+    ):
+        attempt.recipient_version = account_id_version
+
+        if attempt.recipient != account_id:
+            attempt.recipient = account_id
+
+            if attempt.failure_code is not None:
+                # When the recipient changes, the failure code becomes
+                # misleading.
+                attempt.failure_code = attempt.UNSPECIFIED_FAILURE
+
+            if attempt.can_be_triggered:
+                _trigger_transfer_attempt(attempt)
+
+
+@atomic
+def process_trigger_transfer_signal(
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+        creditor_id: int,
+        is_dispatching: bool,
+) -> None:
+    attempt = (
+        TransferAttempt.query.
+        filter_by(
+            collector_id=collector_id,
+            turn_id=turn_id,
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            is_dispatching=is_dispatching,
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if attempt and attempt.can_be_triggered:
+        _trigger_transfer_attempt(attempt)
+
+
+def _trigger_transfer_attempt(transfer_attempt: TransferAttempt) -> None:
+    # TODO: implement!
+    pass

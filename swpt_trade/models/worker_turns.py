@@ -679,8 +679,24 @@ class TransferAttempt(db.Model):
     )
 
     @property
-    def is_recipient_unknown(self) -> bool:
+    def unknown_recipient(self) -> bool:
         return (
             self.recipient == ""
             or self.failure_code == self.RECIPIENT_IS_UNREACHABLE
+        )
+
+    @property
+    def can_be_triggered(self) -> bool:
+        return (
+            not self.rescheduled_for
+            and self.recipient != ""
+            and (
+                not self.attempted_at
+                or (
+                    # The transfer has been attempted, and has failed,
+                    # but not fatally.
+                    self.failure_code is not None
+                    and self.fatal_error is None
+                )
+            )
         )

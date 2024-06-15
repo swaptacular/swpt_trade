@@ -411,11 +411,29 @@ def test_transfer_attempt_properties(current_ts):
         failure_code=None,
         failed_attempts=0,
     )
-    assert ta.is_recipient_unknown
+    assert ta.unknown_recipient
+    assert not ta.can_be_triggered
 
     ta.recipient = "123456"
     ta.recipient_version = 1
-    assert not ta.is_recipient_unknown
+    assert not ta.unknown_recipient
+    assert ta.can_be_triggered
 
     ta.failure_code = m.TransferAttempt.RECIPIENT_IS_UNREACHABLE
-    assert ta.is_recipient_unknown
+    assert ta.unknown_recipient
+    assert ta.can_be_triggered
+
+    ta.failure_code = None
+    ta.rescheduled_for = current_ts
+    assert not ta.can_be_triggered
+
+    ta.rescheduled_for = None
+    ta.attempted_at = current_ts
+    ta.coordinator_request_id = 123
+    assert not ta.can_be_triggered
+
+    ta.failure_code = m.TransferAttempt.UNSPECIFIED_FAILURE
+    assert ta.can_be_triggered
+
+    ta.fatal_error = "Uups!"
+    assert not ta.can_be_triggered
