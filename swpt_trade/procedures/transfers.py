@@ -774,8 +774,9 @@ def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
 
         if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
             # In this case, we know beforehand that the transfer will
-            # fail. Therefore, we request the new account ID of the
-            # creditor, and reschedule the transfer for a later time.
+            # fail. Therefore, we directly request the new account ID
+            # of the creditor, and reschedule the transfer for a later
+            # time.
             db.session.add(
                 AccountIdRequestSignal(
                     collector_id=attempt.collector_id,
