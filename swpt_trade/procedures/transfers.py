@@ -725,7 +725,7 @@ def process_account_id_response_signal(
                 # misleading.
                 attempt.failure_code = attempt.UNSPECIFIED_FAILURE
 
-            _trigger_transfer_attempt(attempt)
+            _trigger_transfer(attempt)
 
 
 @atomic
@@ -749,10 +749,10 @@ def process_trigger_transfer_signal(
         .one_or_none()
     )
     if attempt:
-        _trigger_transfer_attempt(attempt)
+        _trigger_transfer(attempt)
 
 
-def _trigger_transfer_attempt(attempt: TransferAttempt) -> None:
+def _trigger_transfer(attempt: TransferAttempt) -> None:
     if attempt.can_be_triggered:
         # TODO: implement!
         pass
