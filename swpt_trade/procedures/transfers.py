@@ -18,6 +18,7 @@ from swpt_trade.models import (
     MAX_INT16,
     MAX_INT32,
     MIN_INT64,
+    MAX_INT64,
     T_INFINITY,
     AGENT_TRANSFER_NOTE_FORMAT,
     cr_seq,
@@ -786,58 +787,60 @@ def _trigger_transfer_if_possible(
         assert attempt.rescheduled_for is None
         assert attempt.fatal_error is None
         assert attempt.recipient != ""
-        current_ts = datetime.now(tz=timezone.utc)
-        coordinator_request_id = db.session.scalar(cr_seq)
 
+        current_ts = datetime.now(tz=timezone.utc)
         params = _calc_transfer_params(
             attempt,
             transfers_healthy_max_commit_delay,
             transfers_amount_cut,
             current_ts,
         )
-        attempt.attempted_at = current_ts
-        attempt.coordinator_request_id = coordinator_request_id
-        attempt.final_interest_rate_ts = params.final_interest_rate_ts
-        attempt.amount = params.amount
-        attempt.transfer_id = None
-        attempt.finalized_at = None
+        if params.amount > 0:
+            coordinator_request_id = db.session.scalar(cr_seq)
 
-        if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
-            # In this case, we know beforehand that the transfer will
-            # fail. Therefore, we directly request the new account ID
-            # of the creditor, and reschedule the transfer for a later
-            # time.
-            db.session.add(
-                AccountIdRequestSignal(
-                    collector_id=attempt.collector_id,
-                    turn_id=attempt.turn_id,
-                    debtor_id=attempt.debtor_id,
-                    creditor_id=attempt.creditor_id,
-                    is_dispatching=attempt.is_dispatching,
-                )
-            )
-            attempt.rescheduled_for = current_ts + (
-                transfers_healthy_max_commit_delay
-                * (2 ** min(attempt.backoff_counter, 31))
-            )
-            if attempt.backoff_counter < MAX_INT16:
-                attempt.backoff_counter += 1
+            attempt.attempted_at = current_ts
+            attempt.coordinator_request_id = coordinator_request_id
+            attempt.final_interest_rate_ts = params.final_interest_rate_ts
+            attempt.amount = params.amount
+            attempt.transfer_id = None
+            attempt.finalized_at = None
 
-        else:
-            db.session.add(
-                PrepareTransferSignal(
-                    creditor_id=attempt.collector_id,
-                    coordinator_request_id=coordinator_request_id,
-                    debtor_id=attempt.debtor_id,
-                    recipient=attempt.recipient,
-                    min_locked_amount=0,
-                    max_locked_amount=0,
-                    final_interest_rate_ts=params.final_interest_rate_ts,
-                    max_commit_delay=params.max_commit_delay,
-                    inserted_at=current_ts,
+            if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
+                # In this case, we know beforehand that the transfer will
+                # fail. Therefore, we directly request the new account ID
+                # of the creditor, and reschedule the transfer for a later
+                # time.
+                db.session.add(
+                    AccountIdRequestSignal(
+                        collector_id=attempt.collector_id,
+                        turn_id=attempt.turn_id,
+                        debtor_id=attempt.debtor_id,
+                        creditor_id=attempt.creditor_id,
+                        is_dispatching=attempt.is_dispatching,
+                    )
                 )
-            )
-            attempt.failure_code = None
+                n = min(attempt.backoff_counter, 31)
+                attempt.rescheduled_for = (
+                    current_ts + transfers_healthy_max_commit_delay * (2 ** n)
+                )
+                if attempt.backoff_counter < MAX_INT16:
+                    attempt.backoff_counter += 1
+
+            else:
+                db.session.add(
+                    PrepareTransferSignal(
+                        creditor_id=attempt.collector_id,
+                        coordinator_request_id=coordinator_request_id,
+                        debtor_id=attempt.debtor_id,
+                        recipient=attempt.recipient,
+                        min_locked_amount=0,
+                        max_locked_amount=0,
+                        final_interest_rate_ts=params.final_interest_rate_ts,
+                        max_commit_delay=params.max_commit_delay,
+                        inserted_at=current_ts,
+                    )
+                )
+                attempt.failure_code = None
 
 
 def _calc_transfer_params(
@@ -846,14 +849,9 @@ def _calc_transfer_params(
         transfers_amount_cut: float,
         current_ts: datetime,
 ) -> TransferParams:
-    use_backoff = attempt.failure_code != attempt.NEWER_INTEREST_RATE
-    backoff_counter = min(
-        attempt.backoff_counter if use_backoff else 0,
-        31,
-    )
-    healthy_delay_seconds = transfers_healthy_max_commit_delay.total_seconds()
+    n = min(attempt.backoff_counter, 31)
     max_commit_delay = min(
-        healthy_delay_seconds * (2 ** backoff_counter),
+        transfers_healthy_max_commit_delay.total_seconds() * (2 ** n),
         MAX_INT32,
     )
     assert 0 <= max_commit_delay <= MAX_INT32
@@ -864,11 +862,19 @@ def _calc_transfer_params(
         + timedelta(seconds=max_commit_delay)
     )
     demurrage_rate, final_interest_rate_ts = _calc_demurrage_rate(attempt)
-    amount = math.floor(
-        attempt.nominal_amount
-        * calc_demurrage(demurrage_rate, demurrage_period)
-        * (1.0 - transfers_amount_cut)
-    )
+    try:
+        amount = contain_principal_overflow(
+            math.floor(
+                attempt.nominal_amount
+                * calc_demurrage(demurrage_rate, demurrage_period)
+                * (1.0 - transfers_amount_cut)
+            )
+        )
+    except OverflowError:
+        amount = MAX_INT64  # pragma: no cover
+
+    assert 0 <= amount <= MAX_INT64
+    assert amount <= attempt.nominal_amount
     return TransferParams(amount, final_interest_rate_ts, max_commit_delay)
 
 
