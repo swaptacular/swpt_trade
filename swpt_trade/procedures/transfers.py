@@ -1,6 +1,7 @@
 import random
 import math
 from typing import TypeVar, Callable, Tuple, Optional
+from dataclasses import dataclass
 from datetime import datetime, date, timezone
 from sqlalchemy import select, delete, update
 from sqlalchemy.sql.expression import and_, null, false
@@ -37,6 +38,13 @@ from swpt_trade.models import (
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
+
+
+@dataclass
+class TransferParams:
+    amount: int
+    final_interest_rate_ts: datetime
+    max_commit_delay: int
 
 
 @atomic
@@ -761,7 +769,7 @@ def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
         current_ts = datetime.now(tz=timezone.utc)
         coordinator_request_id = db.session.scalar(cr_seq)
 
-        amount, final_interest_rate_ts = _calc_transfer_amount(
+        params = _calc_transfer_params(
             collector_id=attempt.collector_id,
             debtor_id=attempt.debtor_id,
             nominal_amount=attempt.nominal_amount,
@@ -770,8 +778,8 @@ def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
         )
         attempt.attempted_at = current_ts
         attempt.coordinator_request_id = coordinator_request_id
-        attempt.final_interest_rate_ts = final_interest_rate_ts
-        attempt.amount = amount
+        attempt.final_interest_rate_ts = params.final_interest_rate_ts
+        attempt.amount = params.amount
         attempt.transfer_id = None
         attempt.finalized_at = None
 
@@ -800,8 +808,8 @@ def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
                     recipient=attempt.recipient,
                     min_locked_amount=0,
                     max_locked_amount=0,
-                    final_interest_rate_ts=final_interest_rate_ts,
-                    max_commit_delay=MAX_INT32,
+                    final_interest_rate_ts=params.final_interest_rate_ts,
+                    max_commit_delay=params.max_commit_delay,
                     inserted_at=current_ts,
                 )
             )
@@ -816,12 +824,12 @@ def _reschedule_transfer_attempt(
     pass
 
 
-def _calc_transfer_amount(
+def _calc_transfer_params(
         collector_id: int,
         debtor_id: int,
         nominal_amount: float,
         collection_started_at: datetime,
         current_ts: datetime,
-) -> Tuple[int, datetime]:
+) -> TransferParams:
     # TODO: implement.
     pass
