@@ -219,6 +219,9 @@ class Configuration(metaclass=MetaEnvReader):
     PROTOCOL_BROKER_PREFETCH_SIZE = 0
     PROTOCOL_BROKER_PREFETCH_COUNT = 1
 
+    TRANSFERS_HEALTHY_MAX_COMMIT_DELAY: parse_timedelta = parse_timedelta("2h")
+    TRANSFERS_AMOUNT_CUT = 1e-5
+
     PROCESS_PRISTINE_COLLECTORS_THREADS = 1
 
     FLUSH_PROCESSES = 1
@@ -337,6 +340,11 @@ def _check_config_sanity(c):  # pragma: nocover
     ):
         raise RuntimeError(
             "Invalid values for MIN_COLLECTOR_ID and MAX_COLLECTOR_ID."
+        )
+
+    if not (1e-10 <= c["TRANSFERS_AMOUNT_CUT"] <= 0.1):
+        raise RuntimeError(
+            "Invalid value for TRANSFERS_AMOUNT_CUT."
         )
 
     if (c["SHARDING_REALM"].realm_mask & 0x0000ffff) != 0:

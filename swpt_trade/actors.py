@@ -546,12 +546,17 @@ def _on_trigger_transfer_signal(
     *args,
     **kwargs
 ) -> None:
+    cfg = current_app.config
     procedures.process_trigger_transfer_signal(
         collector_id=collector_id,
         turn_id=turn_id,
         debtor_id=debtor_id,
         creditor_id=creditor_id,
         is_dispatching=is_dispatching,
+        transfers_healthy_max_commit_delay=(
+            cfg["TRANSFERS_HEALTHY_MAX_COMMIT_DELAY"]
+        ),
+        transfers_amount_cut=cfg["TRANSFERS_AMOUNT_CUT"],
     )
 
 
@@ -586,6 +591,7 @@ def _on_account_id_response_signal(
     *args,
     **kwargs
 ) -> None:
+    cfg = current_app.config
     procedures.process_account_id_response_signal(
         collector_id=collector_id,
         turn_id=turn_id,
@@ -594,6 +600,10 @@ def _on_account_id_response_signal(
         is_dispatching=is_dispatching,
         account_id=account_id,
         account_id_version=account_id_version,
+        transfers_healthy_max_commit_delay=(
+            cfg["TRANSFERS_HEALTHY_MAX_COMMIT_DELAY"]
+        ),
+        transfers_amount_cut=cfg["TRANSFERS_AMOUNT_CUT"],
     )
 
 

@@ -2,7 +2,7 @@ import random
 import math
 from typing import TypeVar, Callable, Tuple, Optional
 from dataclasses import dataclass
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from sqlalchemy import select, delete, update
 from sqlalchemy.sql.expression import and_, null, false
 from sqlalchemy.orm import exc, load_only, Load
@@ -706,6 +706,8 @@ def process_account_id_response_signal(
         is_dispatching: bool,
         account_id: str,
         account_id_version: int,
+        transfers_healthy_max_commit_delay: timedelta,
+        transfers_amount_cut: float,
 ) -> None:
     attempt = (
         TransferAttempt.query.
@@ -734,7 +736,11 @@ def process_account_id_response_signal(
                 # misleading.
                 attempt.failure_code = attempt.UNSPECIFIED_FAILURE
 
-            _trigger_transfer_if_possible(attempt)
+            _trigger_transfer_if_possible(
+                attempt,
+                transfers_healthy_max_commit_delay,
+                transfers_amount_cut,
+            )
 
 
 @atomic
@@ -744,6 +750,8 @@ def process_trigger_transfer_signal(
         debtor_id: int,
         creditor_id: int,
         is_dispatching: bool,
+        transfers_healthy_max_commit_delay: timedelta,
+        transfers_amount_cut: float,
 ) -> None:
     attempt = (
         TransferAttempt.query.
@@ -758,10 +766,18 @@ def process_trigger_transfer_signal(
         .one_or_none()
     )
     if attempt:
-        _trigger_transfer_if_possible(attempt)
+        _trigger_transfer_if_possible(
+            attempt,
+            transfers_healthy_max_commit_delay,
+            transfers_amount_cut,
+        )
 
 
-def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
+def _trigger_transfer_if_possible(
+        attempt: TransferAttempt,
+        transfers_healthy_max_commit_delay: timedelta,
+        transfers_amount_cut: float,
+) -> None:
     if attempt.can_be_triggered:
         assert attempt.rescheduled_for is None
         assert attempt.fatal_error is None
@@ -770,11 +786,10 @@ def _trigger_transfer_if_possible(attempt: TransferAttempt) -> None:
         coordinator_request_id = db.session.scalar(cr_seq)
 
         params = _calc_transfer_params(
-            collector_id=attempt.collector_id,
-            debtor_id=attempt.debtor_id,
-            nominal_amount=attempt.nominal_amount,
-            collection_started_at=attempt.collection_started_at,
-            current_ts=current_ts,
+            attempt,
+            transfers_healthy_max_commit_delay,
+            transfers_amount_cut,
+            current_ts,
         )
         attempt.attempted_at = current_ts
         attempt.coordinator_request_id = coordinator_request_id
@@ -825,11 +840,45 @@ def _reschedule_transfer_attempt(
 
 
 def _calc_transfer_params(
-        collector_id: int,
-        debtor_id: int,
-        nominal_amount: float,
-        collection_started_at: datetime,
+        attempt: TransferAttempt,
+        transfers_healthy_max_commit_delay: timedelta,
+        transfers_amount_cut: float,
         current_ts: datetime,
 ) -> TransferParams:
+    use_backoff = attempt.failure_code != attempt.NEWER_INTEREST_RATE
+    backoff_counter = min(
+        attempt.backoff_counter if use_backoff else 0,
+        31,
+    )
+    healthy_delay_seconds = transfers_healthy_max_commit_delay.total_seconds()
+    max_commit_delay = min(
+        healthy_delay_seconds * (2 ** backoff_counter),
+        MAX_INT32,
+    )
+    assert max_commit_delay >= 0
+    assert 1e-10 <= transfers_amount_cut <= 0.1
+
+    demurrage_period = (
+        (current_ts - attempt.collection_started_at)
+        + timedelta(seconds=max_commit_delay)
+    )
+    demurrage_rate, final_interest_rate_ts = _calc_safe_interest_rate(
+        attempt.collector_id,
+        attempt.debtor_id,
+        attempt.collection_started_at,
+    )
+    amount = math.floor(
+        attempt.nominal_amount
+        * calc_demurrage(demurrage_rate, demurrage_period)
+        * (1.0 - transfers_amount_cut)
+    )
+    return TransferParams(amount, final_interest_rate_ts, max_commit_delay)
+
+
+def _calc_safe_interest_rate(
+        collector_id: int,
+        debtor_id: int,
+        collection_started_at: datetime,
+) -> Tuple[float, datetime]:
     # TODO: implement.
-    pass
+    return 0.0, datetime.now(tz=timezone.utc)
