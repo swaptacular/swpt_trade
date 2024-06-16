@@ -787,19 +787,12 @@ def _trigger_transfer_if_possible(
         assert attempt.recipient != ""
         current_ts = datetime.now(tz=timezone.utc)
         coordinator_request_id = db.session.scalar(cr_seq)
-
         params = _calc_transfer_params(
             attempt,
             transfers_healthy_max_commit_delay,
             transfers_amount_cut,
             current_ts,
         )
-        attempt.attempted_at = current_ts
-        attempt.coordinator_request_id = coordinator_request_id
-        attempt.final_interest_rate_ts = params.final_interest_rate_ts
-        attempt.amount = params.amount
-        attempt.transfer_id = None
-        attempt.finalized_at = None
 
         if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
             # In this case, we know beforehand that the transfer will
@@ -815,7 +808,12 @@ def _trigger_transfer_if_possible(
                     is_dispatching=attempt.is_dispatching,
                 )
             )
-            _reschedule_transfer_attempt(attempt, current_ts)
+            attempt.rescheduled_for = attempt.attempted_at + (
+                transfers_healthy_max_commit_delay
+                * (2 ** min(attempt.backoff_counter, 31))
+            )
+            if attempt.backoff_counter < MAX_INT32:
+                attempt.backoff_counter += 1
 
         else:
             db.session.add(
@@ -833,13 +831,12 @@ def _trigger_transfer_if_possible(
             )
             attempt.failure_code = None
 
-
-def _reschedule_transfer_attempt(
-        attempt: TransferAttempt,
-        current_ts: datetime,
-) -> None:
-    # TODO: implement.
-    pass
+        attempt.attempted_at = current_ts
+        attempt.coordinator_request_id = coordinator_request_id
+        attempt.final_interest_rate_ts = params.final_interest_rate_ts
+        attempt.amount = params.amount
+        attempt.transfer_id = None
+        attempt.finalized_at = None
 
 
 def _calc_transfer_params(
