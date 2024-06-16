@@ -273,5 +273,5 @@ def calc_demurrage(demurrage_rate: float, period: timedelta) -> float:
         return 0.0
 
     k = calc_k(demurrage_rate)
-    t = period.total_seconds()
+    t = max(0.0, period.total_seconds())
     return min(math.exp(k * t), 1.0)
