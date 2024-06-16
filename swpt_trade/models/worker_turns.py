@@ -611,7 +611,7 @@ class TransferAttempt(db.Model):
             " 4) INSUFFICIENT_AVAILABLE_AMOUNT."
         ),
     )
-    backoff_counter = db.Column(db.Integer, nullable=False, default=0)
+    backoff_counter = db.Column(db.SmallInteger, nullable=False, default=0)
     fatal_error = db.Column(db.String)
     __table_args__ = (
         db.CheckConstraint(nominal_amount >= 2.0),

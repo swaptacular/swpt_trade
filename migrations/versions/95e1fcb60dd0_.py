@@ -70,7 +70,7 @@ def upgrade_():
     sa.Column('transfer_id', sa.BigInteger(), nullable=True),
     sa.Column('finalized_at', sa.TIMESTAMP(timezone=True), nullable=True),
     sa.Column('failure_code', sa.SmallInteger(), nullable=True, comment='Failure codes: 0) An unspecified failure; 1) TIMEOUT; 2) NEWER_INTEREST_RATE; 3) RECIPIENT_IS_UNREACHABLE; 4) INSUFFICIENT_AVAILABLE_AMOUNT.'),
-    sa.Column('backoff_counter', sa.Integer(), nullable=False),
+    sa.Column('backoff_counter', sa.SmallInteger(), nullable=False),
     sa.Column('fatal_error', sa.String(), nullable=True),
     sa.CheckConstraint("attempted_at IS NULL AND coordinator_request_id IS NULL AND final_interest_rate_ts IS NULL AND amount IS NULL OR attempted_at IS NOT NULL AND coordinator_request_id IS NOT NULL AND final_interest_rate_ts IS NOT NULL AND amount IS NOT NULL AND recipient != ''"),
     sa.CheckConstraint('amount > 0'),
