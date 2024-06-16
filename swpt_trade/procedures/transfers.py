@@ -38,6 +38,7 @@ from swpt_trade.models import (
     AccountIdResponseSignal,
 )
 
+TD_POSSIBLE_ROUNDING_ERROR = timedelta(seconds=2)
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 
@@ -864,11 +865,7 @@ def _calc_transfer_params(
         (current_ts - attempt.collection_started_at)
         + timedelta(seconds=max_commit_delay)
     )
-    demurrage_rate, final_interest_rate_ts = _calc_safe_interest_rate(
-        attempt.collector_id,
-        attempt.debtor_id,
-        attempt.collection_started_at,
-    )
+    demurrage_rate, final_interest_rate_ts = _calc_demurrage_rate(attempt)
     amount = math.floor(
         attempt.nominal_amount
         * calc_demurrage(demurrage_rate, demurrage_period)
@@ -877,33 +874,33 @@ def _calc_transfer_params(
     return TransferParams(amount, final_interest_rate_ts, max_commit_delay)
 
 
-def _calc_safe_interest_rate(
-        collector_id: int,
-        debtor_id: int,
-        collection_started_at: datetime,
-) -> Tuple[float, datetime]:
-    collector_info = (
-        db.session.execute(
-            select(
-                WorkerAccount.interest_rate,
-                WorkerAccount.last_interest_rate_change_ts,
-            )
-            .where(
-                and_(
-                    WorkerAccount.creditor_id == collector_id,
-                    WorkerAccount.debtor_id == debtor_id,
+def _calc_demurrage_rate(attempt: TransferAttempt) -> Tuple[float, datetime]:
+    collector_id = attempt.collector_id
+    debtor_id = attempt.debtor_id
+    collection_started_at = attempt.collection_started_at
+    try:
+        collector_info = (
+            db.session.execute(
+                select(
+                    WorkerAccount.interest_rate,
+                    WorkerAccount.last_interest_rate_change_ts,
+                )
+                .where(
+                    and_(
+                        WorkerAccount.creditor_id == collector_id,
+                        WorkerAccount.debtor_id == debtor_id,
+                    )
                 )
             )
+            .one()
         )
-        .one_or_none()
-    )
-    if collector_info is None:  # pragma: no cover
+    except exc.NoResultFound:  # pragma: no cover
         # Normally, this should never happen. But if it did happen,
-        # returning an unsafe interest rate here is the least of our
-        # problems.
+        # returning an incorrect demurrage rate here is the least of
+        # our problems.
         return 0.0, TS0
 
-    safe_interest_rate = min(collector_info.interest_rate, 0.0)
+    demurrage_rate = min(collector_info.interest_rate, 0.0)
     final_interest_rate_ts = collector_info.last_interest_rate_change_ts
     interest_rate_changes = (
         db.session.execute(
@@ -922,8 +919,8 @@ def _calc_safe_interest_rate(
         .all()
     )
     for interest_rate, change_ts in interest_rate_changes:
-        if interest_rate < safe_interest_rate:
-            safe_interest_rate = interest_rate
+        if interest_rate < demurrage_rate:
+            demurrage_rate = interest_rate
 
         if change_ts > final_interest_rate_ts:
             final_interest_rate_ts = change_ts
@@ -931,5 +928,5 @@ def _calc_safe_interest_rate(
         if change_ts < collection_started_at:
             break
 
-    assert safe_interest_rate <= 0.0
-    return safe_interest_rate, final_interest_rate_ts
+    assert demurrage_rate <= 0.0
+    return demurrage_rate, final_interest_rate_ts + TD_POSSIBLE_ROUNDING_ERROR
