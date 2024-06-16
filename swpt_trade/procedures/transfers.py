@@ -13,6 +13,7 @@ from swpt_trade.utils import (
 )
 from swpt_trade.extensions import db
 from swpt_trade.models import (
+    TS0,
     DATE0,
     MAX_INT32,
     MIN_INT64,
@@ -32,6 +33,7 @@ from swpt_trade.models import (
     TransferAttempt,
     TradingPolicy,
     WorkerAccount,
+    InterestRateChange,
     AccountIdRequestSignal,
     AccountIdResponseSignal,
 )
@@ -855,7 +857,7 @@ def _calc_transfer_params(
         healthy_delay_seconds * (2 ** backoff_counter),
         MAX_INT32,
     )
-    assert max_commit_delay >= 0
+    assert 0 <= max_commit_delay <= MAX_INT32
     assert 1e-10 <= transfers_amount_cut <= 0.1
 
     demurrage_period = (
@@ -880,5 +882,54 @@ def _calc_safe_interest_rate(
         debtor_id: int,
         collection_started_at: datetime,
 ) -> Tuple[float, datetime]:
-    # TODO: implement.
-    return 0.0, datetime.now(tz=timezone.utc)
+    collector_info = (
+        db.session.execute(
+            select(
+                WorkerAccount.interest_rate,
+                WorkerAccount.last_interest_rate_change_ts,
+            )
+            .where(
+                and_(
+                    WorkerAccount.creditor_id == collector_id,
+                    WorkerAccount.debtor_id == debtor_id,
+                )
+            )
+        )
+        .one_or_none()
+    )
+    if collector_info is None:  # pragma: no cover
+        # Normally, this should never happen. But if it did happen,
+        # returning an unsafe interest rate here is the least of our
+        # problems.
+        return 0.0, TS0
+
+    safe_interest_rate = min(collector_info.interest_rate, 0.0)
+    final_interest_rate_ts = collector_info.last_interest_rate_change_ts
+    interest_rate_changes = (
+        db.session.execute(
+            select(
+                InterestRateChange.interest_rate,
+                InterestRateChange.change_ts,
+            )
+            .where(
+                and_(
+                    InterestRateChange.creditor_id == collector_id,
+                    InterestRateChange.debtor_id == debtor_id,
+                )
+            )
+            .order_by(InterestRateChange.change_ts.desc())
+        )
+        .all()
+    )
+    for interest_rate, change_ts in interest_rate_changes:
+        if interest_rate < safe_interest_rate:
+            safe_interest_rate = interest_rate
+
+        if change_ts > final_interest_rate_ts:
+            final_interest_rate_ts = change_ts
+
+        if change_ts < collection_started_at:
+            break
+
+    assert safe_interest_rate <= 0.0
+    return safe_interest_rate, final_interest_rate_ts
