@@ -409,7 +409,7 @@ def test_transfer_attempt_properties(current_ts):
         transfer_id=None,
         finalized_at=None,
         failure_code=None,
-        failed_attempts=0,
+        backoff_counter=0,
     )
     assert ta.unknown_recipient
     assert not ta.can_be_triggered
