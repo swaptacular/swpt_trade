@@ -41,7 +41,7 @@ from swpt_trade.models import (
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 TD_TOLERABLE_ROUNDING_ERROR = timedelta(seconds=2)
-TD_CLOCK_SYNC_SAFETY_MARGIN = timedelta(minutes=5)
+TD_CLOCK_SYNC_SAFETY_MARGIN = timedelta(minutes=10)
 
 
 @dataclass
