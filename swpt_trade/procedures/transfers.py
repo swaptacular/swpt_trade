@@ -905,26 +905,25 @@ def _calc_transfer_params(
     demurrage_period = past_demmurage_period + future_demmurage_period
     demurrage_info = _get_demurrage_info(attempt)
     demurrage = calc_demurrage(demurrage_info.rate, demurrage_period)
+    nominal_amount = attempt.nominal_amount
 
+    assert 2.0 <= nominal_amount
     assert 0.0 <= demurrage <= 1.0
     assert 1e-10 <= transfers_amount_cut <= 0.1
     try:
         amount = contain_principal_overflow(
             math.floor(
-                attempt.nominal_amount
+                nominal_amount
                 * demurrage
                 * (1.0 - transfers_amount_cut)
             )
         )
-    except ValueError:
-        # This can happen if `attempt.nominal_amount` is NaN
-        amount = 0  # pragma: no cover
     except OverflowError:
-        # This can happen if `attempt.nominal_amount` is +Infinity
+        # This can happen if `nominal_amount` is +Infinity
         amount = MAX_INT64  # pragma: no cover
 
     assert 0 <= amount <= MAX_INT64
-    assert amount <= attempt.nominal_amount
+    assert amount <= nominal_amount
 
     return TransferParams(
         amount,
