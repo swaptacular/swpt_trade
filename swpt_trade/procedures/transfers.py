@@ -820,12 +820,17 @@ def _trigger_transfer_if_possible(
     new_interest_rate_ts = params.final_interest_rate_ts
     new_amount = params.amount
 
+    if new_amount == 0:
+        # Attempting to make a transfer will never make sense.
+        # Rescheduling more attempts is futile. Normally, this should
+        # not happen.
+        return  # pragma: no cover
+
     if (
-        new_amount == 0
-        or new_interest_rate_ts is None
+        new_interest_rate_ts is None
         or (
             old_failure_code == attempt.NEWER_INTEREST_RATE
-            and old_interest_rate_ts
+            and old_interest_rate_ts is not None
             and old_interest_rate_ts >= new_interest_rate_ts
         )
     ):
@@ -864,22 +869,22 @@ def _trigger_transfer_if_possible(
         )
         if attempt.backoff_counter < MAX_INT16:
             attempt.backoff_counter += 1
+        return
 
-    else:
-        db.session.add(
-            PrepareTransferSignal(
-                creditor_id=attempt.collector_id,
-                coordinator_request_id=new_coordinator_request_id,
-                debtor_id=attempt.debtor_id,
-                recipient=attempt.recipient,
-                min_locked_amount=0,
-                max_locked_amount=0,
-                final_interest_rate_ts=new_interest_rate_ts,
-                max_commit_delay=params.max_commit_delay,
-                inserted_at=current_ts,
-            )
+    db.session.add(
+        PrepareTransferSignal(
+            creditor_id=attempt.collector_id,
+            coordinator_request_id=new_coordinator_request_id,
+            debtor_id=attempt.debtor_id,
+            recipient=attempt.recipient,
+            min_locked_amount=0,
+            max_locked_amount=0,
+            final_interest_rate_ts=new_interest_rate_ts,
+            max_commit_delay=params.max_commit_delay,
+            inserted_at=current_ts,
         )
-        attempt.failure_code = None
+    )
+    attempt.failure_code = None
 
 
 def _calc_transfer_params(
