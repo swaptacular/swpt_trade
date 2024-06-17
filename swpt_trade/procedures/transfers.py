@@ -898,26 +898,31 @@ def _calc_transfer_params(
         transfers_healthy_max_commit_delay.total_seconds() * (2 ** n),
         MAX_INT32,
     )
-    demurrage_info = _get_demurrage_info(attempt)
+
+    assert 0 <= max_commit_delay <= MAX_INT32
     past_demmurage_period = current_ts - attempt.collection_started_at
     future_demmurage_period = timedelta(seconds=max_commit_delay)
     demurrage_period = past_demmurage_period + future_demmurage_period
+    demurrage_info = _get_demurrage_info(attempt)
+    demurrage = calc_demurrage(demurrage_info.rate, demurrage_period)
 
+    assert 0.0 <= demurrage <= 1.0
+    assert 1e-10 <= transfers_amount_cut <= 0.1
     try:
         amount = contain_principal_overflow(
             math.floor(
                 attempt.nominal_amount
-                * calc_demurrage(demurrage_info.rate, demurrage_period)
+                * demurrage
                 * (1.0 - transfers_amount_cut)
             )
         )
+    except ValueError:
+        amount = 0  # pragma: no cover
     except OverflowError:
         amount = MAX_INT64  # pragma: no cover
 
     assert 0 <= amount <= MAX_INT64
     assert amount <= attempt.nominal_amount
-    assert 0 <= max_commit_delay <= MAX_INT32
-    assert 1e-10 <= transfers_amount_cut <= 0.1
 
     return TransferParams(
         amount,
