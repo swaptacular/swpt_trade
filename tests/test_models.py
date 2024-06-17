@@ -418,11 +418,13 @@ def test_transfer_attempt_properties(current_ts):
     assert ta.calc_backoff_seconds(0) == 0
     assert ta.calc_backoff_seconds(-10) == 0
 
-    ta.backoff_counter = 1
+    ta.increment_backoff_counter()
+    assert ta.backoff_counter == 1
     assert ta.calc_backoff_seconds(10) == 2 * 10
     assert ta.calc_backoff_seconds(33) == 2 * 33
 
-    ta.backoff_counter = 2
+    ta.increment_backoff_counter()
+    assert ta.backoff_counter == 2
     assert ta.calc_backoff_seconds(10) == 4 * 10
     assert ta.calc_backoff_seconds(33) == 4 * 33
 

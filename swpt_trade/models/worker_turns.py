@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date
-from .common import get_now_utc, MAX_INT32, MIN_INT64
+from .common import get_now_utc, MAX_INT16, MAX_INT32, MIN_INT64
 from sqlalchemy.sql.expression import null, false, or_, and_
 from swpt_trade.extensions import db
 
@@ -709,3 +709,7 @@ class TransferAttempt(db.Model):
         min_backoff_seconds = max(0, min_backoff_seconds)
         n = min(self.backoff_counter, 31)
         return min(min_backoff_seconds * (2 ** n), MAX_INT32)
+
+    def increment_backoff_counter(self) -> None:
+        if self.backoff_counter < MAX_INT16:
+            self.backoff_counter += 1

@@ -14,7 +14,6 @@ from swpt_trade.utils import (
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     DATE0,
-    MAX_INT16,
     MAX_INT32,
     MIN_INT64,
     MAX_INT64,
@@ -868,8 +867,7 @@ def _trigger_transfer_if_possible(
                 transfers_healthy_max_commit_delay.total_seconds()
             )
         )
-        if attempt.backoff_counter < MAX_INT16:
-            attempt.backoff_counter += 1
+        attempt.increment_backoff_counter()
         return
 
     db.session.add(
