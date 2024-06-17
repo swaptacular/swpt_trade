@@ -39,9 +39,9 @@ from swpt_trade.models import (
     AccountIdResponseSignal,
 )
 
-TD_POSSIBLE_ROUNDING_ERROR = timedelta(seconds=2)
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
+TD_TOLERABLE_ROUNDING_ERROR = timedelta(seconds=2)
 
 
 @dataclass
@@ -863,9 +863,10 @@ def _trigger_transfer_if_possible(
                 is_dispatching=attempt.is_dispatching,
             )
         )
-        n = min(attempt.backoff_counter, 31)
-        attempt.rescheduled_for = (
-            current_ts + transfers_healthy_max_commit_delay * (2 ** n)
+        attempt.rescheduled_for = current_ts + timedelta(
+            seconds=attempt.calc_backoff_seconds(
+                transfers_healthy_max_commit_delay.total_seconds()
+            )
         )
         if attempt.backoff_counter < MAX_INT16:
             attempt.backoff_counter += 1
@@ -893,10 +894,8 @@ def _calc_transfer_params(
         transfers_amount_cut: float,
         current_ts: datetime,
 ) -> TransferParams:
-    n = min(attempt.backoff_counter, 31)
-    max_commit_delay = min(
-        transfers_healthy_max_commit_delay.total_seconds() * (2 ** n),
-        MAX_INT32,
+    max_commit_delay = attempt.calc_backoff_seconds(
+        transfers_healthy_max_commit_delay.total_seconds()
     )
 
     assert 0 <= max_commit_delay <= MAX_INT32
@@ -977,19 +976,19 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
     )
 
     min_interest_rate = collector_info.interest_rate
-    max_change_ts = collector_info.last_interest_rate_change_ts
+    last_change_ts = collector_info.last_interest_rate_change_ts
 
     for interest_rate, change_ts in interest_rate_changes:
         if interest_rate < min_interest_rate:
             min_interest_rate = interest_rate
 
-        if change_ts > max_change_ts:
-            max_change_ts = change_ts
+        if change_ts > last_change_ts:
+            last_change_ts = change_ts
 
         if change_ts < collection_started_at:
             break
 
     return DemurrageInfo(
         min(min_interest_rate, 0.0),
-        max_change_ts + TD_POSSIBLE_ROUNDING_ERROR,
+        last_change_ts + TD_TOLERABLE_ROUNDING_ERROR,
     )

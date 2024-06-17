@@ -413,6 +413,21 @@ def test_transfer_attempt_properties(current_ts):
     )
     assert ta.unknown_recipient
     assert not ta.can_be_triggered
+    assert ta.calc_backoff_seconds(10) == 10
+    assert ta.calc_backoff_seconds(33) == 33
+    assert ta.calc_backoff_seconds(0) == 0
+    assert ta.calc_backoff_seconds(-10) == 0
+
+    ta.backoff_counter = 1
+    assert ta.calc_backoff_seconds(10) == 2 * 10
+    assert ta.calc_backoff_seconds(33) == 2 * 33
+
+    ta.backoff_counter = 2
+    assert ta.calc_backoff_seconds(10) == 4 * 10
+    assert ta.calc_backoff_seconds(33) == 4 * 33
+
+    ta.backoff_counter = 10000
+    assert ta.calc_backoff_seconds(1) == 2 ** 31 - 1
 
     ta.recipient = "123456"
     ta.recipient_version = 1
