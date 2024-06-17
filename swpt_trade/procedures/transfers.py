@@ -41,7 +41,7 @@ from swpt_trade.models import (
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
 TD_TOLERABLE_ROUNDING_ERROR = timedelta(seconds=2)
-TD_CLOCK_SYNC_SAFETY_MARGIN = timedelta(minutes=10)
+TD_CLOCK_PRECISION_SAFETY_MARGIN = timedelta(minutes=10)
 
 
 @dataclass
@@ -901,7 +901,7 @@ def _calc_transfer_params(
     past_demmurage_period = current_ts - attempt.collection_started_at
     future_demmurage_period = timedelta(seconds=max_commit_delay)
     demurrage_period = (
-        TD_CLOCK_SYNC_SAFETY_MARGIN
+        TD_CLOCK_PRECISION_SAFETY_MARGIN
         + past_demmurage_period
         + future_demmurage_period
     )
