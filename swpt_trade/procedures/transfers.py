@@ -917,8 +917,10 @@ def _calc_transfer_params(
             )
         )
     except ValueError:
+        # This can happen if `attempt.nominal_amount` is NaN
         amount = 0  # pragma: no cover
     except OverflowError:
+        # This can happen if `attempt.nominal_amount` is +Infinity
         amount = MAX_INT64  # pragma: no cover
 
     assert 0 <= amount <= MAX_INT64
