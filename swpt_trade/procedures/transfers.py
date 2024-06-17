@@ -955,8 +955,8 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
         )
     except exc.NoResultFound:  # pragma: no cover
         # Normally, this should never happen. But if it did happen,
-        # returning an incorrect demurrage rate here is the least of
-        # our problems.
+        # returning an incorrect demurrage rate here (0.0) is the
+        # least of our problems.
         return DemurrageInfo(0.0, None)
 
     interest_rate_changes = (
