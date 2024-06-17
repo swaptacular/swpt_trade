@@ -13,7 +13,6 @@ from swpt_trade.utils import (
 )
 from swpt_trade.extensions import db
 from swpt_trade.models import (
-    TS0,
     DATE0,
     MAX_INT16,
     MAX_INT32,
@@ -46,9 +45,26 @@ atomic: Callable[[T], T] = db.atomic
 
 
 @dataclass
+class DemurrageInfo:
+    """Information about the demurrage on a collector account.
+
+    The `rate` field represents the lowest interest rate on the
+    collector account for the duration of the trading turn, but not
+    exceeding zero.
+
+    The `final_interest_rate_ts` field represents the onset moment of
+    the last known interest rate on the collector account. A `None`
+    indicates that we know that we are missing some interest rate
+    changes, that could be important.
+    """
+    rate: float
+    final_interest_rate_ts: Optional[datetime]
+
+
+@dataclass
 class TransferParams:
     amount: int
-    final_interest_rate_ts: datetime
+    final_interest_rate_ts: Optional[datetime]
     max_commit_delay: int
 
 
@@ -457,7 +473,7 @@ def release_seller_account_lock(
         debtor_id: int,
         turn_id: int,
         acquired_amount: int,
-        account_creation_date: int,
+        account_creation_date: date,
         account_transfer_number: int,
         is_collector_trade: bool,
 ) -> None:
@@ -584,7 +600,7 @@ def release_buyer_account_lock(
         debtor_id: int,
         turn_id: int,
         acquired_amount: int,
-        account_creation_date: int,
+        account_creation_date: date,
         account_transfer_number: int,
         is_collector_trade: bool,
 ) -> None:
@@ -783,64 +799,87 @@ def _trigger_transfer_if_possible(
         transfers_healthy_max_commit_delay: timedelta,
         transfers_amount_cut: float,
 ) -> None:
-    if attempt.can_be_triggered:
-        assert attempt.rescheduled_for is None
-        assert attempt.fatal_error is None
-        assert attempt.recipient != ""
+    if not attempt.can_be_triggered:
+        return
 
-        current_ts = datetime.now(tz=timezone.utc)
-        params = _calc_transfer_params(
-            attempt,
-            transfers_healthy_max_commit_delay,
-            transfers_amount_cut,
-            current_ts,
+    assert attempt.rescheduled_for is None
+    assert attempt.fatal_error is None
+    assert attempt.recipient != ""
+
+    current_ts = datetime.now(tz=timezone.utc)
+    old_failure_code = attempt.failure_code
+    old_interest_rate_ts = attempt.final_interest_rate_ts
+
+    params = _calc_transfer_params(
+        attempt,
+        transfers_healthy_max_commit_delay,
+        transfers_amount_cut,
+        current_ts,
+    )
+    new_coordinator_request_id = db.session.scalar(cr_seq)
+    new_interest_rate_ts = params.final_interest_rate_ts
+    new_amount = params.amount
+
+    if (
+        new_amount == 0
+        or new_interest_rate_ts is None
+        or (
+            old_failure_code == attempt.NEWER_INTEREST_RATE
+            and old_interest_rate_ts
+            and old_interest_rate_ts >= new_interest_rate_ts
         )
-        if params.amount > 0:
-            coordinator_request_id = db.session.scalar(cr_seq)
+    ):
+        # Attempting to make a transfer right now does not make sense.
+        # Instead, we reschedule the attempt for a later time.
+        attempt.rescheduled_for = (
+            current_ts + transfers_healthy_max_commit_delay
+        )
+        return
 
-            attempt.attempted_at = current_ts
-            attempt.coordinator_request_id = coordinator_request_id
-            attempt.final_interest_rate_ts = params.final_interest_rate_ts
-            attempt.amount = params.amount
-            attempt.transfer_id = None
-            attempt.finalized_at = None
+    attempt.attempted_at = current_ts
+    attempt.coordinator_request_id = new_coordinator_request_id
+    attempt.final_interest_rate_ts = new_interest_rate_ts
+    attempt.amount = new_amount
+    attempt.transfer_id = None
+    attempt.finalized_at = None
 
-            if attempt.failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
-                # In this case, we know beforehand that the transfer will
-                # fail. Therefore, we directly request the new account ID
-                # of the creditor, and reschedule the transfer for a later
-                # time.
-                db.session.add(
-                    AccountIdRequestSignal(
-                        collector_id=attempt.collector_id,
-                        turn_id=attempt.turn_id,
-                        debtor_id=attempt.debtor_id,
-                        creditor_id=attempt.creditor_id,
-                        is_dispatching=attempt.is_dispatching,
-                    )
-                )
-                n = min(attempt.backoff_counter, 31)
-                attempt.rescheduled_for = (
-                    current_ts + transfers_healthy_max_commit_delay * (2 ** n)
-                )
-                if attempt.backoff_counter < MAX_INT16:
-                    attempt.backoff_counter += 1
+    if old_failure_code == attempt.RECIPIENT_IS_UNREACHABLE:
+        # In this case, we know beforehand that the transfer
+        # will fail with a "RECIPIENT_IS_UNREACHABLE" error.
+        # Therefore, we make a request to obtain the new
+        # account ID of the creditor, and directly reschedule
+        # the transfer for a later time.
+        db.session.add(
+            AccountIdRequestSignal(
+                collector_id=attempt.collector_id,
+                turn_id=attempt.turn_id,
+                debtor_id=attempt.debtor_id,
+                creditor_id=attempt.creditor_id,
+                is_dispatching=attempt.is_dispatching,
+            )
+        )
+        n = min(attempt.backoff_counter, 31)
+        attempt.rescheduled_for = (
+            current_ts + transfers_healthy_max_commit_delay * (2 ** n)
+        )
+        if attempt.backoff_counter < MAX_INT16:
+            attempt.backoff_counter += 1
 
-            else:
-                db.session.add(
-                    PrepareTransferSignal(
-                        creditor_id=attempt.collector_id,
-                        coordinator_request_id=coordinator_request_id,
-                        debtor_id=attempt.debtor_id,
-                        recipient=attempt.recipient,
-                        min_locked_amount=0,
-                        max_locked_amount=0,
-                        final_interest_rate_ts=params.final_interest_rate_ts,
-                        max_commit_delay=params.max_commit_delay,
-                        inserted_at=current_ts,
-                    )
-                )
-                attempt.failure_code = None
+    else:
+        db.session.add(
+            PrepareTransferSignal(
+                creditor_id=attempt.collector_id,
+                coordinator_request_id=new_coordinator_request_id,
+                debtor_id=attempt.debtor_id,
+                recipient=attempt.recipient,
+                min_locked_amount=0,
+                max_locked_amount=0,
+                final_interest_rate_ts=new_interest_rate_ts,
+                max_commit_delay=params.max_commit_delay,
+                inserted_at=current_ts,
+            )
+        )
+        attempt.failure_code = None
 
 
 def _calc_transfer_params(
@@ -854,19 +893,16 @@ def _calc_transfer_params(
         transfers_healthy_max_commit_delay.total_seconds() * (2 ** n),
         MAX_INT32,
     )
-    assert 0 <= max_commit_delay <= MAX_INT32
-    assert 1e-10 <= transfers_amount_cut <= 0.1
+    demurrage_info = _get_demurrage_info(attempt)
+    past_demmurage_period = current_ts - attempt.collection_started_at
+    future_demmurage_period = timedelta(seconds=max_commit_delay)
+    demurrage_period = past_demmurage_period + future_demmurage_period
 
-    demurrage_period = (
-        (current_ts - attempt.collection_started_at)
-        + timedelta(seconds=max_commit_delay)
-    )
-    demurrage_rate, final_interest_rate_ts = _calc_demurrage_rate(attempt)
     try:
         amount = contain_principal_overflow(
             math.floor(
                 attempt.nominal_amount
-                * calc_demurrage(demurrage_rate, demurrage_period)
+                * calc_demurrage(demurrage_info.rate, demurrage_period)
                 * (1.0 - transfers_amount_cut)
             )
         )
@@ -875,13 +911,21 @@ def _calc_transfer_params(
 
     assert 0 <= amount <= MAX_INT64
     assert amount <= attempt.nominal_amount
-    return TransferParams(amount, final_interest_rate_ts, max_commit_delay)
+    assert 0 <= max_commit_delay <= MAX_INT32
+    assert 1e-10 <= transfers_amount_cut <= 0.1
+
+    return TransferParams(
+        amount,
+        demurrage_info.final_interest_rate_ts,
+        max_commit_delay,
+    )
 
 
-def _calc_demurrage_rate(attempt: TransferAttempt) -> Tuple[float, datetime]:
+def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
     collector_id = attempt.collector_id
     debtor_id = attempt.debtor_id
     collection_started_at = attempt.collection_started_at
+
     try:
         collector_info = (
             db.session.execute(
@@ -902,10 +946,8 @@ def _calc_demurrage_rate(attempt: TransferAttempt) -> Tuple[float, datetime]:
         # Normally, this should never happen. But if it did happen,
         # returning an incorrect demurrage rate here is the least of
         # our problems.
-        return 0.0, TS0
+        return DemurrageInfo(0.0, None)
 
-    demurrage_rate = min(collector_info.interest_rate, 0.0)
-    final_interest_rate_ts = collector_info.last_interest_rate_change_ts
     interest_rate_changes = (
         db.session.execute(
             select(
@@ -922,15 +964,21 @@ def _calc_demurrage_rate(attempt: TransferAttempt) -> Tuple[float, datetime]:
         )
         .all()
     )
-    for interest_rate, change_ts in interest_rate_changes:
-        if interest_rate < demurrage_rate:
-            demurrage_rate = interest_rate
 
-        if change_ts > final_interest_rate_ts:
-            final_interest_rate_ts = change_ts
+    min_interest_rate = collector_info.interest_rate
+    max_change_ts = collector_info.last_interest_rate_change_ts
+
+    for interest_rate, change_ts in interest_rate_changes:
+        if interest_rate < min_interest_rate:
+            min_interest_rate = interest_rate
+
+        if change_ts > max_change_ts:
+            max_change_ts = change_ts
 
         if change_ts < collection_started_at:
             break
 
-    assert demurrage_rate <= 0.0
-    return demurrage_rate, final_interest_rate_ts + TD_POSSIBLE_ROUNDING_ERROR
+    return DemurrageInfo(
+        min(min_interest_rate, 0.0),
+        max_change_ts + TD_POSSIBLE_ROUNDING_ERROR,
+    )

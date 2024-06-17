@@ -79,7 +79,7 @@ def upgrade_():
     sa.CheckConstraint('fatal_error IS NULL OR failure_code = 0 AND rescheduled_for IS NULL'),
     sa.CheckConstraint('finalized_at IS NULL OR transfer_id IS NOT NULL'),
     sa.CheckConstraint('nominal_amount >= 2.0'),
-    sa.CheckConstraint('rescheduled_for IS NULL OR failure_code IS NOT NULL'),
+    sa.CheckConstraint('rescheduled_for IS NULL OR failure_code IS NOT NULL OR attempted_at IS NULL'),
     sa.CheckConstraint('transfer_id IS NULL OR coordinator_request_id IS NOT NULL'),
     sa.PrimaryKeyConstraint('collector_id', 'turn_id', 'debtor_id', 'creditor_id', 'is_dispatching'),
     comment="Represents a past or future attempt to transfer some amount form a given collector's account to another account, as a part of a given trading turn. More than one attempt may be made if the first attempt has failed."

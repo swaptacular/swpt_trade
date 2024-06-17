@@ -646,7 +646,11 @@ class TransferAttempt(db.Model):
             or_(failure_code == null(), attempted_at != null())
         ),
         db.CheckConstraint(
-            or_(rescheduled_for == null(), failure_code != null())
+            or_(
+                rescheduled_for == null(),
+                failure_code != null(),
+                attempted_at == null(),
+            )
         ),
         db.CheckConstraint(
             or_(
