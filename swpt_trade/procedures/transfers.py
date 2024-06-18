@@ -1011,9 +1011,6 @@ def put_rejected_transfer_through_transfer_attempts(
 ) -> bool:
     """Return `True` if a corresponding transfer attempt has been found.
     """
-    current_ts = datetime.now(tz=timezone.utc)
-    min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
-
     attempt = (
         TransferAttempt.query.
         filter_by(
@@ -1031,39 +1028,10 @@ def put_rejected_transfer_through_transfer_attempts(
         assert attempt.attempted_at
         assert attempt.rescheduled_for is None
 
-        if status_code == SC_NEWER_INTEREST_RATE:
-            attempt.failure_code = attempt.NEWER_INTEREST_RATE
-            attempt.rescheduled_for = (
-                current_ts + transfers_healthy_max_commit_delay
-            )
-
-        elif status_code == SC_TIMEOUT:
-            attempt.reschedule_failed_attempt(
-                attempt.TIMEOUT, min_backoff_seconds
-            )
-
-        elif status_code == SC_RECIPIENT_IS_UNREACHABLE:
-            db.session.add(
-                AccountIdRequestSignal(
-                    collector_id=attempt.collector_id,
-                    turn_id=attempt.turn_id,
-                    debtor_id=attempt.debtor_id,
-                    creditor_id=attempt.creditor_id,
-                    is_dispatching=attempt.is_dispatching,
-                )
-            )
-            attempt.reschedule_failed_attempt(
-                attempt.RECIPIENT_IS_UNREACHABLE, min_backoff_seconds
-            )
-
-        elif status_code == SC_INSUFFICIENT_AVAILABLE_AMOUNT:
-            attempt.reschedule_failed_attempt(
-                attempt.INSUFFICIENT_AVAILABLE_AMOUNT, min_backoff_seconds
-            )
-
-        else:
-            attempt.failure_code = attempt.UNSPECIFIED_FAILURE
-            attempt.fatal_error = status_code
+        _reschedule_failed_attempt(
+            attempt, status_code, transfers_healthy_max_commit_delay
+        )
+        assert attempt.failure_code is not None
 
     return True
 
@@ -1158,10 +1126,6 @@ def put_finalized_transfer_through_transfer_attempts(
         status_code: str,
         transfers_healthy_max_commit_delay: timedelta,
 ) -> None:
-    current_ts = datetime.now(tz=timezone.utc)
-    min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
-    failed = (committed_amount == 0)
-
     attempt = (
         TransferAttempt.query.
         filter_by(
@@ -1182,39 +1146,56 @@ def put_finalized_transfer_through_transfer_attempts(
         assert attempt.rescheduled_for is None
 
         if status_code == SC_OK and committed_amount == attempt.amount:
-            assert not failed
             db.session.delete(attempt)
 
-        elif failed and status_code == SC_NEWER_INTEREST_RATE:
-            attempt.failure_code = attempt.NEWER_INTEREST_RATE
-            attempt.rescheduled_for = (
-                current_ts + transfers_healthy_max_commit_delay
-            )
-
-        elif failed and status_code == SC_TIMEOUT:
-            attempt.reschedule_failed_attempt(
-                attempt.TIMEOUT, min_backoff_seconds
-            )
-
-        elif failed and status_code == SC_RECIPIENT_IS_UNREACHABLE:
-            db.session.add(
-                AccountIdRequestSignal(
-                    collector_id=attempt.collector_id,
-                    turn_id=attempt.turn_id,
-                    debtor_id=attempt.debtor_id,
-                    creditor_id=attempt.creditor_id,
-                    is_dispatching=attempt.is_dispatching,
-                )
-            )
-            attempt.reschedule_failed_attempt(
-                attempt.RECIPIENT_IS_UNREACHABLE, min_backoff_seconds
-            )
-
-        elif failed and status_code == SC_INSUFFICIENT_AVAILABLE_AMOUNT:
-            attempt.reschedule_failed_attempt(
-                attempt.INSUFFICIENT_AVAILABLE_AMOUNT, min_backoff_seconds
-            )
-
         else:
-            attempt.failure_code = attempt.UNSPECIFIED_FAILURE
-            attempt.fatal_error = status_code
+            if committed_amount != 0:
+                status_code = "UNEXPECTED_COMMITTED_AMOUNT"  # pragma: no cover
+
+            _reschedule_failed_attempt(
+                attempt, status_code, transfers_healthy_max_commit_delay
+            )
+            assert attempt.failure_code is not None
+
+
+def _reschedule_failed_attempt(
+        attempt: TransferAttempt,
+        status_code: str,
+        transfers_healthy_max_commit_delay: timedelta,
+) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
+
+    if status_code == SC_NEWER_INTEREST_RATE:
+        attempt.failure_code = attempt.NEWER_INTEREST_RATE
+        attempt.rescheduled_for = (
+            current_ts + transfers_healthy_max_commit_delay
+        )
+
+    elif status_code == SC_TIMEOUT:
+        attempt.reschedule_failed_attempt(
+            attempt.TIMEOUT, min_backoff_seconds
+        )
+
+    elif status_code == SC_RECIPIENT_IS_UNREACHABLE:
+        db.session.add(
+            AccountIdRequestSignal(
+                collector_id=attempt.collector_id,
+                turn_id=attempt.turn_id,
+                debtor_id=attempt.debtor_id,
+                creditor_id=attempt.creditor_id,
+                is_dispatching=attempt.is_dispatching,
+            )
+        )
+        attempt.reschedule_failed_attempt(
+            attempt.RECIPIENT_IS_UNREACHABLE, min_backoff_seconds
+        )
+
+    elif status_code == SC_INSUFFICIENT_AVAILABLE_AMOUNT:
+        attempt.reschedule_failed_attempt(
+            attempt.INSUFFICIENT_AVAILABLE_AMOUNT, min_backoff_seconds
+        )
+
+    else:
+        attempt.failure_code = attempt.UNSPECIFIED_FAILURE
+        attempt.fatal_error = status_code
