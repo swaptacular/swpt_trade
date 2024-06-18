@@ -1043,7 +1043,6 @@ def put_rejected_transfer_through_transfer_attempts(
             )
 
         elif status_code == SC_RECIPIENT_IS_UNREACHABLE:
-            # Make a request to obtain the new account ID of the creditor.
             db.session.add(
                 AccountIdRequestSignal(
                     collector_id=attempt.collector_id,
@@ -1095,52 +1094,48 @@ def put_prepared_transfer_through_transfer_attempts(
     if attempt is None:
         return False
 
-    def commit():
-        assert attempt and attempt.amount
-        K = TransferNote.Kind
-        db.session.add(
-            FinalizeTransferSignal(
-                creditor_id=creditor_id,
-                debtor_id=debtor_id,
-                transfer_id=transfer_id,
-                coordinator_id=coordinator_id,
-                coordinator_request_id=coordinator_request_id,
-                committed_amount=attempt.amount,
-                transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
-                transfer_note=str(
-                    TransferNote(
-                        attempt.turn_id,
-                        K.DISPATCHING if attempt.is_dispatching else K.SENDING,
-                        attempt.creditor_id,
-                        creditor_id,
-                    )
-                ),
-                inserted_at=current_ts,
-            )
-        )
-
     if (
             attempt.debtor_id == debtor_id
             and attempt.collector_id == creditor_id
             and attempt.failure_code is None
     ):
         assert attempt.attempted_at
+        assert attempt.amount > 0
 
         if attempt.transfer_id is None:
-            # The current status is "initiated". Commit the transfer
-            # and change the status directly to "settled".
+            # The current status is "initiated". Change it to "settled".
             assert attempt.finalized_at is None
-            commit()
             attempt.transfer_id = transfer_id
             attempt.finalized_at = current_ts
-            return True
 
-        else:
-            # The current status is "settled".
-            assert attempt.finalized_at
-            if attempt.transfer_id == transfer_id:
-                commit()
-                return True
+        # The current status is "settled".
+        assert attempt.finalized_at
+        if attempt.transfer_id == transfer_id:
+            db.session.add(
+                FinalizeTransferSignal(
+                    creditor_id=creditor_id,
+                    debtor_id=debtor_id,
+                    transfer_id=transfer_id,
+                    coordinator_id=coordinator_id,
+                    coordinator_request_id=coordinator_request_id,
+                    committed_amount=attempt.amount,
+                    transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
+                    transfer_note=str(
+                        TransferNote(
+                            attempt.turn_id,
+                            (
+                                TransferNote.Kind.DISPATCHING
+                                if attempt.is_dispatching
+                                else TransferNote.Kind.SENDING
+                            ),
+                            attempt.creditor_id,
+                            creditor_id,
+                        )
+                    ),
+                    inserted_at=current_ts,
+                )
+            )
+            return True
 
     dismiss_prepared_transfer(
         debtor_id=debtor_id,
@@ -1150,3 +1145,76 @@ def put_prepared_transfer_through_transfer_attempts(
         coordinator_request_id=coordinator_request_id,
     )
     return True
+
+
+def put_finalized_transfer_through_transfer_attempts(
+        *,
+        debtor_id: int,
+        creditor_id: int,
+        transfer_id: int,
+        coordinator_id: int,
+        coordinator_request_id: int,
+        committed_amount: int,
+        status_code: str,
+        transfers_healthy_max_commit_delay: timedelta,
+) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
+    failed = (committed_amount == 0)
+
+    attempt = (
+        TransferAttempt.query.
+        filter_by(
+            collector_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            transfer_id=transfer_id,
+            failure_code=null(),
+        )
+        .filter(TransferAttempt.finalized_at != null())
+        .filter(TransferAttempt.coordinator_request_id != null())
+        .with_for_update()
+        .one_or_none()
+    )
+    if attempt:
+        assert attempt.attempted_at
+        assert attempt.rescheduled_for is None
+
+        if status_code == SC_OK and committed_amount == attempt.amount:
+            assert not failed
+            db.session.delete(attempt)
+
+        elif failed and status_code == SC_NEWER_INTEREST_RATE:
+            attempt.failure_code = attempt.NEWER_INTEREST_RATE
+            attempt.rescheduled_for = (
+                current_ts + transfers_healthy_max_commit_delay
+            )
+
+        elif failed and status_code == SC_TIMEOUT:
+            attempt.reschedule_failed_attempt(
+                attempt.TIMEOUT, min_backoff_seconds
+            )
+
+        elif failed and status_code == SC_RECIPIENT_IS_UNREACHABLE:
+            db.session.add(
+                AccountIdRequestSignal(
+                    collector_id=attempt.collector_id,
+                    turn_id=attempt.turn_id,
+                    debtor_id=attempt.debtor_id,
+                    creditor_id=attempt.creditor_id,
+                    is_dispatching=attempt.is_dispatching,
+                )
+            )
+            attempt.reschedule_failed_attempt(
+                attempt.RECIPIENT_IS_UNREACHABLE, min_backoff_seconds
+            )
+
+        elif failed and status_code == SC_INSUFFICIENT_AVAILABLE_AMOUNT:
+            attempt.reschedule_failed_attempt(
+                attempt.INSUFFICIENT_AVAILABLE_AMOUNT, min_backoff_seconds
+            )
+
+        else:
+            attempt.failure_code = attempt.UNSPECIFIED_FAILURE
+            attempt.fatal_error = status_code

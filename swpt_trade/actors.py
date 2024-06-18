@@ -326,7 +326,18 @@ def _on_finalized_agent_transfer_signal(
             f'Unexpected coordinator type: "{coordinator_type}"'
         )
 
-    # TODO: Implement the transfer finalisation logic!
+    procedures.put_finalized_transfer_through_transfer_attempts(
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        transfer_id=transfer_id,
+        coordinator_id=coordinator_id,
+        coordinator_request_id=coordinator_request_id,
+        committed_amount=committed_amount,
+        status_code=status_code,
+        transfers_healthy_max_commit_delay=(
+            current_app.config["TRANSFERS_HEALTHY_MAX_COMMIT_DELAY"]
+        ),
+    )
 
 
 def _on_updated_ledger_signal(

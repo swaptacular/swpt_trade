@@ -599,7 +599,10 @@ class TransferAttempt(db.Model):
     final_interest_rate_ts = db.Column(db.TIMESTAMP(timezone=True))
     amount = db.Column(db.BigInteger)
     transfer_id = db.Column(db.BigInteger)
-    finalized_at = db.Column(db.TIMESTAMP(timezone=True))
+    finalized_at = db.Column(
+        db.TIMESTAMP(timezone=True),
+        comment="The timestamp of the sent `FinalizeTransfer` SMP message.",
+    )
     failure_code = db.Column(
         db.SmallInteger,
         comment=(
