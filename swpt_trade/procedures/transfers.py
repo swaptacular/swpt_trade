@@ -1163,6 +1163,8 @@ def _reschedule_failed_attempt(
         status_code: str,
         transfers_healthy_max_commit_delay: timedelta,
 ) -> None:
+    assert attempt.attempted_at
+    assert attempt.rescheduled_for is None
     current_ts = datetime.now(tz=timezone.utc)
     min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
 
