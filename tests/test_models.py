@@ -431,6 +431,12 @@ def test_transfer_attempt_properties(current_ts):
     ta.backoff_counter = 10000
     assert ta.calc_backoff_seconds(1) == 2 ** 31 - 1
 
+    ta.backoff_counter = 2 ** 15 - 2
+    ta.increment_backoff_counter()
+    ta.increment_backoff_counter()
+    ta.increment_backoff_counter()
+    assert ta.backoff_counter == 2 ** 15 - 1
+
     ta.recipient = "123456"
     ta.recipient_version = 1
     assert not ta.unknown_recipient
@@ -449,8 +455,16 @@ def test_transfer_attempt_properties(current_ts):
     ta.coordinator_request_id = 123
     assert not ta.can_be_triggered
 
-    ta.failure_code = m.TransferAttempt.UNSPECIFIED_FAILURE
+    ta.failure_code = m.TransferAttempt.TIMEOUT
     assert ta.can_be_triggered
 
+    ta.backoff_counter = 2
+    ta.reschedule_failed_attempt(m.TransferAttempt.UNSPECIFIED_FAILURE, 10)
+    assert not ta.can_be_triggered
+    assert ta.failure_code == m.TransferAttempt.UNSPECIFIED_FAILURE
+    assert ta.rescheduled_for == current_ts + timedelta(seconds=10 * (2 ** 2))
+    assert ta.backoff_counter == 3
+
     ta.fatal_error = "Uups!"
+    ta.rescheduled_for = None
     assert not ta.can_be_triggered

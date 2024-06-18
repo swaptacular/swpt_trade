@@ -43,6 +43,13 @@ atomic: Callable[[T], T] = db.atomic
 TD_TOLERABLE_ROUNDING_ERROR = timedelta(seconds=2)
 TD_CLOCK_PRECISION_SAFETY_MARGIN = timedelta(minutes=10)
 
+# Transfer status codes:
+SC_OK = "OK"
+SC_TIMEOUT = "TIMEOUT"
+SC_NEWER_INTEREST_RATE = "NEWER_INTEREST_RATE"
+SC_RECIPIENT_IS_UNREACHABLE = "RECIPIENT_IS_UNREACHABLE"
+SC_INSUFFICIENT_AVAILABLE_AMOUNT = "INSUFFICIENT_AVAILABLE_AMOUNT"
+
 
 @dataclass
 class DemurrageInfo:
@@ -863,12 +870,10 @@ def _trigger_transfer_if_possible(
                 is_dispatching=attempt.is_dispatching,
             )
         )
-        attempt.rescheduled_for = current_ts + timedelta(
-            seconds=attempt.calc_backoff_seconds(
-                transfers_healthy_max_commit_delay.total_seconds()
-            )
+        attempt.reschedule_failed_attempt(
+            old_failure_code,
+            transfers_healthy_max_commit_delay.total_seconds(),
         )
-        attempt.increment_backoff_counter()
         return
 
     db.session.add(
@@ -995,3 +1000,73 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
         min(min_interest_rate, 0.0),
         last_change_ts + TD_TOLERABLE_ROUNDING_ERROR,
     )
+
+
+@atomic
+def put_rejected_transfer_through_transfer_attempts(
+        *,
+        coordinator_id: int,
+        coordinator_request_id: int,
+        status_code: str,
+        debtor_id: int,
+        creditor_id: int,
+        transfers_healthy_max_commit_delay: timedelta,
+) -> bool:
+    """Return `True` if a corresponding transfer attempt has been found.
+    """
+    current_ts = datetime.now(tz=timezone.utc)
+    min_backoff_seconds = transfers_healthy_max_commit_delay.total_seconds()
+
+    attempt = (
+        TransferAttempt.query.
+        filter_by(
+            collector_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
+        .filter(TransferAttempt.coordinator_request_id != null())
+        .with_for_update()
+        .one_or_none()
+    )
+    if attempt is None:
+        return False
+
+    if attempt.transfer_id is None and attempt.failure_code is None:
+        assert attempt.attempted_at
+        assert attempt.rescheduled_for is None
+
+        if status_code == SC_NEWER_INTEREST_RATE:
+            attempt.failure_code = attempt.NEWER_INTEREST_RATE
+            attempt.rescheduled_for = (
+                current_ts + transfers_healthy_max_commit_delay
+            )
+
+        elif status_code == SC_TIMEOUT:
+            attempt.reschedule_failed_attempt(
+                attempt.TIMEOUT, min_backoff_seconds
+            )
+
+        elif status_code == SC_RECIPIENT_IS_UNREACHABLE:
+            # Make a request to obtain the new account ID of the creditor.
+            db.session.add(
+                AccountIdRequestSignal(
+                    collector_id=attempt.collector_id,
+                    turn_id=attempt.turn_id,
+                    debtor_id=attempt.debtor_id,
+                    creditor_id=attempt.creditor_id,
+                    is_dispatching=attempt.is_dispatching,
+                )
+            )
+            attempt.reschedule_failed_attempt(
+                attempt.RECIPIENT_IS_UNREACHABLE, min_backoff_seconds
+            )
+
+        elif status_code == SC_INSUFFICIENT_AVAILABLE_AMOUNT:
+            attempt.reschedule_failed_attempt(
+                attempt.INSUFFICIENT_AVAILABLE_AMOUNT, min_backoff_seconds
+            )
+
+        else:
+            attempt.failure_code = attempt.UNSPECIFIED_FAILURE
+            attempt.fatal_error = status_code
+
+    return True

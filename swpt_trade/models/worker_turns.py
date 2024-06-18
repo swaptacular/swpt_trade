@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date
+from datetime import date, timedelta
 from .common import get_now_utc, MAX_INT16, MAX_INT32, MIN_INT64
 from sqlalchemy.sql.expression import null, false, or_, and_
 from swpt_trade.extensions import db
@@ -705,11 +705,24 @@ class TransferAttempt(db.Model):
             )
         )
 
-    def calc_backoff_seconds(self, min_backoff_seconds: int) -> int:
-        min_backoff_seconds = max(0, min_backoff_seconds)
+    def calc_backoff_seconds(self, min_backoff_seconds: float) -> int:
+        min_backoff_seconds = max(0, int(min_backoff_seconds))
         n = min(self.backoff_counter, 31)
         return min(min_backoff_seconds * (2 ** n), MAX_INT32)
 
     def increment_backoff_counter(self) -> None:
         if self.backoff_counter < MAX_INT16:
             self.backoff_counter += 1
+
+    def reschedule_failed_attempt(
+            self,
+            failure_code: int,
+            min_backoff_seconds: float,
+    ) -> None:
+        assert self.attempted_at
+        assert self.rescheduled_for is None
+        self.rescheduled_for = self.attempted_at + timedelta(
+            seconds=self.calc_backoff_seconds(min_backoff_seconds)
+        )
+        self.failure_code = failure_code
+        self.increment_backoff_counter()

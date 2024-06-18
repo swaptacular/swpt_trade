@@ -243,6 +243,15 @@ def _on_rejected_agent_transfer_signal(
         status_code=status_code,
         debtor_id=debtor_id,
         creditor_id=creditor_id,
+    ) or procedures.put_rejected_transfer_through_transfer_attempts(
+        coordinator_id=coordinator_id,
+        coordinator_request_id=coordinator_request_id,
+        status_code=status_code,
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        transfers_healthy_max_commit_delay=(
+            current_app.config["TRANSFERS_HEALTHY_MAX_COMMIT_DELAY"]
+        ),
     )
 
 
