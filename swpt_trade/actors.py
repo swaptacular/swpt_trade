@@ -288,6 +288,13 @@ def _on_prepared_agent_transfer_signal(
             deadline=deadline,
             min_demurrage_rate=current_app.config["APP_MIN_DEMURRAGE_RATE"],
         )
+        or procedures.put_prepared_transfer_through_transfer_attempts(
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            transfer_id=transfer_id,
+            coordinator_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
     )
     if not has_been_processed:
         procedures.dismiss_prepared_transfer(

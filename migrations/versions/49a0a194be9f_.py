@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 95e1fcb60dd0
+Revision ID: 49a0a194be9f
 Revises: c442e0862585
-Create Date: 2024-06-13 20:04:34.101100
+Create Date: 2024-06-18 16:52:56.938598
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '95e1fcb60dd0'
+revision = '49a0a194be9f'
 down_revision = 'c442e0862585'
 branch_labels = None
 depends_on = None
@@ -77,10 +77,10 @@ def upgrade_():
     sa.CheckConstraint('backoff_counter >= 0'),
     sa.CheckConstraint('failure_code IS NULL OR attempted_at IS NOT NULL'),
     sa.CheckConstraint('fatal_error IS NULL OR failure_code = 0 AND rescheduled_for IS NULL'),
-    sa.CheckConstraint('finalized_at IS NULL OR transfer_id IS NOT NULL'),
     sa.CheckConstraint('nominal_amount >= 1.0'),
-    sa.CheckConstraint('rescheduled_for IS NULL OR failure_code IS NOT NULL OR attempted_at IS NULL'),
-    sa.CheckConstraint('transfer_id IS NULL OR coordinator_request_id IS NOT NULL'),
+    sa.CheckConstraint('rescheduled_for IS NULL OR attempted_at IS NULL OR failure_code IS NOT NULL'),
+    sa.CheckConstraint('transfer_id IS NULL AND finalized_at IS NULL OR transfer_id IS NOT NULL AND finalized_at IS NOT NULL'),
+    sa.CheckConstraint('transfer_id IS NULL OR attempted_at IS NOT NULL'),
     sa.PrimaryKeyConstraint('collector_id', 'turn_id', 'debtor_id', 'creditor_id', 'is_dispatching'),
     comment="Represents a past or future attempt to transfer some amount form a given collector's account to another account, as a part of a given trading turn. More than one attempt may be made if the first attempt has failed."
     )

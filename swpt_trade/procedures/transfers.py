@@ -269,15 +269,6 @@ def put_prepared_transfer_through_account_locks(
 ) -> bool:
     """Return `True` if a corresponding account lock has been found.
     """
-    def dismiss():
-        dismiss_prepared_transfer(
-            debtor_id=debtor_id,
-            creditor_id=creditor_id,
-            transfer_id=transfer_id,
-            coordinator_id=coordinator_id,
-            coordinator_request_id=coordinator_request_id,
-        )
-
     query = (
         db.session.query(AccountLock, WorkerTurn)
         .join(AccountLock.worker_turn)
@@ -334,7 +325,7 @@ def put_prepared_transfer_through_account_locks(
         else:
             # The current status is "settled".
             assert lock.transfer_id is not None
-            assert lock.finalized_at is not None
+            assert lock.finalized_at
 
             if lock.transfer_id == transfer_id and lock.amount < 0:
                 db.session.add(
@@ -358,7 +349,13 @@ def put_prepared_transfer_through_account_locks(
                 )
                 return True
 
-    dismiss()
+    dismiss_prepared_transfer(
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        transfer_id=transfer_id,
+        coordinator_id=coordinator_id,
+        coordinator_request_id=coordinator_request_id,
+    )
     return True
 
 
@@ -837,7 +834,7 @@ def _trigger_transfer_if_possible(
         new_interest_rate_ts is None
         or (
             old_failure_code == attempt.NEWER_INTEREST_RATE
-            and old_interest_rate_ts is not None
+            and old_interest_rate_ts
             and old_interest_rate_ts >= new_interest_rate_ts
         )
     ):
@@ -1069,4 +1066,87 @@ def put_rejected_transfer_through_transfer_attempts(
             attempt.failure_code = attempt.UNSPECIFIED_FAILURE
             attempt.fatal_error = status_code
 
+    return True
+
+
+@atomic
+def put_prepared_transfer_through_transfer_attempts(
+        *,
+        debtor_id: int,
+        creditor_id: int,
+        transfer_id: int,
+        coordinator_id: int,
+        coordinator_request_id: int,
+) -> bool:
+    """Return `True` if a corresponding transfer attempt has been found.
+    """
+    current_ts = datetime.now(tz=timezone.utc)
+
+    attempt = (
+        TransferAttempt.query.
+        filter_by(
+            collector_id=coordinator_id,
+            coordinator_request_id=coordinator_request_id,
+        )
+        .filter(TransferAttempt.coordinator_request_id != null())
+        .with_for_update()
+        .one_or_none()
+    )
+    if attempt is None:
+        return False
+
+    def commit():
+        assert attempt and attempt.amount
+        K = TransferNote.Kind
+        db.session.add(
+            FinalizeTransferSignal(
+                creditor_id=creditor_id,
+                debtor_id=debtor_id,
+                transfer_id=transfer_id,
+                coordinator_id=coordinator_id,
+                coordinator_request_id=coordinator_request_id,
+                committed_amount=attempt.amount,
+                transfer_note_format=AGENT_TRANSFER_NOTE_FORMAT,
+                transfer_note=str(
+                    TransferNote(
+                        attempt.turn_id,
+                        K.DISPATCHING if attempt.is_dispatching else K.SENDING,
+                        attempt.creditor_id,
+                        creditor_id,
+                    )
+                ),
+                inserted_at=current_ts,
+            )
+        )
+
+    if (
+            attempt.debtor_id == debtor_id
+            and attempt.collector_id == creditor_id
+            and attempt.failure_code is None
+    ):
+        assert attempt.attempted_at
+
+        if attempt.transfer_id is None:
+            # The current status is "initiated". Commit the transfer
+            # and change the status directly to "settled".
+            assert attempt.finalized_at is None
+            commit()
+            attempt.transfer_id = transfer_id
+            attempt.finalized_at = current_ts
+            return True
+
+        else:
+            # The current status is "settled".
+            assert attempt.finalized_at
+            if attempt.transfer_id == transfer_id:
+                commit()
+                return True
+
+    dismiss_prepared_transfer(
+        debtor_id=debtor_id,
+        creditor_id=creditor_id,
+        transfer_id=transfer_id,
+        coordinator_id=coordinator_id,
+        coordinator_request_id=coordinator_request_id,
+    )
     return True

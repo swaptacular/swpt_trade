@@ -637,22 +637,32 @@ class TransferAttempt(db.Model):
             )
         ),
         db.CheckConstraint(
-            or_(transfer_id == null(), coordinator_request_id != null())
+            # A transfer can not become successfully prepared before
+            # it has been attempted.
+            or_(transfer_id == null(), attempted_at != null())
         ),
         db.CheckConstraint(
-            or_(finalized_at == null(), transfer_id != null())
-        ),
-        db.CheckConstraint(
-            or_(failure_code == null(), attempted_at != null())
-        ),
-        db.CheckConstraint(
+            # Successfully prepared transfers are finalized instantly.
             or_(
-                rescheduled_for == null(),
-                failure_code != null(),
-                attempted_at == null(),
+                and_(transfer_id == null(), finalized_at == null()),
+                and_(transfer_id != null(), finalized_at != null()),
             )
         ),
         db.CheckConstraint(
+            # A transfer can not fail before it has been attempted.
+            or_(failure_code == null(), attempted_at != null())
+        ),
+        db.CheckConstraint(
+            # Can not reschedule a transfer unless if it has not been
+            # attempted yet, or the latest attempt has failed.
+            or_(
+                rescheduled_for == null(),
+                attempted_at == null(),
+                failure_code != null(),
+            )
+        ),
+        db.CheckConstraint(
+            # Transfers ending with a fatal error can not be rescheduled.
             or_(
                 fatal_error == null(),
                 and_(
