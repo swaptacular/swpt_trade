@@ -614,7 +614,7 @@ class TransferAttempt(db.Model):
     backoff_counter = db.Column(db.SmallInteger, nullable=False, default=0)
     fatal_error = db.Column(db.String)
     __table_args__ = (
-        db.CheckConstraint(nominal_amount >= 2.0),
+        db.CheckConstraint(nominal_amount >= 1.0),
         db.CheckConstraint(amount > 0),
         db.CheckConstraint(backoff_counter >= 0),
         db.CheckConstraint(

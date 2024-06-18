@@ -909,7 +909,7 @@ def _calc_transfer_params(
     demurrage = calc_demurrage(demurrage_info.rate, demurrage_period)
     nominal_amount = attempt.nominal_amount
 
-    assert 2.0 <= nominal_amount
+    assert 1.0 <= nominal_amount
     assert 0.0 <= demurrage <= 1.0
     assert 1e-10 <= transfers_amount_cut <= 0.1
     try:
@@ -955,11 +955,11 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
             )
             .one()
         )
-    except exc.NoResultFound:  # pragma: no cover
+    except exc.NoResultFound:
         # Normally, this should never happen. But if it did happen,
         # returning an incorrect demurrage rate here (0.0) is the
         # least of our problems.
-        return DemurrageInfo(0.0, None)
+        return DemurrageInfo(0.0, None)  # pragma: no cover
 
     interest_rate_changes = (
         db.session.execute(
