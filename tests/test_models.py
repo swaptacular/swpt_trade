@@ -418,19 +418,23 @@ def test_transfer_attempt_properties(current_ts):
     assert ta.calc_backoff_seconds(0) == 0
     assert ta.calc_backoff_seconds(-10) == 0
 
+    # The first increment is not by 1, but by 3.
     ta.increment_backoff_counter()
-    assert ta.backoff_counter == 1
-    assert ta.calc_backoff_seconds(10) == 2 * 10
-    assert ta.calc_backoff_seconds(33) == 2 * 33
+    assert ta.backoff_counter == 3
+    assert ta.calc_backoff_seconds(10) == (2 ** 3) * 10
+    assert ta.calc_backoff_seconds(33) == (2 ** 3) * 33
 
     ta.increment_backoff_counter()
-    assert ta.backoff_counter == 2
-    assert ta.calc_backoff_seconds(10) == 4 * 10
-    assert ta.calc_backoff_seconds(33) == 4 * 33
+    assert ta.backoff_counter == 4
+    assert ta.calc_backoff_seconds(10) == (2 ** 4) * 10
+    assert ta.calc_backoff_seconds(33) == (2 ** 4) * 33
 
+    # `calc_backoff_seconds()` never exceeds MAX_INT32.
     ta.backoff_counter = 10000
     assert ta.calc_backoff_seconds(1) == 2 ** 31 - 1
+    assert ta.calc_backoff_seconds(1000) == 2 ** 31 - 1
 
+    # `ta.backoff_counter` never exceeds MAX_INT16.
     ta.backoff_counter = 2 ** 15 - 2
     ta.increment_backoff_counter()
     ta.increment_backoff_counter()

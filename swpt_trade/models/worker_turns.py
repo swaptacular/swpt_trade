@@ -724,8 +724,26 @@ class TransferAttempt(db.Model):
         return min(min_backoff_seconds * (2 ** n), MAX_INT32)
 
     def increment_backoff_counter(self) -> None:
-        if self.backoff_counter < MAX_INT16:
-            self.backoff_counter += 1
+        n = self.backoff_counter
+
+        if n == 0:
+            # NOTE: The fist back-off is bigger than the next
+            # back-offs. This ensures than the exponential factor
+            # greatly exceeds the linear factor since the very
+            # beginning.
+            #
+            # For example: When a lot of transfers begin to fail with
+            # "TIMEOUT"s, due to a very slow network, the failed
+            # transfers will be attempted again with an 8-times bigger
+            # `max_commit_delay`s (2 ** 3 == 8). Thus, twice more
+            # transfer attempts (the failed, plus the repeated
+            # attempts) will be given 9-times more time to complete (1
+            # + 8 == 9) compared to the time given to the failed
+            # attempts alone.
+            self.backoff_counter = 3
+
+        elif n < MAX_INT16:
+            self.backoff_counter = n + 1
 
     def reschedule_failed_attempt(
             self,
