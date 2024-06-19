@@ -922,9 +922,9 @@ def _calc_transfer_params(
                 * (1.0 - transfers_amount_cut)
             )
         )
-    except OverflowError:
+    except OverflowError:  # pragma: no cover
         # This can happen if `nominal_amount` is +Infinity
-        amount = MAX_INT64  # pragma: no cover
+        amount = MAX_INT64
 
     assert 0 <= amount <= MAX_INT64
     assert amount <= nominal_amount
@@ -988,7 +988,7 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
             min_interest_rate = interest_rate
 
         if change_ts > last_change_ts:
-            last_change_ts = change_ts
+            last_change_ts = change_ts  # pragma: no cover
 
         if change_ts < collection_started_at:
             break
@@ -1132,7 +1132,6 @@ def put_finalized_transfer_through_transfer_attempts(
             collector_id=coordinator_id,
             coordinator_request_id=coordinator_request_id,
             debtor_id=debtor_id,
-            creditor_id=creditor_id,
             transfer_id=transfer_id,
             failure_code=null(),
         )
@@ -1141,7 +1140,7 @@ def put_finalized_transfer_through_transfer_attempts(
         .with_for_update()
         .one_or_none()
     )
-    if attempt:
+    if attempt and attempt.collector_id == creditor_id:
         assert attempt.attempted_at
         assert attempt.rescheduled_for is None
 

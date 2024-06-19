@@ -32,6 +32,7 @@ from swpt_trade.models import (
     WorkerReceiving,
     WorkerSending,
     WorkerDispatching,
+    TransferAttempt,
     TS0,
     DATE0,
     MAX_INT32,
@@ -1683,12 +1684,51 @@ def wt_2_5(db_session, current_ts):
 
 
 @pytest.fixture(scope="function")
-def collector_id(db_session):
+def collector_id(db_session, current_ts):
     db_session.add(
         ActiveCollector(
             debtor_id=666,
             collector_id=999,
             account_id="TestCollectorAccount999",
+        )
+    )
+    db_session.add(
+        NeededWorkerAccount(creditor_id=999, debtor_id=666)
+    )
+    params = {
+        "creation_date": DATE0,
+        "last_change_ts": current_ts,
+        "last_change_seqnum": 1,
+        "principal": 100,
+        "interest": 31.4,
+        "interest_rate": 5.0,
+        "last_interest_rate_change_ts": current_ts,
+        "config_flags": 0,
+        "account_id": "Account123",
+        "last_transfer_number": 2,
+        "last_transfer_committed_at": TS0,
+        "demurrage_rate": -50.0,
+        "commit_period": 1000000,
+        "transfer_note_max_bytes": 500,
+        "debtor_info_iri": "https://example.com/666",
+    }
+    db_session.add(
+        WorkerAccount(creditor_id=999, debtor_id=666, **params)
+    )
+    db_session.add(
+        InterestRateChange(
+            creditor_id=999,
+            debtor_id=666,
+            change_ts=current_ts,
+            interest_rate=5.0,
+        )
+    )
+    db_session.add(
+        InterestRateChange(
+            creditor_id=999,
+            debtor_id=666,
+            change_ts=current_ts - timedelta(days=10),
+            interest_rate=-3.0,
         )
     )
     db_session.commit()
@@ -2694,3 +2734,151 @@ def test_process_account_id_request_signal(db_session, current_ts):
     assert rss[0].is_dispatching is False
     assert rss[0].account_id == ""
     assert rss[0].account_id_version == MIN_INT64
+
+
+def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=2),
+        )
+    )
+    db_session.commit()
+
+    p.process_account_id_response_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        account_id="account123",
+        account_id_version=1,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-3,
+    )
+    pts = PrepareTransferSignal.query.one()
+    assert pts.creditor_id == 999
+    assert pts.debtor_id == 666
+    assert pts.coordinator_request_id is not None
+    assert pts.recipient == "account123"
+    assert pts.min_locked_amount == 0
+    assert pts.max_locked_amount == 0
+    assert pts.max_commit_delay == int(timedelta(hours=3).total_seconds())
+    assert pts.inserted_at >= current_ts
+    coordinator_request_id = pts.coordinator_request_id
+    final_interest_rate_ts = pts.final_interest_rate_ts
+    assert coordinator_request_id is not None
+    assert final_interest_rate_ts > current_ts - timedelta(hours=1)
+
+    # A trigger signal that do not trigger.
+    p.process_trigger_transfer_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-3,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 1
+
+    ta = TransferAttempt.query.one()
+    assert ta.attempted_at >= current_ts
+    assert ta.recipient == "account123"
+    assert ta.recipient_version == 1
+    assert ta.coordinator_request_id == coordinator_request_id
+    assert ta.transfer_id is None
+    assert ta.finalized_at is None
+    assert ta.failure_code is None
+    assert ta.fatal_error is None
+    assert ta.final_interest_rate_ts == final_interest_rate_ts
+    assert ta.backoff_counter == 0
+    amount = ta.amount
+    assert 900 <= amount <= 1000  # TODO: ensure the demurrage is correct!
+
+    assert p.put_prepared_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=collector_id,
+        transfer_id=12345,
+        coordinator_id=collector_id,
+        coordinator_request_id=coordinator_request_id,
+    )
+    ta = TransferAttempt.query.one()
+    assert ta.recipient == "account123"
+    assert ta.recipient_version == 1
+    assert ta.coordinator_request_id == coordinator_request_id
+    assert ta.transfer_id == 12345
+    assert ta.finalized_at >= current_ts
+    assert ta.failure_code is None
+    assert ta.fatal_error is None
+    assert ta.final_interest_rate_ts == final_interest_rate_ts
+    assert ta.amount == amount
+    assert ta.backoff_counter == 0
+
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == collector_id
+    assert fts.debtor_id == 666
+    assert fts.transfer_id == 12345
+    assert fts.coordinator_id == collector_id
+    assert fts.coordinator_request_id == coordinator_request_id
+    assert fts.committed_amount == amount
+    assert fts.transfer_note_format == AGENT_TRANSFER_NOTE_FORMAT
+    transfser_note = utils.TransferNote.parse(fts.transfer_note)
+    assert transfser_note.turn_id == 1
+    assert transfser_note.note_kind == utils.TransferNote.Kind.DISPATCHING
+    assert transfser_note.first_id == collector_id
+    assert transfser_note.second_id == 123
+
+    # Process the same "PreparedTransfer" signal again. Leads to
+    # sending the same "FinalizeTransfer" message again.
+    assert p.put_prepared_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=collector_id,
+        transfer_id=12345,
+        coordinator_id=collector_id,
+        coordinator_request_id=coordinator_request_id,
+    )
+    ta = TransferAttempt.query.one()
+    assert ta.recipient == "account123"
+    assert ta.recipient_version == 1
+    assert ta.coordinator_request_id == coordinator_request_id
+    assert ta.transfer_id == 12345
+    assert ta.finalized_at >= current_ts
+    assert ta.failure_code is None
+    assert ta.fatal_error is None
+    assert ta.final_interest_rate_ts == final_interest_rate_ts
+    assert ta.amount == amount
+    assert ta.backoff_counter == 0
+
+    ftss = FinalizeTransferSignal.query.all()
+    assert len(ftss) == 2
+    for fts in ftss:
+        assert fts.creditor_id == collector_id
+        assert fts.debtor_id == 666
+        assert fts.transfer_id == 12345
+        assert fts.coordinator_id == collector_id
+        assert fts.coordinator_request_id == coordinator_request_id
+        assert fts.committed_amount == amount
+        assert fts.transfer_note_format == AGENT_TRANSFER_NOTE_FORMAT
+        transfser_note = utils.TransferNote.parse(fts.transfer_note)
+        assert transfser_note.turn_id == 1
+        assert transfser_note.note_kind == utils.TransferNote.Kind.DISPATCHING
+        assert transfser_note.first_id == collector_id
+        assert transfser_note.second_id == 123
+
+    p.put_finalized_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=collector_id,
+        transfer_id=12345,
+        coordinator_id=collector_id,
+        coordinator_request_id=coordinator_request_id,
+        committed_amount=amount,
+        status_code="OK",
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+    )
+    assert len(TransferAttempt.query.all()) == 0
