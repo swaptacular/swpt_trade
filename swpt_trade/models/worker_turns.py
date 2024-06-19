@@ -726,7 +726,7 @@ class TransferAttempt(db.Model):
     def increment_backoff_counter(self) -> None:
         n = self.backoff_counter
 
-        if n == 0:
+        if n < 3:
             # NOTE: The fist back-off is bigger than the next
             # back-offs. This ensures than the exponential factor
             # greatly exceeds the linear factor since the very
