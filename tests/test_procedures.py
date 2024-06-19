@@ -1731,6 +1731,14 @@ def collector_id(db_session, current_ts):
             interest_rate=-20.0,
         )
     )
+    db_session.add(
+        InterestRateChange(
+            creditor_id=999,
+            debtor_id=666,
+            change_ts=current_ts - timedelta(days=1000),
+            interest_rate=-10.0,
+        )
+    )
     db_session.commit()
     return 999
 
@@ -2882,3 +2890,65 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
         transfers_healthy_max_commit_delay=timedelta(hours=3),
     )
     assert len(TransferAttempt.query.all()) == 0
+
+
+def test_trnasfer_attempt_no_collector(db_session, current_ts):
+    db_session.add(
+        TransferAttempt(
+            collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=3),
+            recipient="account123",
+            recipient_version=1,
+            attempted_at=current_ts,
+            amount=1000,
+            coordinator_request_id=7,
+            final_interest_rate_ts=current_ts,
+            transfer_id=12345,
+            finalized_at=current_ts,
+            failure_code=TransferAttempt.UNSPECIFIED_FAILURE,
+            backoff_counter=3,
+        )
+    )
+    db_session.commit()
+
+    p.process_trigger_transfer_signal(
+        collector_id=999,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-8,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 0
+
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == TransferAttempt.UNSPECIFIED_FAILURE
+    assert ta.fatal_error is None
+    assert ta.backoff_counter == 3
+    assert ta.rescheduled_for is not None
+
+    assert p.put_prepared_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=999,
+        transfer_id=12345,
+        coordinator_id=999,
+        coordinator_request_id=7,
+    )
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == TransferAttempt.UNSPECIFIED_FAILURE
+
+    fts = FinalizeTransferSignal.query.one()
+    assert fts.creditor_id == 999
+    assert fts.debtor_id == 666
+    assert fts.transfer_id == 12345
+    assert fts.coordinator_id == 999
+    assert fts.coordinator_request_id == 7
+    assert fts.committed_amount == 0
+    assert fts.transfer_note_format == ""
+    assert fts.transfer_note == ""

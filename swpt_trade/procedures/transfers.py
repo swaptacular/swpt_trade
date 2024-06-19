@@ -961,7 +961,7 @@ def _get_demurrage_info(attempt: TransferAttempt) -> DemurrageInfo:
         # Normally, this should never happen. But if it did happen,
         # returning an incorrect demurrage rate here (0.0) is the
         # least of our problems.
-        return DemurrageInfo(0.0, None)  # pragma: no cover
+        return DemurrageInfo(0.0, None)
 
     interest_rate_changes = (
         db.session.execute(
