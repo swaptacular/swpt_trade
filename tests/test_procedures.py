@@ -1728,7 +1728,7 @@ def collector_id(db_session, current_ts):
             creditor_id=999,
             debtor_id=666,
             change_ts=current_ts - timedelta(days=10),
-            interest_rate=-3.0,
+            interest_rate=-20.0,
         )
     )
     db_session.commit()
@@ -2744,8 +2744,8 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
             debtor_id=666,
             creditor_id=123,
             is_dispatching=True,
-            nominal_amount=1000.5,
-            collection_started_at=current_ts - timedelta(hours=2),
+            nominal_amount=1e9,
+            collection_started_at=current_ts - timedelta(days=30),
         )
     )
     db_session.commit()
@@ -2759,7 +2759,7 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
         account_id="account123",
         account_id_version=1,
         transfers_healthy_max_commit_delay=timedelta(hours=3),
-        transfers_amount_cut=1e-3,
+        transfers_amount_cut=1e-8,
     )
     pts = PrepareTransferSignal.query.one()
     assert pts.creditor_id == 999
@@ -2783,7 +2783,7 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
         creditor_id=123,
         is_dispatching=True,
         transfers_healthy_max_commit_delay=timedelta(hours=3),
-        transfers_amount_cut=1e-3,
+        transfers_amount_cut=1e-8,
     )
     assert len(PrepareTransferSignal.query.all()) == 1
 
@@ -2799,7 +2799,7 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
     assert ta.final_interest_rate_ts == final_interest_rate_ts
     assert ta.backoff_counter == 0
     amount = ta.amount
-    assert 900 <= amount <= 1000  # TODO: ensure the demurrage is correct!
+    assert 0.980e-9 <= amount <= 0.983e9
 
     assert p.put_prepared_transfer_through_transfer_attempts(
         debtor_id=666,
