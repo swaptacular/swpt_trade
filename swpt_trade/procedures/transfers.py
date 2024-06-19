@@ -1096,8 +1096,8 @@ def put_prepared_transfer_through_transfer_attempts(
                                 if attempt.is_dispatching
                                 else TransferNote.Kind.SENDING
                             ),
+                            attempt.collector_id,
                             attempt.creditor_id,
-                            creditor_id,
                         )
                     ),
                     inserted_at=current_ts,
