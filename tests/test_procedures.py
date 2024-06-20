@@ -2893,6 +2893,98 @@ def test_transfer_attempt_success(db_session, collector_id, current_ts):
     assert len(TransferAttempt.query.all()) == 0
 
 
+@pytest.mark.parametrize("status", [
+    ("TIMEOUT",
+     TransferAttempt.TIMEOUT),
+    ("NEWER_INTEREST_RATE",
+     TransferAttempt.NEWER_INTEREST_RATE),
+    ("RECIPIENT_IS_UNREACHABLE",
+     TransferAttempt.RECIPIENT_IS_UNREACHABLE),
+    ("INSUFFICIENT_AVAILABLE_AMOUNT",
+     TransferAttempt.INSUFFICIENT_AVAILABLE_AMOUNT),
+    ("FATAL_ERROR",
+     TransferAttempt.UNSPECIFIED_FAILURE),
+])
+def test_transfer_attempt_failure(
+        db_session,
+        collector_id,
+        current_ts,
+        status,
+):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1e9,
+            collection_started_at=current_ts - timedelta(days=30),
+            backoff_counter=100,
+        )
+    )
+    db_session.commit()
+
+    p.process_account_id_response_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        account_id="account123",
+        account_id_version=1,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-8,
+    )
+    pts = PrepareTransferSignal.query.one()
+    coordinator_request_id = pts.coordinator_request_id
+
+    assert p.put_prepared_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=collector_id,
+        transfer_id=12345,
+        coordinator_id=collector_id,
+        coordinator_request_id=coordinator_request_id,
+    )
+
+    p.put_finalized_transfer_through_transfer_attempts(
+        debtor_id=666,
+        creditor_id=collector_id,
+        transfer_id=12345,
+        coordinator_id=collector_id,
+        coordinator_request_id=coordinator_request_id,
+        committed_amount=0,
+        status_code=status[0],
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+    )
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == status[1]
+    assert ta.fatal_error == (
+        None
+        if status[0] != "FATAL_ERROR"
+        else status[0]
+    )
+    assert ta.backoff_counter == (
+        100
+        if status[0] in ["NEWER_INTEREST_RATE", "FATAL_ERROR"]
+        else 101
+    )
+    assert (ta.rescheduled_for is None) is (
+        False
+        if status[0] != "FATAL_ERROR"
+        else True
+    )
+    if status[0] == "RECIPIENT_IS_UNREACHABLE":
+        airs = AccountIdRequestSignal.query.one()
+        assert airs.collector_id == collector_id
+        assert airs.turn_id == 1
+        assert airs.debtor_id == 666
+        assert airs.creditor_id == 123
+        assert airs.is_dispatching is True
+    else:
+        assert len(AccountIdRequestSignal.query.all()) == 0
+
+
 def test_transfer_attempt_no_collector(db_session, current_ts):
     db_session.add(
         TransferAttempt(
