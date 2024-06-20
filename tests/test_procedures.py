@@ -2745,7 +2745,7 @@ def test_process_account_id_request_signal(db_session, current_ts):
     assert rss[0].account_id_version == MIN_INT64
 
 
-def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
+def test_transfer_attempt_success(db_session, collector_id, current_ts):
     db_session.add(
         TransferAttempt(
             collector_id=collector_id,
@@ -2771,7 +2771,7 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
         transfers_amount_cut=1e-8,
     )
     pts = PrepareTransferSignal.query.one()
-    assert pts.creditor_id == 999
+    assert pts.creditor_id == collector_id
     assert pts.debtor_id == 666
     assert pts.coordinator_request_id is not None
     assert pts.recipient == "account123"
@@ -2893,7 +2893,7 @@ def test_trnasfer_attempt_success(db_session, collector_id, current_ts):
     assert len(TransferAttempt.query.all()) == 0
 
 
-def test_trnasfer_attempt_no_collector(db_session, current_ts):
+def test_transfer_attempt_no_collector(db_session, current_ts):
     db_session.add(
         TransferAttempt(
             collector_id=999,
@@ -2935,7 +2935,7 @@ def test_trnasfer_attempt_no_collector(db_session, current_ts):
     assert ta.rescheduled_for is not None
 
 
-def test_trnasfer_attempt_old_interest_rate(
+def test_transfer_attempt_old_interest_rate(
         db_session,
         collector_id,
         current_ts,
@@ -2981,7 +2981,7 @@ def test_trnasfer_attempt_old_interest_rate(
     assert ta.rescheduled_for is not None
 
 
-def test_trnasfer_attempt_unmatched_prepared_transfer(
+def test_transfer_attempt_unmatched_prepared_transfer(
         db_session,
         collector_id,
         current_ts,
@@ -3039,7 +3039,7 @@ def test_trnasfer_attempt_unmatched_prepared_transfer(
     ("FATAL_ERROR",
      TransferAttempt.UNSPECIFIED_FAILURE),
 ])
-def test_trnasfer_attempt_rejected_transfer(
+def test_transfer_attempt_rejected_transfer(
         db_session,
         collector_id,
         current_ts,
@@ -3102,3 +3102,70 @@ def test_trnasfer_attempt_rejected_transfer(
         assert airs.is_dispatching is True
     else:
         assert len(AccountIdRequestSignal.query.all()) == 0
+
+
+def test_transfer_attempt_trigger_after_recipient_is_unreachable(
+        db_session,
+        collector_id,
+        current_ts,
+):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=3),
+            recipient="account123",
+            recipient_version=1,
+            attempted_at=current_ts,
+            amount=1000,
+            coordinator_request_id=7,
+            final_interest_rate_ts=current_ts,
+            failure_code=TransferAttempt.RECIPIENT_IS_UNREACHABLE,
+        )
+    )
+    db_session.commit()
+
+    p.process_trigger_transfer_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-8,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 0
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == TransferAttempt.RECIPIENT_IS_UNREACHABLE
+    assert ta.fatal_error is None
+    assert ta.backoff_counter > 0
+    assert ta.rescheduled_for is not None
+
+    airs = AccountIdRequestSignal.query.one()
+    assert airs.collector_id == collector_id
+    assert airs.turn_id == 1
+    assert airs.debtor_id == 666
+    assert airs.creditor_id == 123
+    assert airs.is_dispatching is True
+
+    p.process_account_id_response_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        account_id="account123new",
+        account_id_version=2,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-8,
+    )
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == TransferAttempt.UNSPECIFIED_FAILURE
+    assert ta.fatal_error is None
+    assert ta.rescheduled_for is not None
