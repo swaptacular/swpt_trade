@@ -20,6 +20,7 @@ from swpt_trade.models import (
     PrepareTransferSignal,
     FinalizeTransferSignal,
     AccountIdResponseSignal,
+    AccountIdRequestSignal,
     DebtorInfoFetch,
     DebtorInfoDocument,
     TradingPolicy,
@@ -2933,22 +2934,171 @@ def test_trnasfer_attempt_no_collector(db_session, current_ts):
     assert ta.backoff_counter == 3
     assert ta.rescheduled_for is not None
 
+
+def test_trnasfer_attempt_old_interest_rate(
+        db_session,
+        collector_id,
+        current_ts,
+):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=3),
+            recipient="account123",
+            recipient_version=1,
+            attempted_at=current_ts,
+            amount=1000,
+            coordinator_request_id=7,
+            final_interest_rate_ts=current_ts + timedelta(days=10),
+            transfer_id=12345,
+            finalized_at=current_ts,
+            failure_code=TransferAttempt.NEWER_INTEREST_RATE,
+            backoff_counter=3,
+        )
+    )
+    db_session.commit()
+
+    p.process_trigger_transfer_signal(
+        collector_id=collector_id,
+        turn_id=1,
+        debtor_id=666,
+        creditor_id=123,
+        is_dispatching=True,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+        transfers_amount_cut=1e-8,
+    )
+    assert len(PrepareTransferSignal.query.all()) == 0
+
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == TransferAttempt.NEWER_INTEREST_RATE
+    assert ta.fatal_error is None
+    assert ta.backoff_counter == 3
+    assert ta.rescheduled_for is not None
+
+
+def test_trnasfer_attempt_unmatched_prepared_transfer(
+        db_session,
+        collector_id,
+        current_ts,
+):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=3),
+            recipient="account123",
+            recipient_version=1,
+            attempted_at=current_ts,
+            amount=1000,
+            coordinator_request_id=7,
+            final_interest_rate_ts=current_ts,
+            transfer_id=12345,
+            finalized_at=current_ts,
+            failure_code=TransferAttempt.UNSPECIFIED_FAILURE,
+            backoff_counter=3,
+        )
+    )
+    db_session.commit()
+
     assert p.put_prepared_transfer_through_transfer_attempts(
         debtor_id=666,
-        creditor_id=999,
+        creditor_id=collector_id,
         transfer_id=12345,
-        coordinator_id=999,
+        coordinator_id=collector_id,
         coordinator_request_id=7,
     )
-    ta = TransferAttempt.query.one()
-    assert ta.failure_code == TransferAttempt.UNSPECIFIED_FAILURE
-
     fts = FinalizeTransferSignal.query.one()
-    assert fts.creditor_id == 999
+    assert fts.creditor_id == collector_id
     assert fts.debtor_id == 666
     assert fts.transfer_id == 12345
-    assert fts.coordinator_id == 999
+    assert fts.coordinator_id == collector_id
     assert fts.coordinator_request_id == 7
     assert fts.committed_amount == 0
     assert fts.transfer_note_format == ""
     assert fts.transfer_note == ""
+
+
+@pytest.mark.parametrize("status", [
+    ("TIMEOUT",
+     TransferAttempt.TIMEOUT),
+    ("NEWER_INTEREST_RATE",
+     TransferAttempt.NEWER_INTEREST_RATE),
+    ("RECIPIENT_IS_UNREACHABLE",
+     TransferAttempt.RECIPIENT_IS_UNREACHABLE),
+    ("INSUFFICIENT_AVAILABLE_AMOUNT",
+     TransferAttempt.INSUFFICIENT_AVAILABLE_AMOUNT),
+    ("FATAL_ERROR",
+     TransferAttempt.UNSPECIFIED_FAILURE),
+])
+def test_trnasfer_attempt_rejected_transfer(
+        db_session,
+        collector_id,
+        current_ts,
+        status,
+):
+    db_session.add(
+        TransferAttempt(
+            collector_id=collector_id,
+            turn_id=1,
+            debtor_id=666,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts - timedelta(hours=3),
+            recipient="account123",
+            recipient_version=1,
+            attempted_at=current_ts,
+            amount=1000,
+            coordinator_request_id=7,
+            final_interest_rate_ts=current_ts,
+            backoff_counter=100,
+        )
+    )
+    db_session.commit()
+
+    p.put_rejected_transfer_through_transfer_attempts(
+        coordinator_id=collector_id,
+        coordinator_request_id=7,
+        status_code=status[0],
+        debtor_id=666,
+        creditor_id=123,
+        transfers_healthy_max_commit_delay=timedelta(hours=3),
+    )
+    assert len(PrepareTransferSignal.query.all()) == 0
+    assert len(FinalizeTransferSignal.query.all()) == 0
+
+    ta = TransferAttempt.query.one()
+    assert ta.failure_code == status[1]
+    assert ta.fatal_error == (
+        None
+        if status[0] != "FATAL_ERROR"
+        else status[0]
+    )
+    assert ta.backoff_counter == (
+        100
+        if status[0] in ["NEWER_INTEREST_RATE", "FATAL_ERROR"]
+        else 101
+    )
+    assert (ta.rescheduled_for is None) is (
+        False
+        if status[0] != "FATAL_ERROR"
+        else True
+    )
+    if status[0] == "RECIPIENT_IS_UNREACHABLE":
+        airs = AccountIdRequestSignal.query.one()
+        assert airs.collector_id == collector_id
+        assert airs.turn_id == 1
+        assert airs.debtor_id == 666
+        assert airs.creditor_id == 123
+        assert airs.is_dispatching is True
+    else:
+        assert len(AccountIdRequestSignal.query.all()) == 0
