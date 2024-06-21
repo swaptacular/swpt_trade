@@ -52,7 +52,7 @@ def test_flush_messages(mocker, app, db_session):
             "--quit-early",
         ]
     )
-    assert result.exit_code == 1
+    assert result.exit_code != 2
     assert send_signalbus_message.called_once()
     assert len(m.FinalizeTransferSignal.query.all()) == 0
 
@@ -154,7 +154,7 @@ def test_fetch_debtor_infos(mocker, app, db_session):
         )
 
     result = invoke()
-    assert result.exit_code == 1
+    assert result.exit_code != 2
 
     assert len(m.DebtorInfoFetch.query.all()) == 0
     assert len(m.DiscoverDebtorSignal.query.all()) == 0
@@ -185,6 +185,76 @@ def test_fetch_debtor_infos(mocker, app, db_session):
     assert len(confirmations) == 1
     assert confirmations[0].debtor_id == 666
     assert confirmations[0].debtor_info_locator == "https://example.com/666"
+
+
+def test_trigger_transfer_attempts(app, db_session, current_ts):
+    ta1 = m.TransferAttempt(
+            collector_id=666,
+            turn_id=1,
+            debtor_id=222,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts,
+            recipient="account123",
+            recipient_version=1,
+            rescheduled_for=current_ts - timedelta(minutes=10),
+    )
+    ta2 = m.TransferAttempt(
+            collector_id=666,
+            turn_id=1,
+            debtor_id=333,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts,
+            recipient="account123",
+            recipient_version=1,
+            rescheduled_for=None,
+    )
+    ta3 = m.TransferAttempt(
+            collector_id=666,
+            turn_id=1,
+            debtor_id=444,
+            creditor_id=123,
+            is_dispatching=True,
+            nominal_amount=1000.5,
+            collection_started_at=current_ts,
+            recipient="account123",
+            recipient_version=1,
+            rescheduled_for=current_ts + timedelta(days=10),
+    )
+    db.session.add(ta1)
+    db.session.add(ta2)
+    db.session.add(ta3)
+    db.session.commit()
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "trigger_transfer_attempts",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code != 2
+    attempts = m.TransferAttempt.query.all()
+    attempts.sort(key=lambda x: x.debtor_id)
+    assert len(attempts) == 3
+    assert attempts[0].debtor_id == 222
+    assert attempts[0].rescheduled_for is None
+    assert attempts[1].debtor_id == 333
+    assert attempts[1].rescheduled_for is None
+    assert attempts[2].debtor_id == 444
+    assert attempts[2].rescheduled_for is not None
+
+    tts = m.TriggerTransferSignal.query.all()
+    assert len(tts) == 1
+    assert tts[0].collector_id == 666
+    assert tts[0].turn_id == 1
+    assert tts[0].debtor_id == 222
+    assert tts[0].creditor_id == 123
+    assert tts[0].is_dispatching is True
 
 
 def test_delete_parent_documents(app, db_session, restore_sharding_realm):

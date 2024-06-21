@@ -232,6 +232,9 @@ class Configuration(metaclass=MetaEnvReader):
     FETCH_CONNECTIONS = 100
     FETCH_TIMEOUT = 10.0
 
+    TRIGGER_PROCESSES = 1
+    TRIGGER_PERIOD = 2.0
+
     DELETE_PARENT_SHARD_RECORDS = False
 
     API_TITLE = "Trade API"
@@ -326,6 +329,7 @@ class Configuration(metaclass=MetaEnvReader):
     APP_ACCOUNT_ID_REQUEST_BURST_COUNT = 10000
     APP_ACCOUNT_ID_RESPONSE_BURST_COUNT = 10000
     APP_DEBTOR_INFO_FETCH_BURST_COUNT = 2000
+    APP_RESCHEDULED_TRANSFERS_BURST_COUNT = 5000
     APP_SUPERUSER_SUBJECT_REGEX = "^creditors-superuser$"
     APP_SUPERVISOR_SUBJECT_REGEX = "^creditors-supervisor$"
     APP_CREDITOR_SUBJECT_REGEX = "^creditors:([0-9]+)$"

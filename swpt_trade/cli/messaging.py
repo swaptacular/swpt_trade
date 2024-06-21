@@ -47,8 +47,8 @@ from .common import swpt_trade
 def consume_messages(
     url, queue, processes, threads, prefetch_size, prefetch_count
 ):
-    """Consume and process incoming Swaptacular Messaging Protocol
-    messages.
+    """Run processes that consume and process incoming Swaptacular
+    Messaging Protocol messages.
 
     If some of the available options are not specified directly, the
     values of the following environment variables will be used:
@@ -146,7 +146,7 @@ def flush_messages(
     wait: float,
     quit_early: bool,
 ) -> None:
-    """Send pending messages to the message broker.
+    """Run processes that send pending messages to the message broker.
 
     If a list of MESSAGE_TYPES is given, flushes only these types of
     messages. If no MESSAGE_TYPES are specified, flushes all messages.

@@ -11,11 +11,11 @@ from swpt_pythonlib.multiproc_utils import (
     spawn_worker_processes,
     try_unblock_signals,
 )
-from swpt_trade.fetch_debtor_infos import process_debtor_info_fetches
+from swpt_trade.run_transfers import process_rescheduled_transfers
 from .common import swpt_trade
 
 
-@swpt_trade.command("fetch_debtor_infos")
+@swpt_trade.command("trigger_transfer_attempts")
 @with_appcontext
 @click.option(
     "-p",
@@ -23,30 +23,8 @@ from .common import swpt_trade
     type=int,
     help=(
         "The number of worker processes."
-        " If not specified, the value of the FETCH_PROCESSES environment"
+        " If not specified, the value of the TRIGGER_PROCESSES environment"
         " variable will be used, defaulting to 1 if empty."
-    ),
-)
-@click.option(
-    "-c",
-    "--connections",
-    type=int,
-    help=(
-        "The maximum number of HTTP connections that each worker process"
-        " will initiate simultaneously. If not specified, the value of"
-        " the FETCH_CONNECTIONS environment variable will be used,"
-        " defaulting to 100 if empty."
-    ),
-)
-@click.option(
-    "-t",
-    "--timeout",
-    type=float,
-    help=(
-        "The number of seconds to wait for a response, before the HTTP"
-        " request is cancelled. If not specified, the value of the "
-        " FETCH_TIMEOUT environment variable will be used, defaulting"
-        " to 10 seconds if empty."
     ),
 )
 @click.option(
@@ -55,7 +33,7 @@ from .common import swpt_trade
     type=float,
     help=(
         "Poll the database for scheduled requests every FLOAT seconds."
-        " If not specified, the value of the FETCH_PERIOD environment"
+        " If not specified, the value of the TRIGGER_PERIOD environment"
         " variable will be used, defaulting to 2 seconds if empty."
     ),
 )
@@ -65,25 +43,17 @@ from .common import swpt_trade
     default=False,
     help="Exit after some time (mainly useful during testing).",
 )
-def fetch_debtor_infos(
+def trigger_transfer_attempts(
     processes: int,
-    connections: int,
-    timeout: float,
     wait: float,
     quit_early: bool,
 ) -> None:
-    """Run processes that perform scheduled HTTP requests to fetch
-    debtor info documents.
-
+    """Run processes that trigger rescheduled transfer attempts.
     """
     logger = logging.getLogger(__name__)
-    logger.info("Started fetching debtor info documents.")
+    logger.info("Started triggering transfer attempts.")
 
-    def _fetch(
-            connections: int,
-            timeout: float,
-            wait: float,
-    ) -> None:  # pragma: no cover
+    def _trigger(wait: float) -> None:  # pragma: no cover
         from swpt_trade import create_app
 
         app = create_app()
@@ -101,19 +71,19 @@ def fetch_debtor_infos(
             while not stopped:
                 started_at = time.time()
                 try:
-                    count = process_debtor_info_fetches(connections, timeout)
+                    count = process_rescheduled_transfers()
                 except Exception:
                     logger.exception(
-                        "Caught error while fetching debtor info documents."
+                        "Caught error while triggering transfer attempts."
                     )
                     sys.exit(1)
 
                 if count > 0:
                     logger.info(
-                        "%i debtor info documents have been fetched.", count
+                        "%i transfer attempts have been triggered.", count
                     )
                 else:
-                    logger.debug("0 debtor info documents have been fetched.")
+                    logger.debug("0 transfer attempts have been triggered.")
 
                 if quit_early:
                     break
@@ -123,23 +93,13 @@ def fetch_debtor_infos(
         processes=(
             processes
             if processes is not None
-            else current_app.config["FETCH_PROCESSES"]
+            else current_app.config["TRIGGER_PROCESSES"]
         ),
-        target=_fetch,
-        connections=(
-            connections
-            if connections is not None
-            else current_app.config["FETCH_CONNECTIONS"]
-        ),
-        timeout=(
-            timeout
-            if timeout is not None
-            else current_app.config["FETCH_TIMEOUT"]
-        ),
+        target=_trigger,
         wait=(
             wait
             if wait is not None
-            else current_app.config["FETCH_PERIOD"]
+            else current_app.config["TRIGGER_PERIOD"]
         ),
     )
     sys.exit(1)
