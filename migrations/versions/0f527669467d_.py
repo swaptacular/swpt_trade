@@ -47,13 +47,18 @@ def upgrade_():
     sa.Column('amount_to_collect', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_collecting" table, at the moment the "dispatching_status" record has been created.'),
     sa.Column('total_collected_amount', sa.BigInteger(), nullable=True, comment='A non-NULL value indicates that no more transfers for corresponding records in the "worker_collecting" table will be collected.'),
     sa.Column('amount_to_send', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_sending" table, at the moment the "dispatching_status" record has been created.'),
+    sa.Column('started_sending', sa.BOOLEAN(), nullable=False),
     sa.Column('all_sent', sa.BOOLEAN(), nullable=False),
     sa.Column('amount_to_receive', sa.BigInteger(), nullable=False, comment='The sum of all expected amounts from the corresponding records in the "worker_receiving" table, at the moment the "dispatching_status" record has been created.'),
     sa.Column('number_to_receive', sa.Integer(), nullable=False, comment='The number of corresponding records in the "worker_receiving" table, at the moment the "dispatching_status" record has been created.'),
     sa.Column('total_received_amount', sa.BigInteger(), nullable=True, comment='A non-NULL value indicates that no more transfers for corresponding records in the "worker_receiving" table will be received.'),
     sa.Column('all_received', sa.BOOLEAN(), nullable=False),
     sa.Column('amount_to_dispatch', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_dispatching" table, at the moment the "dispatching_status" record has been created.'),
+    sa.Column('started_dispatching', sa.BOOLEAN(), nullable=False),
+    sa.CheckConstraint('started_sending = (total_collected_amount IS NOT NULL)'),
+    sa.CheckConstraint('all_sent = false OR started_sending = true'),
     sa.CheckConstraint('all_received = false OR total_received_amount IS NOT NULL'),
+    sa.CheckConstraint('started_dispatching = (all_sent = true AND total_received_amount IS NOT NULL)'),
     sa.CheckConstraint('amount_to_collect >= 0'),
     sa.CheckConstraint('amount_to_dispatch >= 0'),
     sa.CheckConstraint('amount_to_send <= amount_to_collect'),
@@ -63,9 +68,12 @@ def upgrade_():
     sa.CheckConstraint('total_collected_amount <= amount_to_collect'),
     sa.CheckConstraint('total_collected_amount >= 0'),
     sa.CheckConstraint('total_received_amount >= 0'),
-    sa.PrimaryKeyConstraint('collector_id', 'turn_id', 'debtor_id'),
     comment='Represents the status of the process of collecting, sending, receiving, and dispatching for a given collector account, during a given trading turn.'
     )
+    # Create a "covering" index instead of a "normal" index.
+    op.execute('CREATE UNIQUE INDEX idx_dispatching_status_pk ON dispatching_status (collector_id, turn_id, debtor_id) INCLUDE (started_sending, all_sent, started_dispatching)')
+    op.execute('ALTER TABLE dispatching_status ADD CONSTRAINT dispatching_status_pkey PRIMARY KEY USING INDEX idx_dispatching_status_pk')
+
     op.create_table('worker_collecting',
     sa.Column('collector_id', sa.BigInteger(), nullable=False),
     sa.Column('turn_id', sa.Integer(), nullable=False),

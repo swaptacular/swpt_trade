@@ -132,12 +132,14 @@ class DispatchingData:
                 "amount_to_collect": value[0],
                 "total_collected_amount": None,
                 "amount_to_send": value[1],
+                "started_sending": False,
                 "all_sent": False,
                 "amount_to_receive": value[2],
                 "number_to_receive": value[3],
                 "total_received_amount": None,
                 "all_received": False,
                 "amount_to_dispatch": value[4],
+                "started_dispatching": False,
             }
 
 

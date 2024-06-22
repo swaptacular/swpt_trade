@@ -1,7 +1,8 @@
 from __future__ import annotations
 from datetime import date, timedelta
 from .common import get_now_utc, MAX_INT16, MAX_INT32, MIN_INT64
-from sqlalchemy.sql.expression import null, false, or_, and_
+from sqlalchemy.orm import foreign  # noqa
+from sqlalchemy.sql.expression import null, true, false, or_, and_
 from swpt_trade.extensions import db
 
 
@@ -241,6 +242,14 @@ class CreditorParticipation(db.Model):
 
 
 class DispatchingStatus(db.Model):
+    # NOTE: The `started_sending`, `all_sent`, and
+    # `started_dispatching` columns are not be part of the primary
+    # key, but it probably is a good idea to include them in the
+    # primary key index to allow index-only scans. Because SQLAlchemy
+    # does not support this yet (2024-01-19), the migration file
+    # should be edited so as not to create a "normal" index, but
+    # create a "covering" index instead.
+
     collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)
@@ -273,6 +282,7 @@ class DispatchingStatus(db.Model):
             ' record has been created.'
         ),
     )
+    started_sending = db.Column(db.BOOLEAN, nullable=False, default=False)
     all_sent = db.Column(db.BOOLEAN, nullable=False, default=False)
     amount_to_receive = db.Column(
         db.BigInteger,
@@ -310,6 +320,7 @@ class DispatchingStatus(db.Model):
             ' "dispatching_status" record has been created.'
         ),
     )
+    started_dispatching = db.Column(db.BOOLEAN, nullable=False, default=False)
     __table_args__ = (
         db.CheckConstraint(amount_to_collect >= 0),
         db.CheckConstraint(total_collected_amount >= 0),
@@ -320,9 +331,20 @@ class DispatchingStatus(db.Model):
         db.CheckConstraint(number_to_receive >= 0),
         db.CheckConstraint(total_received_amount >= 0),
         db.CheckConstraint(
+            started_sending == (total_collected_amount != null())
+        ),
+        db.CheckConstraint(
+            or_(all_sent == false(), started_sending == true())
+        ),
+        db.CheckConstraint(
             or_(all_received == false(), total_received_amount != null())
         ),
         db.CheckConstraint(amount_to_dispatch >= 0),
+        db.CheckConstraint(
+            started_dispatching == and_(
+                all_sent == true(), total_received_amount != null()
+            )
+        ),
         {
             "comment": (
                 'Represents the status of the process of collecting, sending,'
@@ -330,6 +352,67 @@ class DispatchingStatus(db.Model):
                 ' during a given trading turn.'
             ),
         },
+    )
+
+    collectings = db.relationship(
+        "WorkerCollecting",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerCollecting.collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerCollecting.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerCollecting.debtor_id)"
+            " == DispatchingStatus.debtor_id"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
+    )
+    sendings = db.relationship(
+        "WorkerSending",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerSending.from_collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerSending.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerSending.debtor_id)"
+            " == DispatchingStatus.debtor_id"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
+    )
+    receivings = db.relationship(
+        "WorkerReceiving",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerReceiving.to_collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerReceiving.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerReceiving.debtor_id)"
+            " == DispatchingStatus.debtor_id"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
+    )
+    dispatchings = db.relationship(
+        "WorkerDispatching",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerDispatching.collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerDispatching.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerDispatching.debtor_id)"
+            " == DispatchingStatus.debtor_id"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
     )
 
     @property
