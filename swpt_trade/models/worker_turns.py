@@ -473,6 +473,13 @@ class WorkerSending(db.Model):
 
 
 class WorkerReceiving(db.Model):
+    # NOTE: The `received_amount` column is not be part of the primary
+    # key, but it probably is a good idea to include it in the primary
+    # key index to allow index-only scans. Because SQLAlchemy does not
+    # support this yet (2024-01-19), the migration file should be
+    # edited so as not to create a "normal" index, but create a
+    # "covering" index instead.
+
     to_collector_id = db.Column(db.BigInteger, primary_key=True)
     turn_id = db.Column(db.Integer, primary_key=True)
     debtor_id = db.Column(db.BigInteger, primary_key=True)

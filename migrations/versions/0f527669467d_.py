@@ -111,9 +111,12 @@ def upgrade_():
     sa.CheckConstraint('expected_amount > 1'),
     sa.CheckConstraint('received_amount >= 0'),
     sa.CheckConstraint('from_collector_id != to_collector_id'),
-    sa.PrimaryKeyConstraint('to_collector_id', 'turn_id', 'debtor_id', 'from_collector_id'),
     comment='Indicates that some amount will be transferred (received) from another collector account, as part of the given trading turn. During the phase 3 of each turn, "worker" servers will move the records from the "collector_receiving" solver table to this table.'
     )
+    # Create a "covering" index instead of a "normal" index.
+    op.execute('CREATE UNIQUE INDEX idx_worker_receiving_pk ON worker_receiving (to_collector_id, turn_id, debtor_id, from_collector_id) INCLUDE (received_amount)')
+    op.execute('ALTER TABLE worker_receiving ADD CONSTRAINT worker_receiving_pkey PRIMARY KEY USING INDEX idx_worker_receiving_pk')
+
     with op.batch_alter_table('worker_receiving', schema=None) as batch_op:
         batch_op.create_index('idx_worker_receiving_not_received', ['to_collector_id', 'turn_id', 'debtor_id', 'from_collector_id'], unique=False, postgresql_where=sa.text('received_amount = 0'))
 
