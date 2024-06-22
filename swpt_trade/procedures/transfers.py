@@ -25,6 +25,7 @@ from swpt_trade.models import (
     ActiveCollector,
     PrepareTransferSignal,
     FinalizeTransferSignal,
+    TriggerTransferSignal,
     CreditorParticipation,
     WorkerCollecting,
     WorkerSending,
@@ -1200,3 +1201,33 @@ def _reschedule_failed_attempt(
     else:
         attempt.failure_code = attempt.UNSPECIFIED_FAILURE
         attempt.fatal_error = status_code
+
+
+@atomic
+def process_rescheduled_transfers_batch(batch_size: int) -> int:
+    assert batch_size > 0
+    current_ts = datetime.now(tz=timezone.utc)
+
+    transfer_attempts = (
+        db.session.query(TransferAttempt)
+        .filter(TransferAttempt.rescheduled_for != null())
+        .filter(TransferAttempt.rescheduled_for <= current_ts)
+        .options(load_only(TransferAttempt.rescheduled_for))
+        .with_for_update(skip_locked=True)
+        .limit(batch_size)
+        .all()
+    )
+
+    for attempt in transfer_attempts:
+        db.session.add(
+            TriggerTransferSignal(
+                collector_id=attempt.collector_id,
+                turn_id=attempt.turn_id,
+                debtor_id=attempt.debtor_id,
+                creditor_id=attempt.creditor_id,
+                is_dispatching=attempt.is_dispatching,
+            )
+        )
+        attempt.rescheduled_for = None
+
+    return len(transfer_attempts)
