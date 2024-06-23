@@ -81,7 +81,12 @@ def test_process_rescheduled_transfers(app, db_session, current_ts):
     assert tts[0].is_dispatching is True
 
 
-def test_kick_collectors_ready_to_send(mocker, app, db_session, current_ts):
+def test_kick_dispatching_statuses_ready_to_send(
+        mocker,
+        app,
+        db_session,
+        current_ts,
+):
     mocker.patch("swpt_trade.run_transfers.INSERT_BATCH_SIZE", new=1)
     mocker.patch("swpt_trade.run_transfers.SELECT_BATCH_SIZE", new=1)
 
@@ -147,7 +152,7 @@ def test_kick_collectors_ready_to_send(mocker, app, db_session, current_ts):
     assert len(StartDispatchingSignal.query.all()) == 0
 
 
-def test_update_collectors_with_everything_sent(
+def test_update_dispatching_statuses_with_everything_sent(
         mocker,
         app,
         db_session,
@@ -217,7 +222,7 @@ def test_update_collectors_with_everything_sent(
     assert len(StartDispatchingSignal.query.all()) == 0
 
 
-def test_kick_collectors_ready_to_dispatch(
+def test_kick_dispatching_statuses_ready_to_dispatch(
         mocker,
         app,
         db_session,
@@ -294,7 +299,7 @@ def test_kick_collectors_ready_to_dispatch(
     assert len(StartDispatchingSignal.query.all()) == 1
 
 
-def test_delete_collectors_ready_to_be_deleted(
+def test_delete_dispatching_statuses_with_everything_dispatched(
         mocker,
         app,
         db_session,
