@@ -140,6 +140,7 @@ class DispatchingData:
                 "all_received": False,
                 "amount_to_dispatch": value[4],
                 "started_dispatching": False,
+                "awaiting_signal_flag": False,
             }
 
 
