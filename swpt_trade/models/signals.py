@@ -500,3 +500,59 @@ class AccountIdResponseSignal(Signal):
     @classproperty
     def signalbus_burst_count(self):
         return current_app.config["APP_ACCOUNT_ID_RESPONSE_BURST_COUNT"]
+
+
+class StartSendingSignal(Signal):
+    """Trigger sending for a given `DispatchingStatus` record.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("StartSending")
+        collector_id = fields.Integer()
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.collector_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_START_SENDING_BURST_COUNT"]
+
+
+class StartDispatchingSignal(Signal):
+    """Trigger dispatching for a given `DispatchingStatus` record.
+    """
+    exchange_name = TO_TRADE_EXCHANGE
+
+    class __marshmallow__(Schema):
+        type = fields.Constant("StartDispatching")
+        collector_id = fields.Integer()
+        turn_id = fields.Integer()
+        debtor_id = fields.Integer()
+        inserted_at = fields.DateTime(data_key="ts")
+
+    __marshmallow_schema__ = __marshmallow__()
+
+    signal_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    collector_id = db.Column(db.BigInteger, nullable=False)
+    turn_id = db.Column(db.Integer, nullable=False)
+    debtor_id = db.Column(db.BigInteger, nullable=False)
+
+    @property
+    def routing_key(self):  # pragma: no cover
+        return calc_bin_routing_key(self.collector_id)
+
+    @classproperty
+    def signalbus_burst_count(self):
+        return current_app.config["APP_START_DISPATCHING_BURST_COUNT"]

@@ -55,6 +55,8 @@ DEBTOR_ID_SHARDED_MESSAGE_TYPES = set([
 COLLECTOR_ID_SHARDED_MESSAGE_TYPES = set([
     "TriggerTransfer",
     "AccountIdResponse",
+    "StartSending",
+    "StartDispatching",
 ])
 IRI_SHARDED_MESSAGE_TYPES = set([
     "FetchDebtorInfo",

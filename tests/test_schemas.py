@@ -804,6 +804,102 @@ def test_account_id_response_message():
                    for m in e.messages.values())
 
 
+def test_start_sending_message():
+    s = schemas.StartSendingMessageSchema()
+
+    data = s.loads("""{
+    "type": "StartSending",
+    "collector_id": 999,
+    "debtor_id": 666,
+    "turn_id": 1,
+    "ts": "2022-01-01T00:00:00Z",
+    "unknown": "ignored"
+    }""")
+
+    assert data['type'] == 'StartSending'
+    assert type(data['collector_id']) is int
+    assert data['collector_id'] == 999
+    assert type(data['turn_id']) is int
+    assert data['turn_id'] == 1
+    assert type(data['debtor_id']) is int
+    assert data['debtor_id'] == 666
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+    assert "unknown" not in data
+
+    with pytest.raises(ValidationError, match='Invalid type.'):
+        data = s.loads("""{
+        "type": "WrongType",
+        "collector_id": 999,
+        "debtor_id": 666,
+        "turn_id": 1,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Invalid debtor ID'):
+        data = s.loads("""{
+        "type": "StartSending",
+        "collector_id": 999,
+        "debtor_id": 0,
+        "turn_id": 1,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == len(data)
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+
+def test_start_dispatching_message():
+    s = schemas.StartDispatchingMessageSchema()
+
+    data = s.loads("""{
+    "type": "StartDispatching",
+    "collector_id": 999,
+    "debtor_id": 666,
+    "turn_id": 1,
+    "ts": "2022-01-01T00:00:00Z",
+    "unknown": "ignored"
+    }""")
+
+    assert data['type'] == 'StartDispatching'
+    assert type(data['collector_id']) is int
+    assert data['collector_id'] == 999
+    assert type(data['turn_id']) is int
+    assert data['turn_id'] == 1
+    assert type(data['debtor_id']) is int
+    assert data['debtor_id'] == 666
+    assert data['ts'] == datetime.fromisoformat('2022-01-01T00:00:00+00:00')
+    assert "unknown" not in data
+
+    with pytest.raises(ValidationError, match='Invalid type.'):
+        data = s.loads("""{
+        "type": "WrongType",
+        "collector_id": 999,
+        "debtor_id": 666,
+        "turn_id": 1,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    with pytest.raises(ValidationError, match='Invalid debtor ID'):
+        data = s.loads("""{
+        "type": "StartDispatching",
+        "collector_id": 999,
+        "debtor_id": 0,
+        "turn_id": 1,
+        "ts": "2022-01-01T00:00:00Z"
+        }""")
+
+    try:
+        s.loads('{}')
+    except ValidationError as e:
+        assert len(e.messages) == len(data)
+        assert all(m == ['Missing data for required field.']
+                   for m in e.messages.values())
+
+
 def test_coin_info_document():
     s = schemas.CoinInfoDocumentSchema()
 

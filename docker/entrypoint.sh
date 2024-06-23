@@ -133,6 +133,8 @@ case $1 in
         flush_trigger_transfers=TriggerTransferSignal
         flush_account_id_requests=AccountIdRequestSignal
         flush_account_id_responses=AccountIdResponseSignal
+        flush_start_sendings=StartSendingSignal
+        flush_start_dispatchings=StartDispatchingSignal
         flush_all=
 
         # For example: if `$1` is "flush_configure_accounts",

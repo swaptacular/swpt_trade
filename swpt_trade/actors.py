@@ -634,6 +634,30 @@ def _on_account_id_response_signal(
     )
 
 
+def _on_start_sending_signal(
+    collector_id: int,
+    turn_id: int,
+    debtor_id: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement.
+    pass
+
+
+def _on_start_dispatching_signal(
+    collector_id: int,
+    turn_id: int,
+    debtor_id: int,
+    ts: datetime,
+    *args,
+    **kwargs
+) -> None:
+    # TODO: implement.
+    pass
+
+
 _MESSAGE_TYPES = {
     "RejectedConfig": (
         ps.RejectedConfigMessageSchema(),
@@ -706,6 +730,14 @@ _MESSAGE_TYPES = {
     "AccountIdResponse": (
         schemas.AccountIdResponseMessageSchema(),
         _on_account_id_response_signal,
+    ),
+    "StartSending": (
+        schemas.StartSendingMessageSchema(),
+        _on_start_sending_signal,
+    ),
+    "StartDispatching": (
+        schemas.StartDispatchingMessageSchema(),
+        _on_start_dispatching_signal,
     ),
     "UpdatedLedger": (
         schemas.UpdatedLedgerMessageSchema(),
