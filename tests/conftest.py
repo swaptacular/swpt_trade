@@ -55,6 +55,8 @@ def db_session(app):
         "TRUNCATE TABLE trigger_transfer_signal",
         "TRUNCATE TABLE account_id_request_signal",
         "TRUNCATE TABLE account_id_response_signal",
+        "TRUNCATE TABLE start_sending_signal",
+        "TRUNCATE TABLE start_dispatching_signal",
         "TRUNCATE TABLE debtor_info_document",
         "TRUNCATE TABLE debtor_locator_claim",
         "TRUNCATE TABLE debtor_info_fetch",

@@ -370,6 +370,22 @@ class DispatchingStatus(db.Model):
         uselist=True,
         viewonly=True,
     )
+    pending_collectings = db.relationship(
+        "WorkerCollecting",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerCollecting.collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerCollecting.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerCollecting.debtor_id)"
+            " == DispatchingStatus.debtor_id, "
+            "WorkerCollecting.collected == false()"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
+    )
     sendings = db.relationship(
         "WorkerSending",
         primaryjoin=(
@@ -395,6 +411,22 @@ class DispatchingStatus(db.Model):
             " == DispatchingStatus.turn_id, "
             "foreign(WorkerReceiving.debtor_id)"
             " == DispatchingStatus.debtor_id"
+            ")"
+        ),
+        uselist=True,
+        viewonly=True,
+    )
+    pending_receivings = db.relationship(
+        "WorkerReceiving",
+        primaryjoin=(
+            "and_("
+            "foreign(WorkerReceiving.to_collector_id)"
+            " == DispatchingStatus.collector_id, "
+            "foreign(WorkerReceiving.turn_id)"
+            " == DispatchingStatus.turn_id, "
+            "foreign(WorkerReceiving.debtor_id)"
+            " == DispatchingStatus.debtor_id,"
+            "WorkerReceiving.received_amount == 0"
             ")"
         ),
         uselist=True,
