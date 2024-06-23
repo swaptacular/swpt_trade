@@ -12,10 +12,10 @@ from swpt_trade.models import (
     StartDispatchingSignal,
 )
 from swpt_trade.run_transfers import (
-    kick_collectors_ready_to_send,
-    update_collectors_with_everything_sent,
-    kick_collectors_ready_to_dispatch,
-    delete_collectors_ready_to_be_deleted,
+    kick_dispatching_statuses_ready_to_send,
+    update_dispatching_statuses_with_everything_sent,
+    kick_dispatching_statuses_ready_to_dispatch,
+    delete_dispatching_statuses_with_everything_dispatched,
 )
 
 
@@ -124,7 +124,7 @@ def test_kick_collectors_ready_to_send(mocker, app, db_session, current_ts):
     )
     db_session.commit()
 
-    kick_collectors_ready_to_send()
+    kick_dispatching_statuses_ready_to_send()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -142,7 +142,7 @@ def test_kick_collectors_ready_to_send(mocker, app, db_session, current_ts):
     assert ssss[0].inserted_at >= current_ts
     assert len(StartDispatchingSignal.query.all()) == 0
 
-    kick_collectors_ready_to_send()
+    kick_dispatching_statuses_ready_to_send()
     assert len(StartSendingSignal.query.all()) == 1
     assert len(StartDispatchingSignal.query.all()) == 0
 
@@ -200,7 +200,7 @@ def test_update_collectors_with_everything_sent(
     )
     db_session.commit()
 
-    update_collectors_with_everything_sent()
+    update_dispatching_statuses_with_everything_sent()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -212,7 +212,7 @@ def test_update_collectors_with_everything_sent(
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 0
 
-    update_collectors_with_everything_sent()
+    update_dispatching_statuses_with_everything_sent()
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 0
 
@@ -271,7 +271,7 @@ def test_kick_collectors_ready_to_dispatch(
     )
     db_session.commit()
 
-    kick_collectors_ready_to_dispatch()
+    kick_dispatching_statuses_ready_to_dispatch()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -289,7 +289,7 @@ def test_kick_collectors_ready_to_dispatch(
     assert sdss[0].debtor_id == 666
     assert sdss[0].inserted_at >= current_ts
 
-    kick_collectors_ready_to_dispatch()
+    kick_dispatching_statuses_ready_to_dispatch()
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 1
 
@@ -353,7 +353,7 @@ def test_delete_collectors_ready_to_be_deleted(
     )
     db_session.commit()
 
-    delete_collectors_ready_to_be_deleted()
+    delete_dispatching_statuses_with_everything_dispatched()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -363,7 +363,7 @@ def test_delete_collectors_ready_to_be_deleted(
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 0
 
-    delete_collectors_ready_to_be_deleted()
+    delete_dispatching_statuses_with_everything_dispatched()
     assert len(DispatchingStatus.query.all()) == 1
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 0

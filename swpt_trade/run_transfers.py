@@ -41,7 +41,7 @@ def process_rescheduled_transfers() -> int:
     return count
 
 
-def kick_collectors_ready_to_send() -> None:
+def kick_dispatching_statuses_ready_to_send() -> None:
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -102,7 +102,7 @@ def kick_collectors_ready_to_send() -> None:
                 db.session.commit()
 
 
-def update_collectors_with_everything_sent() -> None:
+def update_dispatching_statuses_with_everything_sent() -> None:
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -145,7 +145,7 @@ def update_collectors_with_everything_sent() -> None:
                 db.session.commit()
 
 
-def kick_collectors_ready_to_dispatch() -> None:
+def kick_dispatching_statuses_ready_to_dispatch() -> None:
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -207,7 +207,7 @@ def kick_collectors_ready_to_dispatch() -> None:
                 db.session.commit()
 
 
-def delete_collectors_ready_to_be_deleted() -> None:
+def delete_dispatching_statuses_with_everything_dispatched() -> None:
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
