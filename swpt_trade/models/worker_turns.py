@@ -242,12 +242,12 @@ class CreditorParticipation(db.Model):
 
 
 class DispatchingStatus(db.Model):
-    # NOTE: The `started_sending`, `all_sent`, and
-    # `started_dispatching` columns are not be part of the primary
-    # key, but it probably is a good idea to include them in the
-    # primary key index to allow index-only scans. Because SQLAlchemy
-    # does not support this yet (2024-01-19), the migration file
-    # should be edited so as not to create a "normal" index, but
+    # NOTE: The `started_sending`, `all_sent`, `started_dispatching`,
+    # and `awaiting_signal_flag` columns are not be part of the
+    # primary key, but it probably is a good idea to include them in
+    # the primary key index to allow index-only scans. Because
+    # SQLAlchemy does not support this yet (2024-01-19), the migration
+    # file should be edited so as not to create a "normal" index, but
     # create a "covering" index instead.
 
     collector_id = db.Column(db.BigInteger, primary_key=True)
@@ -321,6 +321,7 @@ class DispatchingStatus(db.Model):
         ),
     )
     started_dispatching = db.Column(db.BOOLEAN, nullable=False, default=False)
+    awaiting_signal_flag = db.Column(db.BOOLEAN, nullable=False, default=False)
     __table_args__ = (
         db.CheckConstraint(amount_to_collect >= 0),
         db.CheckConstraint(total_collected_amount >= 0),

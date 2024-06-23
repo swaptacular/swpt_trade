@@ -55,6 +55,7 @@ def upgrade_():
     sa.Column('all_received', sa.BOOLEAN(), nullable=False),
     sa.Column('amount_to_dispatch', sa.BigInteger(), nullable=False, comment='The sum of all amounts from the corresponding records in the "worker_dispatching" table, at the moment the "dispatching_status" record has been created.'),
     sa.Column('started_dispatching', sa.BOOLEAN(), nullable=False),
+    sa.Column('awaiting_signal_flag', sa.BOOLEAN(), nullable=False),
     sa.CheckConstraint('started_sending = (total_collected_amount IS NOT NULL)'),
     sa.CheckConstraint('all_sent = false OR started_sending = true'),
     sa.CheckConstraint('all_received = false OR total_received_amount IS NOT NULL'),
@@ -71,7 +72,7 @@ def upgrade_():
     comment='Represents the status of the process of collecting, sending, receiving, and dispatching for a given collector account, during a given trading turn.'
     )
     # Create a "covering" index instead of a "normal" index.
-    op.execute('CREATE UNIQUE INDEX idx_dispatching_status_pk ON dispatching_status (collector_id, turn_id, debtor_id) INCLUDE (started_sending, all_sent, started_dispatching)')
+    op.execute('CREATE UNIQUE INDEX idx_dispatching_status_pk ON dispatching_status (collector_id, turn_id, debtor_id) INCLUDE (started_sending, all_sent, started_dispatching, awaiting_signal_flag)')
     op.execute('ALTER TABLE dispatching_status ADD CONSTRAINT dispatching_status_pkey PRIMARY KEY USING INDEX idx_dispatching_status_pk')
 
     op.create_table('worker_collecting',
