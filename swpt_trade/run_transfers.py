@@ -2,7 +2,7 @@ from typing import TypeVar, Callable
 from flask import current_app
 from datetime import datetime, timezone
 from sqlalchemy import select, insert, update, delete
-from sqlalchemy.sql.expression import tuple_, and_, true, false, func
+from sqlalchemy.sql.expression import tuple_, and_, true, false, text
 from swpt_trade.extensions import db
 from swpt_trade.procedures import process_rescheduled_transfers_batch
 from swpt_trade.models import (
@@ -42,6 +42,17 @@ def process_rescheduled_transfers() -> int:
 
 
 def kick_dispatching_statuses_ready_to_send() -> None:
+    pending_collectings_subquery = (
+        select(1)
+        .select_from(WorkerCollecting)
+        .where(
+            WorkerCollecting.collector_id == DispatchingStatus.collector_id,
+            WorkerCollecting.turn_id == DispatchingStatus.turn_id,
+            WorkerCollecting.debtor_id == DispatchingStatus.debtor_id,
+            WorkerCollecting.collected == false(),
+        )
+    ).exists()
+
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -49,19 +60,13 @@ def kick_dispatching_statuses_ready_to_send() -> None:
                     DispatchingStatus.turn_id,
                     DispatchingStatus.debtor_id,
                 )
-                .outerjoin(DispatchingStatus.pending_collectings)
                 .where(
                     and_(
                         DispatchingStatus.started_sending == false(),
                         DispatchingStatus.awaiting_signal_flag == false(),
+                        ~pending_collectings_subquery,
                     )
                 )
-                .group_by(
-                    DispatchingStatus.collector_id,
-                    DispatchingStatus.turn_id,
-                    DispatchingStatus.debtor_id,
-                )
-                .having(func.count(WorkerCollecting.collector_id) == 0)
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 locked_rows = (
@@ -103,6 +108,16 @@ def kick_dispatching_statuses_ready_to_send() -> None:
 
 
 def update_dispatching_statuses_with_everything_sent() -> None:
+    pending_sendings_subquery = (
+        select(1)
+        .select_from(WorkerSending)
+        .where(
+            WorkerSending.from_collector_id == DispatchingStatus.collector_id,
+            WorkerSending.turn_id == DispatchingStatus.turn_id,
+            WorkerSending.debtor_id == DispatchingStatus.debtor_id,
+        )
+    ).exists()
+
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -110,17 +125,11 @@ def update_dispatching_statuses_with_everything_sent() -> None:
                     DispatchingStatus.turn_id,
                     DispatchingStatus.debtor_id,
                 )
-                .outerjoin(DispatchingStatus.sendings)
                 .where(
                     DispatchingStatus.started_sending == true(),
                     DispatchingStatus.all_sent == false(),
+                    ~pending_sendings_subquery,
                 )
-                .group_by(
-                    DispatchingStatus.collector_id,
-                    DispatchingStatus.turn_id,
-                    DispatchingStatus.debtor_id,
-                )
-                .having(func.count(WorkerSending.from_collector_id) == 0)
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 locked_rows = (
@@ -146,6 +155,17 @@ def update_dispatching_statuses_with_everything_sent() -> None:
 
 
 def kick_dispatching_statuses_ready_to_dispatch() -> None:
+    pending_receivings_subquery = (
+        select(1)
+        .select_from(WorkerReceiving)
+        .where(
+            WorkerReceiving.to_collector_id == DispatchingStatus.collector_id,
+            WorkerReceiving.turn_id == DispatchingStatus.turn_id,
+            WorkerReceiving.debtor_id == DispatchingStatus.debtor_id,
+            WorkerReceiving.received_amount == text("0"),
+        )
+    ).exists()
+
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -153,20 +173,14 @@ def kick_dispatching_statuses_ready_to_dispatch() -> None:
                     DispatchingStatus.turn_id,
                     DispatchingStatus.debtor_id,
                 )
-                .outerjoin(DispatchingStatus.pending_receivings)
                 .where(
                     and_(
                         DispatchingStatus.all_sent == true(),
                         DispatchingStatus.started_dispatching == false(),
                         DispatchingStatus.awaiting_signal_flag == false(),
+                        ~pending_receivings_subquery,
                     )
                 )
-                .group_by(
-                    DispatchingStatus.collector_id,
-                    DispatchingStatus.turn_id,
-                    DispatchingStatus.debtor_id,
-                )
-                .having(func.count(WorkerReceiving.to_collector_id) == 0)
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 locked_rows = (
@@ -208,6 +222,16 @@ def kick_dispatching_statuses_ready_to_dispatch() -> None:
 
 
 def delete_dispatching_statuses_with_everything_dispatched() -> None:
+    pending_dispatchings_subquery = (
+        select(1)
+        .select_from(WorkerDispatching)
+        .where(
+            WorkerDispatching.collector_id == DispatchingStatus.collector_id,
+            WorkerDispatching.turn_id == DispatchingStatus.turn_id,
+            WorkerDispatching.debtor_id == DispatchingStatus.debtor_id,
+        )
+    ).exists()
+
     with db.engine.connect() as w_conn:
         with w_conn.execution_options(yield_per=SELECT_BATCH_SIZE).execute(
                 select(
@@ -215,14 +239,12 @@ def delete_dispatching_statuses_with_everything_dispatched() -> None:
                     DispatchingStatus.turn_id,
                     DispatchingStatus.debtor_id,
                 )
-                .outerjoin(DispatchingStatus.dispatchings)
-                .where(DispatchingStatus.started_dispatching == true())
-                .group_by(
-                    DispatchingStatus.collector_id,
-                    DispatchingStatus.turn_id,
-                    DispatchingStatus.debtor_id,
+                .where(
+                    and_(
+                        DispatchingStatus.started_dispatching == true(),
+                        ~pending_dispatchings_subquery,
+                    )
                 )
-                .having(func.count(WorkerDispatching.collector_id) == 0)
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
                 locked_rows = (

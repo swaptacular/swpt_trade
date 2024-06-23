@@ -1,7 +1,6 @@
 from __future__ import annotations
 from datetime import date, timedelta
 from .common import get_now_utc, MAX_INT16, MAX_INT32, MIN_INT64
-from sqlalchemy.orm import foreign  # noqa
 from sqlalchemy.sql.expression import null, true, false, or_, and_
 from swpt_trade.extensions import db
 
@@ -353,99 +352,6 @@ class DispatchingStatus(db.Model):
                 ' during a given trading turn.'
             ),
         },
-    )
-
-    collectings = db.relationship(
-        "WorkerCollecting",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerCollecting.collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerCollecting.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerCollecting.debtor_id)"
-            " == DispatchingStatus.debtor_id"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
-    )
-    pending_collectings = db.relationship(
-        "WorkerCollecting",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerCollecting.collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerCollecting.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerCollecting.debtor_id)"
-            " == DispatchingStatus.debtor_id, "
-            "WorkerCollecting.collected == false()"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
-    )
-    sendings = db.relationship(
-        "WorkerSending",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerSending.from_collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerSending.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerSending.debtor_id)"
-            " == DispatchingStatus.debtor_id"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
-    )
-    receivings = db.relationship(
-        "WorkerReceiving",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerReceiving.to_collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerReceiving.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerReceiving.debtor_id)"
-            " == DispatchingStatus.debtor_id"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
-    )
-    pending_receivings = db.relationship(
-        "WorkerReceiving",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerReceiving.to_collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerReceiving.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerReceiving.debtor_id)"
-            " == DispatchingStatus.debtor_id,"
-            "WorkerReceiving.received_amount == 0"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
-    )
-    dispatchings = db.relationship(
-        "WorkerDispatching",
-        primaryjoin=(
-            "and_("
-            "foreign(WorkerDispatching.collector_id)"
-            " == DispatchingStatus.collector_id, "
-            "foreign(WorkerDispatching.turn_id)"
-            " == DispatchingStatus.turn_id, "
-            "foreign(WorkerDispatching.debtor_id)"
-            " == DispatchingStatus.debtor_id"
-            ")"
-        ),
-        uselist=True,
-        viewonly=True,
     )
 
     @property
