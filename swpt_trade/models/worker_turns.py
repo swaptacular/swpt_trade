@@ -331,6 +331,7 @@ class DispatchingStatus(db.Model):
         db.CheckConstraint(amount_to_receive >= 0),
         db.CheckConstraint(number_to_receive >= 0),
         db.CheckConstraint(total_received_amount >= 0),
+        db.CheckConstraint(amount_to_dispatch >= 0),
         db.CheckConstraint(
             started_sending == (total_collected_amount != null())
         ),
@@ -340,7 +341,6 @@ class DispatchingStatus(db.Model):
         db.CheckConstraint(
             or_(all_received == false(), total_received_amount != null())
         ),
-        db.CheckConstraint(amount_to_dispatch >= 0),
         db.CheckConstraint(
             started_dispatching == and_(
                 all_sent == true(), total_received_amount != null()
