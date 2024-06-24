@@ -2,7 +2,8 @@ from typing import TypeVar, Callable
 from flask import current_app
 from datetime import datetime, timezone
 from sqlalchemy import select, insert, update, delete
-from sqlalchemy.sql.expression import tuple_, and_, true, false, text
+from sqlalchemy.sql.expression import tuple_, and_, not_, true, false, text
+from swpt_pythonlib.utils import ShardingRealm
 from swpt_trade.extensions import db
 from swpt_trade.procedures import process_rescheduled_transfers_batch
 from swpt_trade.models import (
@@ -41,7 +42,8 @@ def process_rescheduled_transfers() -> int:
     return count
 
 
-def kick_dispatching_statuses_ready_to_send() -> None:
+def signal_dispatching_statuses_ready_to_send() -> None:
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     pending_collectings_subquery = (
         select(1)
         .select_from(WorkerCollecting)
@@ -64,11 +66,15 @@ def kick_dispatching_statuses_ready_to_send() -> None:
                     and_(
                         DispatchingStatus.started_sending == false(),
                         DispatchingStatus.awaiting_signal_flag == false(),
-                        ~pending_collectings_subquery,
+                        not_(pending_collectings_subquery),
                     )
                 )
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
+                this_shard_rows = [
+                    row for row in rows if
+                    sharding_realm.match(row.collector_id)
+                ]
                 locked_rows = (
                     db.session.execute(
                         select(
@@ -76,7 +82,15 @@ def kick_dispatching_statuses_ready_to_send() -> None:
                             DispatchingStatus.turn_id,
                             DispatchingStatus.debtor_id,
                         )
-                        .where(DISPATCHING_STATUS_PK.in_(rows))
+                        .where(
+                            and_(
+                                DISPATCHING_STATUS_PK.in_(this_shard_rows),
+                                DispatchingStatus.started_sending
+                                == false(),
+                                DispatchingStatus.awaiting_signal_flag
+                                == false(),
+                            )
+                        )
                         .with_for_update(skip_locked=True)
                     )
                     .all()
@@ -108,6 +122,7 @@ def kick_dispatching_statuses_ready_to_send() -> None:
 
 
 def update_dispatching_statuses_with_everything_sent() -> None:
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     pending_sendings_subquery = (
         select(1)
         .select_from(WorkerSending)
@@ -128,10 +143,14 @@ def update_dispatching_statuses_with_everything_sent() -> None:
                 .where(
                     DispatchingStatus.started_sending == true(),
                     DispatchingStatus.all_sent == false(),
-                    ~pending_sendings_subquery,
+                    not_(pending_sendings_subquery),
                 )
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
+                this_shard_rows = [
+                    row for row in rows if
+                    sharding_realm.match(row.collector_id)
+                ]
                 locked_rows = (
                     db.session.execute(
                         select(
@@ -139,7 +158,13 @@ def update_dispatching_statuses_with_everything_sent() -> None:
                             DispatchingStatus.turn_id,
                             DispatchingStatus.debtor_id,
                         )
-                        .where(DISPATCHING_STATUS_PK.in_(rows))
+                        .where(
+                            and_(
+                                DISPATCHING_STATUS_PK.in_(this_shard_rows),
+                                DispatchingStatus.started_sending == true(),
+                                DispatchingStatus.all_sent == false(),
+                            )
+                        )
                         .with_for_update(skip_locked=True)
                     )
                     .all()
@@ -154,7 +179,8 @@ def update_dispatching_statuses_with_everything_sent() -> None:
                 db.session.commit()
 
 
-def kick_dispatching_statuses_ready_to_dispatch() -> None:
+def signal_dispatching_statuses_ready_to_dispatch() -> None:
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     pending_receivings_subquery = (
         select(1)
         .select_from(WorkerReceiving)
@@ -178,11 +204,15 @@ def kick_dispatching_statuses_ready_to_dispatch() -> None:
                         DispatchingStatus.all_sent == true(),
                         DispatchingStatus.started_dispatching == false(),
                         DispatchingStatus.awaiting_signal_flag == false(),
-                        ~pending_receivings_subquery,
+                        not_(pending_receivings_subquery),
                     )
                 )
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
+                this_shard_rows = [
+                    row for row in rows if
+                    sharding_realm.match(row.collector_id)
+                ]
                 locked_rows = (
                     db.session.execute(
                         select(
@@ -190,7 +220,16 @@ def kick_dispatching_statuses_ready_to_dispatch() -> None:
                             DispatchingStatus.turn_id,
                             DispatchingStatus.debtor_id,
                         )
-                        .where(DISPATCHING_STATUS_PK.in_(rows))
+                        .where(
+                            and_(
+                                DISPATCHING_STATUS_PK.in_(this_shard_rows),
+                                DispatchingStatus.all_sent == true(),
+                                DispatchingStatus.started_dispatching
+                                == false(),
+                                DispatchingStatus.awaiting_signal_flag
+                                == false(),
+                            )
+                        )
                         .with_for_update(skip_locked=True)
                     )
                     .all()
@@ -222,6 +261,7 @@ def kick_dispatching_statuses_ready_to_dispatch() -> None:
 
 
 def delete_dispatching_statuses_with_everything_dispatched() -> None:
+    sharding_realm: ShardingRealm = current_app.config["SHARDING_REALM"]
     pending_dispatchings_subquery = (
         select(1)
         .select_from(WorkerDispatching)
@@ -242,11 +282,15 @@ def delete_dispatching_statuses_with_everything_dispatched() -> None:
                 .where(
                     and_(
                         DispatchingStatus.started_dispatching == true(),
-                        ~pending_dispatchings_subquery,
+                        not_(pending_dispatchings_subquery),
                     )
                 )
         ) as result:
             for rows in batched(result, INSERT_BATCH_SIZE):
+                this_shard_rows = [
+                    row for row in rows if
+                    sharding_realm.match(row.collector_id)
+                ]
                 locked_rows = (
                     db.session.execute(
                         select(
@@ -254,7 +298,13 @@ def delete_dispatching_statuses_with_everything_dispatched() -> None:
                             DispatchingStatus.turn_id,
                             DispatchingStatus.debtor_id,
                         )
-                        .where(DISPATCHING_STATUS_PK.in_(rows))
+                        .where(
+                            and_(
+                                DISPATCHING_STATUS_PK.in_(this_shard_rows),
+                                DispatchingStatus.started_dispatching
+                                == true(),
+                            )
+                        )
                         .with_for_update(skip_locked=True)
                     )
                     .all()

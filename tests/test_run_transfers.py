@@ -12,9 +12,9 @@ from swpt_trade.models import (
     StartDispatchingSignal,
 )
 from swpt_trade.run_transfers import (
-    kick_dispatching_statuses_ready_to_send,
+    signal_dispatching_statuses_ready_to_send,
     update_dispatching_statuses_with_everything_sent,
-    kick_dispatching_statuses_ready_to_dispatch,
+    signal_dispatching_statuses_ready_to_dispatch,
     delete_dispatching_statuses_with_everything_dispatched,
 )
 
@@ -81,7 +81,7 @@ def test_process_rescheduled_transfers(app, db_session, current_ts):
     assert tts[0].is_dispatching is True
 
 
-def test_kick_dispatching_statuses_ready_to_send(
+def test_signal_dispatching_statuses_ready_to_send(
         mocker,
         app,
         db_session,
@@ -129,7 +129,7 @@ def test_kick_dispatching_statuses_ready_to_send(
     )
     db_session.commit()
 
-    kick_dispatching_statuses_ready_to_send()
+    signal_dispatching_statuses_ready_to_send()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -147,7 +147,7 @@ def test_kick_dispatching_statuses_ready_to_send(
     assert ssss[0].inserted_at >= current_ts
     assert len(StartDispatchingSignal.query.all()) == 0
 
-    kick_dispatching_statuses_ready_to_send()
+    signal_dispatching_statuses_ready_to_send()
     assert len(StartSendingSignal.query.all()) == 1
     assert len(StartDispatchingSignal.query.all()) == 0
 
@@ -222,7 +222,7 @@ def test_update_dispatching_statuses_with_everything_sent(
     assert len(StartDispatchingSignal.query.all()) == 0
 
 
-def test_kick_dispatching_statuses_ready_to_dispatch(
+def test_signal_dispatching_statuses_ready_to_dispatch(
         mocker,
         app,
         db_session,
@@ -276,7 +276,7 @@ def test_kick_dispatching_statuses_ready_to_dispatch(
     )
     db_session.commit()
 
-    kick_dispatching_statuses_ready_to_dispatch()
+    signal_dispatching_statuses_ready_to_dispatch()
 
     dss = DispatchingStatus.query.all()
     dss.sort(key=lambda x: x.collector_id)
@@ -294,7 +294,7 @@ def test_kick_dispatching_statuses_ready_to_dispatch(
     assert sdss[0].debtor_id == 666
     assert sdss[0].inserted_at >= current_ts
 
-    kick_dispatching_statuses_ready_to_dispatch()
+    signal_dispatching_statuses_ready_to_dispatch()
     assert len(StartSendingSignal.query.all()) == 0
     assert len(StartDispatchingSignal.query.all()) == 1
 
