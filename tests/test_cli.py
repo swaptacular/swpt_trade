@@ -1330,7 +1330,7 @@ def test_delete_transfer_attempts(
     assert tas[0].collector_id == 888
 
 
-def test_process_pristine_collectors(
+def test_handle_pristine_collectors(
         app,
         db_session,
         restore_sharding_realm,
@@ -1388,7 +1388,7 @@ def test_process_pristine_collectors(
     result = runner.invoke(
         args=[
             "swpt_trade",
-            "process_pristine_collectors",
+            "handle_pristine_collectors",
             "--wait",
             "0.000001",
             "--quit-early",

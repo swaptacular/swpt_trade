@@ -20,7 +20,7 @@ from swpt_trade.run_transfers import process_rescheduled_transfers
 from .common import swpt_trade
 
 
-@swpt_trade.command("process_pristine_collectors")
+@swpt_trade.command("handle_pristine_collectors")
 @with_appcontext
 @click.option(
     "-t", "--threads", type=int, help="The number of worker threads."
@@ -40,15 +40,15 @@ from .common import swpt_trade
     default=False,
     help="Exit after some time (mainly useful during testing).",
 )
-def process_pristine_collectors(threads, wait, quit_early):
-    """Process all pristine collector accounts.
+def handle_pristine_collectors(threads, wait, quit_early):
+    """Run a process which handles pristine collector accounts.
 
     If --threads is not specified, the value of the configuration
-    variable PROCESS_PRISTINE_COLLECTORS_THREADS is taken. If it is
+    variable HANDLE_PRISTINE_COLLECTORS_THREADS is taken. If it is
     not set, the default number of threads is 1.
 
     If --wait is not specified, the value of the configuration
-    variable APP_PROCESS_PRISTINE_COLLECTORS_WAIT is taken. If it is
+    variable HANDLE_PRISTINE_COLLECTORS_PERIOD is taken. If it is
     not set, the default number of seconds is 60.
     """
 
@@ -62,14 +62,14 @@ def process_pristine_collectors(threads, wait, quit_early):
     #       re-implement the logic in stored procedures.
 
     threads = threads or current_app.config[
-        "PROCESS_PRISTINE_COLLECTORS_THREADS"
+        "HANDLE_PRISTINE_COLLECTORS_THREADS"
     ]
     wait = (
         wait
         if wait is not None
-        else current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_WAIT"]
+        else current_app.config["HANDLE_PRISTINE_COLLECTORS_PERIOD"]
     )
-    max_count = current_app.config["APP_PROCESS_PRISTINE_COLLECTORS_MAX_COUNT"]
+    max_count = current_app.config["APP_HANDLE_PRISTINE_COLLECTORS_MAX_COUNT"]
     max_postponement = timedelta(
         days=current_app.config["APP_EXTREME_MESSAGE_DELAY_DAYS"]
     )
@@ -84,7 +84,7 @@ def process_pristine_collectors(threads, wait, quit_early):
             max_count=max_count,
         )
 
-    def process_pristine_collector(debtor_id, collector_id):
+    def handle_pristine_collector(debtor_id, collector_id):
         assert sharding_realm.match(collector_id)
         procedures.configure_worker_account(
             debtor_id=debtor_id,
@@ -101,7 +101,7 @@ def process_pristine_collectors(threads, wait, quit_early):
     ThreadPoolProcessor(
         threads,
         get_args_collection=get_args_collection,
-        process_func=process_pristine_collector,
+        process_func=handle_pristine_collector,
         wait_seconds=wait,
         max_count=max_count,
     ).run(quit_early=quit_early)
