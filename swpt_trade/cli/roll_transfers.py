@@ -48,6 +48,7 @@ def roll_transfers(wait, quit_early):
         logger.info(
             "Looking for collector accounts ready to initiate transfers."
         )
+        started_at = time.time()
         run_transfers.signal_dispatching_statuses_ready_to_send()
         run_transfers.update_dispatching_statuses_with_everything_sent()
         run_transfers.signal_dispatching_statuses_ready_to_dispatch()
@@ -56,4 +57,4 @@ def roll_transfers(wait, quit_early):
         if quit_early:
             break
         if wait_seconds > 0.0:  # pragma: no cover
-            time.sleep(wait_seconds)
+            time.sleep(max(0.0, wait_seconds + started_at - time.time()))
