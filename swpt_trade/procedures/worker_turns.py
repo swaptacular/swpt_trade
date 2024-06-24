@@ -1,5 +1,6 @@
 from typing import TypeVar, Callable, Sequence
 from sqlalchemy import select
+from sqlalchemy.sql.expression import text
 from swpt_trade.extensions import db
 from swpt_trade.models import Turn, WorkerTurn
 
@@ -52,7 +53,7 @@ def get_unfinished_worker_turn_ids() -> Sequence[int]:
     return (
         db.session.execute(
             select(WorkerTurn.turn_id)
-            .filter(WorkerTurn.phase < 3)
+            .filter(WorkerTurn.phase < text("3"))
         )
         .scalars()
         .all()
@@ -63,6 +64,6 @@ def get_unfinished_worker_turn_ids() -> Sequence[int]:
 def get_pending_worker_turns() -> Sequence[WorkerTurn]:
     return (
         WorkerTurn.query
-        .filter(WorkerTurn.worker_turn_subphase < 10)
+        .filter(WorkerTurn.worker_turn_subphase < text("10"))
         .all()
     )

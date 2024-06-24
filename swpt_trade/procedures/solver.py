@@ -42,7 +42,7 @@ def start_new_turn_if_possible(
         text("LOCK TABLE turn IN SHARE ROW EXCLUSIVE MODE"),
         bind_arguments={"bind": db.engines["solver"]},
     )
-    unfinished_turns = Turn.query.filter(Turn.phase < 4).all()
+    unfinished_turns = Turn.query.filter(Turn.phase < text("4")).all()
     if not unfinished_turns:
         latest_turn = (
             Turn.query
@@ -185,7 +185,7 @@ def try_to_advance_turn_to_phase4(turn_id: int) -> None:
 def get_unfinished_turns() -> Sequence[Turn]:
     return (
         Turn.query
-        .filter(Turn.phase < 4)
+        .filter(Turn.phase < text("4"))
         .all()
     )
 
@@ -212,7 +212,7 @@ def get_pristine_collectors(
         )
         .filter(
             and_(
-                CollectorAccount.status == 0,
+                CollectorAccount.status == text("0"),
                 CollectorAccount.collector_hash.op("&")(hash_mask)
                 == hash_prefix,
             )

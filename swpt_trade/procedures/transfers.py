@@ -4,7 +4,7 @@ from typing import TypeVar, Callable, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime, date, timezone, timedelta
 from sqlalchemy import select, delete, update
-from sqlalchemy.sql.expression import and_, null, false
+from sqlalchemy.sql.expression import and_, null, false, text
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
     TransferNote,
