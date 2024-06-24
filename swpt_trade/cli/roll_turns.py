@@ -55,7 +55,7 @@ from .common import swpt_trade
     help="Exit after some time (mainly useful during testing).",
 )
 def roll_turns(period, period_offset, check_interval, quit_early):
-    """Run a process that starts new turns, and advances started
+    """Run a process which starts new turns, and advances started
     turns.
 
     Every turn consists of several phases. When one phase is

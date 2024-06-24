@@ -187,7 +187,7 @@ def test_fetch_debtor_infos(mocker, app, db_session):
     assert confirmations[0].debtor_info_locator == "https://example.com/666"
 
 
-def test_trigger_transfer_attempts(app, db_session, current_ts):
+def test_trigger_transfers(app, db_session, current_ts):
     ta1 = m.TransferAttempt(
             collector_id=666,
             turn_id=1,
@@ -233,7 +233,7 @@ def test_trigger_transfer_attempts(app, db_session, current_ts):
     result = runner.invoke(
         args=[
             "swpt_trade",
-            "trigger_transfer_attempts",
+            "trigger_transfers",
             "--quit-early",
         ]
     )
@@ -255,6 +255,41 @@ def test_trigger_transfer_attempts(app, db_session, current_ts):
     assert tts[0].debtor_id == 222
     assert tts[0].creditor_id == 123
     assert tts[0].is_dispatching is True
+
+
+def test_roll_transfers(app, db_session, current_ts):
+    db.session.add(
+        m.DispatchingStatus(
+            collector_id=999,
+            turn_id=1,
+            debtor_id=666,
+            amount_to_collect=1000,
+            total_collected_amount=1000,
+            amount_to_send=0,
+            amount_to_receive=0,
+            number_to_receive=0,
+            total_received_amount=0,
+            all_received=True,
+            amount_to_dispatch=1000,
+            awaiting_signal_flag=False,
+            started_sending=True,
+            all_sent=True,
+            started_dispatching=True,
+        )
+    )
+    db.session.commit()
+    assert len(m.DispatchingStatus.query.all()) == 1
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "swpt_trade",
+            "roll_transfers",
+            "--quit-early",
+        ]
+    )
+    assert result.exit_code != 2
+    assert len(m.DispatchingStatus.query.all()) == 0
 
 
 def test_delete_parent_documents(app, db_session, restore_sharding_realm):

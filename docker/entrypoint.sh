@@ -110,7 +110,7 @@ case $1 in
         | scan_worker_collectings | scan_worker_sendings \
         | scan_worker_receivings | scan_worker_dispatchings \
         | scan_transfer_attempts | roll_turns | roll_worker_turns \
-        | fetch_debtor_infos | trigger_transfer_attempts)
+        | roll_transfers | fetch_debtor_infos | trigger_transfers)
         exec flask swpt_trade "$@"
         ;;
     flush_configure_accounts | flush_prepare_transfers | flush_finalize_transfers \

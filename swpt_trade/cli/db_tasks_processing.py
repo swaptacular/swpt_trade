@@ -107,7 +107,7 @@ def process_pristine_collectors(threads, wait, quit_early):
     ).run(quit_early=quit_early)
 
 
-@swpt_trade.command("trigger_transfer_attempts")
+@swpt_trade.command("trigger_transfers")
 @with_appcontext
 @click.option(
     "-p",
@@ -115,8 +115,8 @@ def process_pristine_collectors(threads, wait, quit_early):
     type=int,
     help=(
         "The number of worker processes."
-        " If not specified, the value of the TRIGGER_PROCESSES environment"
-        " variable will be used, defaulting to 1 if empty."
+        " If not specified, the value of the TRIGGER_TRANSFERS_PROCESSES"
+        " environment variable will be used, defaulting to 1 if empty."
     ),
 )
 @click.option(
@@ -125,8 +125,9 @@ def process_pristine_collectors(threads, wait, quit_early):
     type=float,
     help=(
         "Poll the database for scheduled requests every FLOAT seconds."
-        " If not specified, the value of the TRIGGER_PERIOD environment"
-        " variable will be used, defaulting to 2 seconds if empty."
+        " If not specified, the value of the TRIGGER_TRANSFERS_PERIOD"
+        " environment variable will be used, defaulting to 5 seconds"
+        " if empty."
     ),
 )
 @click.option(
@@ -135,7 +136,7 @@ def process_pristine_collectors(threads, wait, quit_early):
     default=False,
     help="Exit after some time (mainly useful during testing).",
 )
-def trigger_transfer_attempts(
+def trigger_transfers(
     processes: int,
     wait: float,
     quit_early: bool,
@@ -185,13 +186,13 @@ def trigger_transfer_attempts(
         processes=(
             processes
             if processes is not None
-            else current_app.config["TRIGGER_PROCESSES"]
+            else current_app.config["TRIGGER_TRANSFERS_PROCESSES"]
         ),
         target=_trigger,
         wait=(
             wait
             if wait is not None
-            else current_app.config["TRIGGER_PERIOD"]
+            else current_app.config["TRIGGER_TRANSFERS_PERIOD"]
         ),
     )
     sys.exit(1)
