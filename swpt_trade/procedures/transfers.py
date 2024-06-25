@@ -1338,8 +1338,8 @@ def process_start_sending_signal(
                 literal(worker_turn.collection_started_at),
                 literal(current_ts),
                 literal(""),
-                literal(MIN_INT64),
-                literal(0),
+                literal(MIN_INT64, db.BigInteger),
+                literal(0, db.SmallInteger),
             )
             .where(worker_sending_predicate)
         )
