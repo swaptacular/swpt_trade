@@ -3,8 +3,17 @@ import math
 from typing import TypeVar, Callable, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime, date, timezone, timedelta
-from sqlalchemy import select, delete, update
-from sqlalchemy.sql.expression import and_, null, false, text
+from sqlalchemy import select, insert, delete, update
+from sqlalchemy.sql.expression import (
+    and_,
+    null,
+    true,
+    false,
+    func,
+    literal,
+    text,
+    cast,
+)
 from sqlalchemy.orm import exc, load_only, Load
 from swpt_trade.utils import (
     TransferNote,
@@ -27,6 +36,7 @@ from swpt_trade.models import (
     FinalizeTransferSignal,
     TriggerTransferSignal,
     CreditorParticipation,
+    DispatchingStatus,
     WorkerCollecting,
     WorkerSending,
     WorkerReceiving,
@@ -1231,3 +1241,125 @@ def process_rescheduled_transfers_batch(batch_size: int) -> int:
         attempt.rescheduled_for = None
 
     return len(transfer_attempts)
+
+
+@atomic
+def process_start_sending_signal(
+        *,
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    query = (
+        db.session.query(DispatchingStatus, WorkerTurn)
+        .outerjoin(WorkerTurn, WorkerTurn.turn_id == DispatchingStatus.turn_id)
+        .filter(
+            DispatchingStatus.collector_id == collector_id,
+            DispatchingStatus.turn_id == turn_id,
+            DispatchingStatus.debtor_id == debtor_id,
+            DispatchingStatus.started_sending == false(),
+            DispatchingStatus.awaiting_signal_flag == true(),
+        )
+        .options(load_only(WorkerTurn.collection_started_at))
+        .with_for_update(of=DispatchingStatus)
+    )
+    try:
+        dispatching_status, worker_turn = query.one()
+    except exc.NoResultFound:
+        return
+
+    assert dispatching_status
+    assert worker_turn
+    assert worker_turn.collection_started_at
+
+    worker_collectings_predicate = and_(
+        WorkerCollecting.collector_id == collector_id,
+        WorkerCollecting.turn_id == turn_id,
+        WorkerCollecting.debtor_id == debtor_id,
+    )
+    dispatching_status.total_collected_amount = contain_principal_overflow(
+        int(
+            db.session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(WorkerCollecting.amount),
+                        text("0::numeric"),
+                    )
+                )
+                .select_from(WorkerCollecting)
+                .where(worker_collectings_predicate)
+            )
+            .scalar_one()
+        )
+    )
+    dispatching_status.started_sending = True
+    dispatching_status.awaiting_signal_flag = False
+
+    nominal_amount_expression = (
+        cast(WorkerSending.amount, db.FLOAT)
+        * (
+            dispatching_status.available_amount_to_send
+            / dispatching_status.amount_to_send
+        )
+    )
+    worker_sending_predicate = and_(
+        WorkerSending.from_collector_id == collector_id,
+        WorkerSending.turn_id == turn_id,
+        WorkerSending.debtor_id == debtor_id,
+        nominal_amount_expression >= 1.0,
+    )
+
+    db.session.execute(
+        delete(WorkerCollecting).where(worker_collectings_predicate)
+    )
+    db.session.execute(
+        insert(TransferAttempt).from_select(
+            [
+                "collector_id",
+                "turn_id",
+                "debtor_id",
+                "creditor_id",
+                "is_dispatching",
+                "nominal_amount",
+                "collection_started_at",
+                "inserted_at",
+                "recipient",
+                "recipient_version",
+                "backoff_counter",
+            ],
+            select(
+                WorkerSending.from_collector_id,
+                WorkerSending.turn_id,
+                WorkerSending.debtor_id,
+                WorkerSending.to_collector_id,
+                false(),
+                nominal_amount_expression,
+                literal(worker_turn.collection_started_at),
+                literal(current_ts),
+                literal(""),
+                literal(MIN_INT64),
+                literal(0),
+            )
+            .where(worker_sending_predicate)
+        )
+    )
+    db.session.execute(
+        insert(AccountIdRequestSignal).from_select(
+            [
+                "collector_id",
+                "turn_id",
+                "debtor_id",
+                "creditor_id",
+                "is_dispatching",
+            ],
+            select(
+                WorkerSending.from_collector_id,
+                WorkerSending.turn_id,
+                WorkerSending.debtor_id,
+                WorkerSending.to_collector_id,
+                false(),
+            )
+            .where(worker_sending_predicate)
+        )
+    )

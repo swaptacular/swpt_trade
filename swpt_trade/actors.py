@@ -642,8 +642,11 @@ def _on_start_sending_signal(
     *args,
     **kwargs
 ) -> None:
-    # TODO: implement.
-    pass
+    procedures.process_start_sending_signal(
+        collector_id=collector_id,
+        turn_id=turn_id,
+        debtor_id=debtor_id,
+    )
 
 
 def _on_start_dispatching_signal(

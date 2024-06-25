@@ -29,6 +29,7 @@ from swpt_trade.models import (
     AccountLock,
     ActiveCollector,
     CreditorParticipation,
+    DispatchingStatus,
     WorkerCollecting,
     WorkerReceiving,
     WorkerSending,
@@ -3252,3 +3253,90 @@ def _assert_attempt_status(ta, status, collector_id):
         assert airs.is_dispatching is True
     else:
         assert len(AccountIdRequestSignal.query.all()) == 0
+
+
+def test_process_start_sending_signal(db_session, wt_3_10, current_ts):
+    turn_id = wt_3_10.turn_id
+
+    db_session.add(
+        DispatchingStatus(
+            collector_id=999,
+            turn_id=turn_id,
+            debtor_id=666,
+            amount_to_collect=10000,
+            amount_to_send=3000,
+            amount_to_receive=0,
+            number_to_receive=0,
+            amount_to_dispatch=7000,
+            started_sending=False,
+            awaiting_signal_flag=True,
+        )
+    )
+    db_session.add(
+        WorkerCollecting(
+            collector_id=999,
+            turn_id=turn_id,
+            debtor_id=666,
+            creditor_id=123,
+            amount=8000,
+            collected=True,
+            purge_after=current_ts,
+        )
+    )
+    db_session.add(
+        WorkerCollecting(
+            collector_id=999,
+            turn_id=turn_id,
+            debtor_id=666,
+            creditor_id=124,
+            amount=2000,
+            collected=True,
+            purge_after=current_ts,
+        )
+    )
+    db_session.add(
+        WorkerSending(
+            from_collector_id=999,
+            turn_id=turn_id,
+            debtor_id=666,
+            to_collector_id=888,
+            amount=3000,
+            purge_after=current_ts,
+        )
+    )
+    db_session.commit()
+
+    p.process_start_sending_signal(
+        collector_id=999,
+        turn_id=turn_id,
+        debtor_id=666,
+    )
+    assert len(WorkerCollecting.query.all()) == 0
+    assert len(WorkerSending.query.all()) == 1
+
+    ds = DispatchingStatus.query.one()
+    assert ds.started_sending is True
+    assert ds.awaiting_signal_flag is False
+    assert ds.total_collected_amount == 10000
+    assert ds.started_dispatching is False
+
+    ta = TransferAttempt.query.one()
+    assert ta.collector_id == 999
+    assert ta.turn_id == turn_id
+    assert ta.debtor_id == 666
+    assert ta.creditor_id == 888
+    assert ta.is_dispatching is False
+    assert ta.nominal_amount == 3000.0
+    assert ta.collection_started_at == wt_3_10.collection_started_at
+    assert ta.recipient == ""
+    assert ta.recipient_version == MIN_INT64
+    assert ta.rescheduled_for is None
+    assert ta.attempted_at is None
+    assert ta.backoff_counter == 0
+
+    airs = AccountIdRequestSignal.query.one()
+    assert airs.collector_id == 999
+    assert airs.turn_id == turn_id
+    assert airs.debtor_id == 666
+    assert airs.creditor_id == 888
+    assert airs.is_dispatching is False
