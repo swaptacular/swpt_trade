@@ -36,6 +36,7 @@ SMP_MESSAGE_TYPES = set([
     "PreparedTransfer",
     "FinalizeTransfer",
     "FinalizedTransfer",
+    "AccountTransfer",
     "AccountPurge",
 ])
 CREDITOR_ID_SHARDED_MESSAGE_TYPES = SMP_MESSAGE_TYPES | set([
