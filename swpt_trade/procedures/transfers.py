@@ -165,6 +165,7 @@ def process_candidate_offer_signal(
         account_lock.released_at = None
         account_lock.account_creation_date = None
         account_lock.account_last_transfer_number = None
+        account_lock.has_been_revised = False
     else:
         with db.retry_on_integrity_error():
             account_lock = AccountLock(
