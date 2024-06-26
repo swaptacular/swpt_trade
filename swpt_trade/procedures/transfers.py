@@ -1363,3 +1363,126 @@ def process_start_sending_signal(
             .where(worker_sending_predicate)
         )
     )
+
+
+@atomic
+def process_start_dispatching_signal(
+        *,
+        collector_id: int,
+        turn_id: int,
+        debtor_id: int,
+) -> None:
+    current_ts = datetime.now(tz=timezone.utc)
+    query = (
+        db.session.query(DispatchingStatus, WorkerTurn)
+        .outerjoin(WorkerTurn, WorkerTurn.turn_id == DispatchingStatus.turn_id)
+        .filter(
+            DispatchingStatus.collector_id == collector_id,
+            DispatchingStatus.turn_id == turn_id,
+            DispatchingStatus.debtor_id == debtor_id,
+            DispatchingStatus.all_sent == true(),
+            DispatchingStatus.started_dispatching == false(),
+            DispatchingStatus.awaiting_signal_flag == true(),
+        )
+        .options(load_only(WorkerTurn.collection_started_at))
+        .with_for_update(of=DispatchingStatus)
+    )
+    try:
+        dispatching_status, worker_turn = query.one()
+    except exc.NoResultFound:
+        return
+
+    assert dispatching_status
+    assert worker_turn
+    assert worker_turn.collection_started_at
+
+    worker_receivings_predicate = and_(
+        WorkerReceiving.to_collector_id == collector_id,
+        WorkerReceiving.turn_id == turn_id,
+        WorkerReceiving.debtor_id == debtor_id,
+    )
+    dispatching_status.total_received_amount = contain_principal_overflow(
+        int(
+            db.session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(WorkerReceiving.received_amount),
+                        text("0::numeric"),
+                    )
+                )
+                .select_from(WorkerReceiving)
+                .where(worker_receivings_predicate)
+            )
+            .scalar_one()
+        )
+    )
+    dispatching_status.started_dispatching = True
+    dispatching_status.awaiting_signal_flag = False
+
+    nominal_amount_expression = (
+        cast(WorkerDispatching.amount, db.FLOAT)
+        * (
+            dispatching_status.available_amount_to_dispatch
+            / dispatching_status.amount_to_dispatch
+        )
+    )
+    worker_dispatching_predicate = and_(
+        WorkerDispatching.collector_id == collector_id,
+        WorkerDispatching.turn_id == turn_id,
+        WorkerDispatching.debtor_id == debtor_id,
+        nominal_amount_expression >= 1.0,
+    )
+
+    db.session.execute(
+        delete(WorkerReceiving).where(worker_receivings_predicate)
+    )
+    db.session.execute(
+        insert(TransferAttempt).from_select(
+            [
+                "collector_id",
+                "turn_id",
+                "debtor_id",
+                "creditor_id",
+                "is_dispatching",
+                "nominal_amount",
+                "collection_started_at",
+                "inserted_at",
+                "recipient",
+                "recipient_version",
+                "backoff_counter",
+            ],
+            select(
+                WorkerDispatching.collector_id,
+                WorkerDispatching.turn_id,
+                WorkerDispatching.debtor_id,
+                WorkerDispatching.creditor_id,
+                true(),
+                nominal_amount_expression,
+                literal(worker_turn.collection_started_at),
+                literal(current_ts),
+                literal(""),
+                literal(MIN_INT64, db.BigInteger),
+                literal(0, db.SmallInteger),
+            )
+            .where(worker_dispatching_predicate)
+        )
+    )
+    db.session.execute(
+        insert(AccountIdRequestSignal).from_select(
+            [
+                "collector_id",
+                "turn_id",
+                "debtor_id",
+                "creditor_id",
+                "is_dispatching",
+            ],
+            select(
+                WorkerDispatching.collector_id,
+                WorkerDispatching.turn_id,
+                WorkerDispatching.debtor_id,
+                WorkerDispatching.creditor_id,
+                true(),
+            )
+            .where(worker_dispatching_predicate)
+        )
+    )
