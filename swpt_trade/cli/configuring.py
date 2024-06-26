@@ -26,7 +26,7 @@ def subscribe():  # pragma: no cover
 
     """
 
-    from .extensions import (
+    from swpt_trade.extensions import (
         CREDITORS_IN_EXCHANGE,
         CREDITORS_OUT_EXCHANGE,
         TO_TRADE_EXCHANGE,
