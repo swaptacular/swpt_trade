@@ -1296,73 +1296,75 @@ def process_start_sending_signal(
     dispatching_status.started_sending = True
     dispatching_status.awaiting_signal_flag = False
 
-    nominal_amount_expression = (
-        cast(WorkerSending.amount, db.FLOAT)
-        * (
-            dispatching_status.available_amount_to_send
-            / dispatching_status.amount_to_send
-        )
-    )
-    worker_sending_predicate = and_(
-        WorkerSending.from_collector_id == collector_id,
-        WorkerSending.turn_id == turn_id,
-        WorkerSending.debtor_id == debtor_id,
-        nominal_amount_expression >= 1.0,
-    )
-
     db.session.execute(
         delete(WorkerCollecting).where(worker_collectings_predicate)
     )
-    db.session.execute(
-        insert(TransferAttempt).from_select(
-            [
-                "collector_id",
-                "turn_id",
-                "debtor_id",
-                "creditor_id",
-                "is_dispatching",
-                "nominal_amount",
-                "collection_started_at",
-                "inserted_at",
-                "recipient",
-                "recipient_version",
-                "backoff_counter",
-            ],
-            select(
-                WorkerSending.from_collector_id,
-                WorkerSending.turn_id,
-                WorkerSending.debtor_id,
-                WorkerSending.to_collector_id,
-                false(),
-                nominal_amount_expression,
-                literal(worker_turn.collection_started_at),
-                literal(current_ts),
-                literal(""),
-                literal(MIN_INT64, db.BigInteger),
-                literal(0, db.SmallInteger),
+
+    if dispatching_status.amount_to_send > 0:
+        nominal_amount_expression = (
+            cast(WorkerSending.amount, db.FLOAT)
+            * (
+                dispatching_status.available_amount_to_send
+                / dispatching_status.amount_to_send
             )
-            .where(worker_sending_predicate)
         )
-    )
-    db.session.execute(
-        insert(AccountIdRequestSignal).from_select(
-            [
-                "collector_id",
-                "turn_id",
-                "debtor_id",
-                "creditor_id",
-                "is_dispatching",
-            ],
-            select(
-                WorkerSending.from_collector_id,
-                WorkerSending.turn_id,
-                WorkerSending.debtor_id,
-                WorkerSending.to_collector_id,
-                false(),
+        worker_sending_predicate = and_(
+            WorkerSending.from_collector_id == collector_id,
+            WorkerSending.turn_id == turn_id,
+            WorkerSending.debtor_id == debtor_id,
+            nominal_amount_expression >= 1.0,
+        )
+
+        db.session.execute(
+            insert(TransferAttempt).from_select(
+                [
+                    "collector_id",
+                    "turn_id",
+                    "debtor_id",
+                    "creditor_id",
+                    "is_dispatching",
+                    "nominal_amount",
+                    "collection_started_at",
+                    "inserted_at",
+                    "recipient",
+                    "recipient_version",
+                    "backoff_counter",
+                ],
+                select(
+                    WorkerSending.from_collector_id,
+                    WorkerSending.turn_id,
+                    WorkerSending.debtor_id,
+                    WorkerSending.to_collector_id,
+                    false(),
+                    nominal_amount_expression,
+                    literal(worker_turn.collection_started_at),
+                    literal(current_ts),
+                    literal(""),
+                    literal(MIN_INT64, db.BigInteger),
+                    literal(0, db.SmallInteger),
+                )
+                .where(worker_sending_predicate)
             )
-            .where(worker_sending_predicate)
         )
-    )
+        db.session.execute(
+            insert(AccountIdRequestSignal).from_select(
+                [
+                    "collector_id",
+                    "turn_id",
+                    "debtor_id",
+                    "creditor_id",
+                    "is_dispatching",
+                ],
+                select(
+                    WorkerSending.from_collector_id,
+                    WorkerSending.turn_id,
+                    WorkerSending.debtor_id,
+                    WorkerSending.to_collector_id,
+                    false(),
+                )
+                .where(worker_sending_predicate)
+            )
+        )
 
 
 @atomic
@@ -1419,70 +1421,71 @@ def process_start_dispatching_signal(
     dispatching_status.started_dispatching = True
     dispatching_status.awaiting_signal_flag = False
 
-    nominal_amount_expression = (
-        cast(WorkerDispatching.amount, db.FLOAT)
-        * (
-            dispatching_status.available_amount_to_dispatch
-            / dispatching_status.amount_to_dispatch
-        )
-    )
-    worker_dispatching_predicate = and_(
-        WorkerDispatching.collector_id == collector_id,
-        WorkerDispatching.turn_id == turn_id,
-        WorkerDispatching.debtor_id == debtor_id,
-        nominal_amount_expression >= 1.0,
-    )
-
     db.session.execute(
         delete(WorkerReceiving).where(worker_receivings_predicate)
     )
-    db.session.execute(
-        insert(TransferAttempt).from_select(
-            [
-                "collector_id",
-                "turn_id",
-                "debtor_id",
-                "creditor_id",
-                "is_dispatching",
-                "nominal_amount",
-                "collection_started_at",
-                "inserted_at",
-                "recipient",
-                "recipient_version",
-                "backoff_counter",
-            ],
-            select(
-                WorkerDispatching.collector_id,
-                WorkerDispatching.turn_id,
-                WorkerDispatching.debtor_id,
-                WorkerDispatching.creditor_id,
-                true(),
-                nominal_amount_expression,
-                literal(worker_turn.collection_started_at),
-                literal(current_ts),
-                literal(""),
-                literal(MIN_INT64, db.BigInteger),
-                literal(0, db.SmallInteger),
+
+    if dispatching_status.amount_to_dispatch > 0:
+        nominal_amount_expression = (
+            cast(WorkerDispatching.amount, db.FLOAT)
+            * (
+                dispatching_status.available_amount_to_dispatch
+                / dispatching_status.amount_to_dispatch
             )
-            .where(worker_dispatching_predicate)
         )
-    )
-    db.session.execute(
-        insert(AccountIdRequestSignal).from_select(
-            [
-                "collector_id",
-                "turn_id",
-                "debtor_id",
-                "creditor_id",
-                "is_dispatching",
-            ],
-            select(
-                WorkerDispatching.collector_id,
-                WorkerDispatching.turn_id,
-                WorkerDispatching.debtor_id,
-                WorkerDispatching.creditor_id,
-                true(),
+        worker_dispatching_predicate = and_(
+            WorkerDispatching.collector_id == collector_id,
+            WorkerDispatching.turn_id == turn_id,
+            WorkerDispatching.debtor_id == debtor_id,
+            nominal_amount_expression >= 1.0,
+        )
+        db.session.execute(
+            insert(TransferAttempt).from_select(
+                [
+                    "collector_id",
+                    "turn_id",
+                    "debtor_id",
+                    "creditor_id",
+                    "is_dispatching",
+                    "nominal_amount",
+                    "collection_started_at",
+                    "inserted_at",
+                    "recipient",
+                    "recipient_version",
+                    "backoff_counter",
+                ],
+                select(
+                    WorkerDispatching.collector_id,
+                    WorkerDispatching.turn_id,
+                    WorkerDispatching.debtor_id,
+                    WorkerDispatching.creditor_id,
+                    true(),
+                    nominal_amount_expression,
+                    literal(worker_turn.collection_started_at),
+                    literal(current_ts),
+                    literal(""),
+                    literal(MIN_INT64, db.BigInteger),
+                    literal(0, db.SmallInteger),
+                )
+                .where(worker_dispatching_predicate)
             )
-            .where(worker_dispatching_predicate)
         )
-    )
+        db.session.execute(
+            insert(AccountIdRequestSignal).from_select(
+                [
+                    "collector_id",
+                    "turn_id",
+                    "debtor_id",
+                    "creditor_id",
+                    "is_dispatching",
+                ],
+                select(
+                    WorkerDispatching.collector_id,
+                    WorkerDispatching.turn_id,
+                    WorkerDispatching.debtor_id,
+                    WorkerDispatching.creditor_id,
+                    true(),
+                )
+                .where(worker_dispatching_predicate)
+            )
+        )
