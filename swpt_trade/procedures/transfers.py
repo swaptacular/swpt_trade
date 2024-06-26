@@ -452,17 +452,17 @@ def process_revise_account_lock_signal(
                 # account. In this case, transferring the amount is
                 # neither possible nor needed. Instead, we simply
                 # release the account lock.
+                dismiss()
                 acd, altn = _register_collector_trade(creditor_id, amount)
                 lock.released_at = lock.finalized_at = current_ts
                 lock.account_creation_date = acd
                 lock.account_last_transfer_number = altn
-                dismiss()
 
             elif amount < 0:
                 # The account is the sender. The amount must be taken
                 # from the account, and transferred to the collector.
-                lock.finalized_at = current_ts
                 commit(-amount)
+                lock.finalized_at = current_ts
 
             else:
                 # The account is the receiver. We expect the amount to
