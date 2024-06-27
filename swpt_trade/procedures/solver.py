@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Sequence, List, Iterable, Tuple
 from random import Random
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, insert, text
+from sqlalchemy import select, insert, delete, text
 from sqlalchemy.sql.expression import null, and_
 from sqlalchemy.orm import load_only
 from swpt_trade.utils import can_start_new_turn
@@ -137,16 +137,37 @@ def try_to_advance_turn_to_phase2(
                 .where(DebtorInfo.turn_id == turn_id),
             )
         )
-        DebtorInfo.query.filter_by(turn_id=turn_id).delete(
-            synchronize_session=False
-        )
-        ConfirmedDebtor.query.filter_by(turn_id=turn_id).delete(
-            synchronize_session=False
-        )
 
         turn.phase = 2
         turn.phase_deadline = current_ts + phase2_duration
         turn.collection_deadline = current_ts + max_commit_period
+
+        # NOTE: When reaching turn phase 2, all records for the given
+        # turn from the `DebtorInfo` and `ConfirmedDebtor` tables will
+        # be deleted. This however, does not guarantee that a worker
+        # process will not continue to insert new rows for the given
+        # turn in these tables. Therefore, in order to ensure that
+        # such obsolete records will be deleted eventually, here we
+        # delete all records for which the turn phase 2 has been
+        # reached.
+        db.session.execute(
+            delete(DebtorInfo)
+            .where(
+                and_(
+                    Turn.turn_id == DebtorInfo.turn_id,
+                    Turn.phase >= 2,
+                )
+            )
+        )
+        db.session.execute(
+            delete(ConfirmedDebtor)
+            .where(
+                and_(
+                    Turn.turn_id == ConfirmedDebtor.turn_id,
+                    Turn.phase >= 2,
+                )
+            )
+        )
 
 
 @atomic

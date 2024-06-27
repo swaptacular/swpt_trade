@@ -1,6 +1,7 @@
 from typing import TypeVar, Callable
 from datetime import datetime, timezone
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, delete
+from sqlalchemy.sql.expression import and_
 from swpt_trade.extensions import db
 from swpt_trade.models import (
     CollectorAccount,
@@ -24,17 +25,6 @@ SELECT_BATCH_SIZE = 50000
 
 T = TypeVar("T")
 atomic: Callable[[T], T] = db.atomic
-
-# TODO: When changing to phase 3, the `try_to_advance_turn_to_phase3`
-# function will delete all records for the given turn from the
-# `CurrencyInfo`, `SellOffer`, and `BuyOffer` tables. This however,
-# does not guarantee that a worker process will not continue to insert
-# new rows for the given turn in these tables. Therefore, in order to
-# ensure that such obsolete records will be deleted eventually, a
-# garbage-collecting process should be implemented, which continuously
-# scans those tables for obsolete records and deletes them. In fact,
-# this process should scan and garbage-collect the `DebtorInfo` and
-# `ConfirmedDebtor` tables as well.
 
 
 def try_to_advance_turn_to_phase3(turn: Turn) -> None:
@@ -130,19 +120,45 @@ def _try_to_commit_solver_results(solver: Solver, turn_id: int) -> None:
         _write_collector_transfers(solver, turn_id)
         _write_givings(solver, turn_id)
 
-        CurrencyInfo.query.filter_by(turn_id=turn_id).delete(
-            synchronize_session=False
-        )
-        SellOffer.query.filter_by(turn_id=turn_id).delete(
-            synchronize_session=False
-        )
-        BuyOffer.query.filter_by(turn_id=turn_id).delete(
-            synchronize_session=False
-        )
-
         turn.phase = 3
         turn.phase_deadline = None
         turn.collection_started_at = datetime.now(tz=timezone.utc)
+
+        # NOTE: When reaching turn phase 3, all records for the given
+        # turn from the `CurrencyInfo`, `SellOffer`, and `BuyOffer`
+        # tables will be deleted. This however, does not guarantee
+        # that a worker process will not continue to insert new rows
+        # for the given turn in these tables. Therefore, in order to
+        # ensure that such obsolete records will be deleted
+        # eventually, here we delete all records for which the turn
+        # phase 3 has been reached.
+        db.session.execute(
+            delete(CurrencyInfo)
+            .where(
+                and_(
+                    Turn.turn_id == CurrencyInfo.turn_id,
+                    Turn.phase >= 3,
+                )
+            )
+        )
+        db.session.execute(
+            delete(SellOffer)
+            .where(
+                and_(
+                    Turn.turn_id == SellOffer.turn_id,
+                    Turn.phase >= 3,
+                )
+            )
+        )
+        db.session.execute(
+            delete(BuyOffer)
+            .where(
+                and_(
+                    Turn.turn_id == BuyOffer.turn_id,
+                    Turn.phase >= 3,
+                )
+            )
+        )
 
 
 def _write_takings(solver: Solver, turn_id: int) -> None:
