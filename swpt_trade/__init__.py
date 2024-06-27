@@ -211,6 +211,9 @@ class Configuration(metaclass=MetaEnvReader):
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
 
+    TRANSFERS_HEALTHY_MAX_COMMIT_DELAY: parse_timedelta = parse_timedelta("2h")
+    TRANSFERS_AMOUNT_CUT = 1e-5
+
     PROTOCOL_BROKER_URL = "amqp://guest:guest@localhost:5672"
     PROTOCOL_BROKER_QUEUE = "swpt_trade"
     PROTOCOL_BROKER_QUEUE_ROUTING_KEY = "#"
@@ -219,16 +222,13 @@ class Configuration(metaclass=MetaEnvReader):
     PROTOCOL_BROKER_PREFETCH_SIZE = 0
     PROTOCOL_BROKER_PREFETCH_COUNT = 1
 
-    TRANSFERS_HEALTHY_MAX_COMMIT_DELAY: parse_timedelta = parse_timedelta("2h")
-    TRANSFERS_AMOUNT_CUT = 1e-5
-
     FLUSH_PROCESSES = 1
     FLUSH_PERIOD = 2.0
 
-    FETCH_PROCESSES = 1
-    FETCH_PERIOD = 5.0
-    FETCH_CONNECTIONS = 100
-    FETCH_TIMEOUT = 10.0
+    HTTP_FETCH_PROCESSES = 1
+    HTTP_FETCH_PERIOD = 5.0
+    HTTP_FETCH_CONNECTIONS = 100
+    HTTP_FETCH_TIMEOUT = 10.0
 
     TRIGGER_TRANSFERS_PROCESSES = 1
     TRIGGER_TRANSFERS_PERIOD = 5.0
@@ -403,7 +403,7 @@ def create_app(config_dict={}):
     from flask import Flask
     from swpt_pythonlib.utils import Int64Converter
     from .extensions import db, migrate, api, publisher
-    from .routes import admin_api, specs
+    from .routes import collectors_api, specs
     from .cli import swpt_trade
     from . import models  # noqa
 
@@ -440,7 +440,7 @@ def create_app(config_dict={}):
     migrate.init_app(app, db)
     publisher.init_app(app)
     api.init_app(app)
-    api.register_blueprint(admin_api)
+    api.register_blueprint(collectors_api)
     app.cli.add_command(swpt_trade)
     _check_config_sanity(app.config)
 

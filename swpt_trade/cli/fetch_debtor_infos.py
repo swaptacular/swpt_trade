@@ -23,7 +23,7 @@ from .common import swpt_trade
     type=int,
     help=(
         "The number of worker processes."
-        " If not specified, the value of the FETCH_PROCESSES environment"
+        " If not specified, the value of the HTTP_FETCH_PROCESSES environment"
         " variable will be used, defaulting to 1 if empty."
     ),
 )
@@ -34,7 +34,7 @@ from .common import swpt_trade
     help=(
         "The maximum number of HTTP connections that each worker process"
         " will initiate simultaneously. If not specified, the value of"
-        " the FETCH_CONNECTIONS environment variable will be used,"
+        " the HTTP_FETCH_CONNECTIONS environment variable will be used,"
         " defaulting to 100 if empty."
     ),
 )
@@ -45,7 +45,7 @@ from .common import swpt_trade
     help=(
         "The number of seconds to wait for a response, before the HTTP"
         " request is cancelled. If not specified, the value of the "
-        " FETCH_TIMEOUT environment variable will be used, defaulting"
+        " HTTP_FETCH_TIMEOUT environment variable will be used, defaulting"
         " to 10 seconds if empty."
     ),
 )
@@ -55,7 +55,7 @@ from .common import swpt_trade
     type=float,
     help=(
         "Poll the database for scheduled requests every FLOAT seconds."
-        " If not specified, the value of the FETCH_PERIOD environment"
+        " If not specified, the value of the HTTP_FETCH_PERIOD environment"
         " variable will be used, defaulting to 5 seconds if empty."
     ),
 )
@@ -123,23 +123,23 @@ def fetch_debtor_infos(
         processes=(
             processes
             if processes is not None
-            else current_app.config["FETCH_PROCESSES"]
+            else current_app.config["HTTP_FETCH_PROCESSES"]
         ),
         target=_fetch,
         connections=(
             connections
             if connections is not None
-            else current_app.config["FETCH_CONNECTIONS"]
+            else current_app.config["HTTP_FETCH_CONNECTIONS"]
         ),
         timeout=(
             timeout
             if timeout is not None
-            else current_app.config["FETCH_TIMEOUT"]
+            else current_app.config["HTTP_FETCH_TIMEOUT"]
         ),
         wait=(
             wait
             if wait is not None
-            else current_app.config["FETCH_PERIOD"]
+            else current_app.config["HTTP_FETCH_PERIOD"]
         ),
     )
     sys.exit(1)

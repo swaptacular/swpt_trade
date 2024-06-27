@@ -1,1 +1,1 @@
-from .admin import admin_api  # noqa
+from .collectors import collectors_api  # noqa

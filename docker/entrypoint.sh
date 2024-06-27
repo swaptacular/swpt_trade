@@ -150,7 +150,6 @@ case $1 in
         ;;
     solver)
         # Spawns all the necessary solver processes in one container.
-        generate_oathkeeper_configuration
         exec supervisord -c "$APP_ROOT_DIR/supervisord-solver.conf"
         ;;
     *)
