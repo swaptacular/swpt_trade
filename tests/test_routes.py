@@ -14,6 +14,13 @@ def test_ensure_collectors(client):
     }
 
     r = client.post(
+        "/trade/collectors/0/activate",
+        json=json_request,
+    )
+    assert r.status_code == 500
+    assert len(CollectorAccount.query.all()) == 0
+
+    r = client.post(
         "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors:3"},
         json=json_request,

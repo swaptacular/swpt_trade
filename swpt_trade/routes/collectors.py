@@ -33,6 +33,9 @@ class ActivateCollectorsEndpoint(MethodView):
     def post(self, activate_collectors_request, debtorId):
         """Ensure a number of alive collector accounts.
         """
+        if debtorId == 0:
+            abort(500)
+
         try:
             procedures.ensure_collector_accounts(
                 debtor_id=debtorId,
