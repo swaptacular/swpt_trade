@@ -22,15 +22,15 @@ collectors_api.before_request(ensure_admin)
 
 
 @collectors_api.route(
-    "collectors/<i64:debtorId>/ensure-alive", parameters=[DID]
+    "collectors/<i64:debtorId>/activate", parameters=[DID]
 )
-class EnsureAliveCollectorsEndpoint(MethodView):
-    @collectors_api.arguments(schemas.EnsureAliveCollectorsRequestSchema)
+class ActivateCollectorsEndpoint(MethodView):
+    @collectors_api.arguments(schemas.ActivateCollectorsRequestSchema)
     @collectors_api.response(204)
     @collectors_api.doc(
-        operationId="ensureAliveCollectors", security=specs.SCOPE_ACCESS_MODIFY
+        operationId="activateCollectors", security=specs.SCOPE_ACTIVATE
     )
-    def post(self, ensure_alive_collectors_request, debtorId):
+    def post(self, activate_collectors_request, debtorId):
         """Ensure a number of alive collector accounts.
         """
         try:
@@ -39,7 +39,7 @@ class EnsureAliveCollectorsEndpoint(MethodView):
                 min_collector_id=current_app.config["MIN_COLLECTOR_ID"],
                 max_collector_id=current_app.config["MAX_COLLECTOR_ID"],
                 number_of_accounts=(
-                    ensure_alive_collectors_request["number_of_accounts"]
+                    activate_collectors_request["number_of_accounts"]
                 ),
             )
         except RuntimeError:

@@ -9,12 +9,12 @@ def client(app, db_session):
 
 def test_ensure_collectors(client):
     json_request = {
-        "type": "EnsureAliveCollectorsRequest",
+        "type": "ActivateCollectorsRequest",
         "numberOfAccounts": 5,
     }
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors:3"},
         json=json_request,
     )
@@ -22,7 +22,7 @@ def test_ensure_collectors(client):
     assert len(CollectorAccount.query.all()) == 0
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "INVALID"},
         json=json_request,
     )
@@ -30,7 +30,7 @@ def test_ensure_collectors(client):
     assert len(CollectorAccount.query.all()) == 0
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors-supervisor"},
         json={
             "type": "WrongType",
@@ -42,7 +42,7 @@ def test_ensure_collectors(client):
     assert len(CollectorAccount.query.all()) == 0
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors-supervisor"},
         json={},
     )
@@ -50,7 +50,7 @@ def test_ensure_collectors(client):
     assert len(CollectorAccount.query.all()) == 1
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors-supervisor"},
         json=json_request,
     )
@@ -60,7 +60,7 @@ def test_ensure_collectors(client):
     assert all(x.debtor_id == 666 for x in cas)
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         headers={"X-Swpt-User-Id": "creditors-superuser"},
         json=json_request,
     )
@@ -68,16 +68,16 @@ def test_ensure_collectors(client):
     assert len(CollectorAccount.query.all()) == 5
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         json=json_request,
     )
     assert r.status_code == 204
     assert len(CollectorAccount.query.all()) == 5
 
     r = client.post(
-        "/trade/collectors/666/ensure-alive",
+        "/trade/collectors/666/activate",
         json={
-            "type": "EnsureAliveCollectorsRequest",
+            "type": "ActivateCollectorsRequest",
             "numberOfAccounts": 5000000000000,
         },
     )

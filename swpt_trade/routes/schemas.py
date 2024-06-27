@@ -21,13 +21,13 @@ class ValidateTypeMixin:
             raise ValidationError("Invalid type.")
 
 
-class EnsureAliveCollectorsRequestSchema(ValidateTypeMixin, Schema):
+class ActivateCollectorsRequestSchema(ValidateTypeMixin, Schema):
     type = fields.String(
-        load_default="EnsureAliveCollectorsRequest",
+        load_default="ActivateCollectorsRequest",
         load_only=True,
         metadata=dict(
             description=TYPE_DESCRIPTION,
-            example="EnsureAliveCollectorsRequest",
+            example="ActivateCollectorsRequest",
         ),
     )
     number_of_accounts = fields.Integer(
@@ -36,7 +36,7 @@ class EnsureAliveCollectorsRequestSchema(ValidateTypeMixin, Schema):
         data_key="numberOfAccounts",
         metadata=dict(
             format="int64",
-            description="The number of needed alive collector accounts.",
+            description="The number of needed collector accounts.",
             example=3,
         ),
     )
