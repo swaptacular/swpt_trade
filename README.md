@@ -35,7 +35,69 @@ The deliverables are two [docker images]: the *app-image*, and the
 Swaptacular Messaging Protocol].
 
 
+Dependencies
+------------
+
+Containers started from the *app-image* must have access to the
+following servers:
+
+1. One [PostgreSQL] server instance, which stores the solver server's
+   data.
+
+2. One or more [PostgreSQL] server instances, which store each worker
+   server's data.
+
+3. A [RabbitMQ] server instance, which acts as broker for [Swaptacular
+   Messaging Protocol] (SMP) messages.
+
+   The following [RabbitMQ exchanges] must be configured on the broker
+   instance:
+
+   - **`creditors_out`**: For messages that must be sent to accounting
+     authorities. The routing key will represent the debtor ID as
+     hexadecimal (lowercase). For example, for debtor ID equal to 10, the
+     routing key will be "00.00.00.00.00.00.00.0a".
+
+   - **`to_trade`**: For messages that must be processed by one of the
+     "worker" servers. The routing key will represent the highest 24
+     bits of the MD5 digest of the sharding key. For example, if the
+     sharding key for a given message type is the creditor ID, and the
+     creditor ID is 123, the routing key will be
+     "1.1.1.1.1.1.0.0.0.0.0.1.0.0.0.0.0.1.1.0.0.0.1.1". This allows
+     different messages to be handled by different "worker" servers
+     (sharding).
+
+   Also, one [RabbitMQ queue] must be configured on the broker
+   instance, **for each "worker" server**, so that all incoming SMP
+   messages for the creditors stored on the PostgreSQL server
+   instance, are routed to this queue.
+
+   **Note:** If you execute the "configure" command (see below), with
+   the environment variable `SETUP_RABBITMQ_BINDINGS` set to `yes`, an
+   attempt will be made to automatically setup all the required
+   RabbitMQ queues, exchanges, and the bindings between them.
+
+4. Optional [OAuth 2.0] authorization server, which authorizes
+   clients' requests to the [Admin Web API]. There is a plethora of
+   popular Oauth 2.0 server implementations. Normally, they maintain
+   their own user database, and go together with UI for user
+   registration, login, and authorization consent.
+
+To increase security and performance, it is highly recommended that
+you configure HTTP reverse-proxy server(s) (like [nginx]) between your
+clients and your "Payments Web API". In addition, this approach allows
+different creditors to be located on different database servers
+(sharding).
+
+
 [Swaptacular]: https://swaptacular.github.io/overview
 [docker images]: https://www.geeksforgeeks.org/what-is-docker-images/
 [database shard]: https://en.wikipedia.org/wiki/Shard_(database_architecture)
 [Swagger UI]: https://swagger.io/tools/swagger-ui/
+[JSON Serialization for the Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol-json.rst
+[PostgreSQL]: https://www.postgresql.org/
+[RabbitMQ]: https://www.rabbitmq.com/
+[RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
+[RabbitMQ exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
+[OAuth 2.0]: https://oauth.net/2/
