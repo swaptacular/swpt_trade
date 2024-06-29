@@ -67,9 +67,9 @@ following servers:
      different messages to be handled by different worker servers
      (sharding).
 
-   Also, one [RabbitMQ queue] must be configured on the broker
-   instance, **for each worker server**, so that all incoming SMP
-   messages for the creditors stored on the PostgreSQL server
+   Also, **for each worker server** one [RabbitMQ queue] must be
+   configured on the broker instance, so that all incoming SMP
+   messages for the creditors managed by a given worker server
    instance, are routed to this queue.
 
    **Note:** If you execute the "configure" command (see below), with
