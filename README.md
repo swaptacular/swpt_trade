@@ -12,7 +12,7 @@ The deliverables are two [docker images]: the *app-image*, and the
   1. **One "solver" server.**
   
   This server periodically gathers currencies information, together
-  with buy and sell offers, and analyses them so as to proposes a list
+  with buy and sell offers, and analyses them so as to propose a list
   of transactions that will be beneficial for all the participants.
 
   2. **One or more "worker" servers.**
@@ -28,8 +28,8 @@ The deliverables are two [docker images]: the *app-image*, and the
   administrative tools, useful for the continued proper functioning of
   the "Circular Trade" service.
 
-* The `swagger-ui-image` is a simple [Swagger UI] cleint for the
-  server Web API, mainly useful for testing.
+* The `swagger-ui-image` is a simple [Swagger UI] client for the admin
+  Web API, mainly useful for testing.
 
 **Note:** This implementation uses [JSON Serialization for the
 Swaptacular Messaging Protocol].
@@ -38,3 +38,4 @@ Swaptacular Messaging Protocol].
 [Swaptacular]: https://swaptacular.github.io/overview
 [docker images]: https://www.geeksforgeeks.org/what-is-docker-images/
 [database shard]: https://en.wikipedia.org/wiki/Shard_(database_architecture)
+[Swagger UI]: https://swagger.io/tools/swagger-ui/
