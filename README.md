@@ -82,7 +82,7 @@ following servers:
 
      * Policy, ledger, and flag update notifications, sent by the
        subsystem that is responsible for managing users' accounts.
-       (The "Circular Trade" reference implementations is designed to
+       (The "Circular Trade" reference implementation is designed to
        work in tandem with the ["Creditors Agent" reference
        implementation].)
 
@@ -255,8 +255,21 @@ PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
 FLUSH_PROCESSES=2
 FLUSH_PERIOD=1.5
 
+# Worker servers should periodically make HTTP scheduled requests
+# to fetch debtor info doucments. The specified number of
+# processes ("$HTTP_FETCH_PROCESSES") will be spawned to do this
+# job (default 1). Each process will open a maximum number
+# of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections, and
+# will give up after not receiving a response
+# for "$HTTP_FETCH_TIMEOUT" seconds. Note that
+# HTTP_FETCH_PROCESSES can be set to 0, in which case, the
+# container will not try to fetch any debtor info doucments.
+# The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
+# to wait between two sequential database queries to obtain
+# scheduled HTTP fetches, which time to be performed has
+# come (default 5).
 HTTP_FETCH_PROCESSES=1
-HTTP_FETCH_PERIOD=2.0
+HTTP_FETCH_PERIOD=2.5
 HTTP_FETCH_CONNECTIONS=100
 HTTP_FETCH_TIMEOUT=10.0
 
