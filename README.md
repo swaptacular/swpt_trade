@@ -208,16 +208,17 @@ MAX_COLLECTOR_ID=0x00000100000007ff
 # service to make a resonable estimate for the maximum possible
 # losses coming form negative interest rates. This variable
 # specifies the period during which it is highly likely that all
-# the outgoing transfers will be successfully performed. The
-# default is 2 hours. As a rule of thumb, this period should be
-# twice as big as the TURN_PHASE2_DURATION period.
+# scheduled outgoing transfers will be successfully performed.
+# The default is 2 hours. As a rule of thumb, this period should
+# be twice as big as the TURN_PHASE2_DURATION period.
 TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=3h
 
 # For each arranged transfer, a very small portion of the
 # transferred amount will be seized as a reward for performing a
-# transaction that is beneficial to all the participants. This
-# variable specifies how big the seized portion is. The default
-# is "1e-5", wich means that 0.001% of the amount will be seized.
+# transaction that is beneficial for all the participants (and as
+# a safety-margin as well). This variable specifies how big the
+# seized portion is. The default is "1e-5", wich means that
+# 0.001% of the amount will be seized.
 TRANSFERS_AMOUNT_CUT=1e-6
 
 # Connection string for this worker's PostgreSQL database server.
