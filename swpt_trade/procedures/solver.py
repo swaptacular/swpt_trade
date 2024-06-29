@@ -340,7 +340,8 @@ def ensure_collector_accounts(
                 "The number of available collector IDs is not big enough."
             )
 
-        rgen = Random(debtor_id)
+        rgen = Random()
+        rgen.seed(debtor_id, version=2)
         while True:
             yield rgen.randint(min_collector_id, max_collector_id)
 
