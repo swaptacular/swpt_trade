@@ -161,6 +161,13 @@ MIN_TRADE_AMOUNT=1000
 # Connection string for the solver's PostgreSQL database server.
 SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
 
+# The solver server maintains a pool of database connections
+# to the solver's PostgreSQL database server. This variable
+# determines the maximum number of connections in this pool. If
+# zero is specified (the default) there is no limit to the
+# connection pool's size.
+SOLVER_CLIENT_POOL_SIZE=0
+
 # Set the minimum level of severity for log messages ("info",
 # "warning", or "error"). The default is "warning".
 APP_LOG_LEVEL=info
@@ -275,10 +282,10 @@ For more configuration options, check the
 [development.env](../master/development.env) file.
 
  
-Configuring "admin API" server
-------------------------------
+Configuring the "admin API" server
+----------------------------------
 
-The behavior of admin API server can be tuned with environment
+The behavior of the admin API server can be tuned with environment
 variables. Here are the most important settings with some random
 example values:
 
@@ -296,6 +303,13 @@ MAX_COLLECTOR_ID=0x00000100000007ff
 
 # Connection string for the solver's PostgreSQL database server.
 SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
+
+# The admin API server maintains a pool of database connections
+# to the solver's PostgreSQL database server. This variable
+# determines the maximum number of connections in this pool. If
+# zero is specified (the default) there is no limit to the
+# connection pool's size.
+SOLVER_CLIENT_POOL_SIZE=0
 
 # The specified number of processes ("$WEBSERVER_PROCESSES") will
 # be spawned to handle "admin API" requests (default 1), each
