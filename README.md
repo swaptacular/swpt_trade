@@ -270,15 +270,15 @@ PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
 FLUSH_PROCESSES=2
 FLUSH_PERIOD=1.5
 
-# Worker servers should periodically make scheduled HTTP requests
-# to fetch currency info doucments. The specified number of
-# processes ("$HTTP_FETCH_PROCESSES") will be spawned to do this
-# job (default 1). Each process will open a maximum number
+# Worker servers should periodically perform scheduled HTTP
+# requests to fetch debtor info doucments. The specified number
+# of processes ("$HTTP_FETCH_PROCESSES") will be spawned to do
+# this job (default 1). Each process will open a maximum number
 # of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections, and
 # will give up after not receiving a response
 # for "$HTTP_FETCH_TIMEOUT" seconds. Note that
 # HTTP_FETCH_PROCESSES can be set to 0, in which case, the
-# container will not try to fetch any currency info doucments.
+# container will not try to fetch any debtor info doucments.
 # The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
 # to wait between two sequential database queries to obtain
 # scheduled HTTP fetches whose time to be performed has
