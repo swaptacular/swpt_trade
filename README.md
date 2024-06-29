@@ -69,7 +69,7 @@ following servers:
 
    Also, **for each worker server** one [RabbitMQ queue] must be
    configured on the broker instance, so that all messages published
-   on the `to_trade exchange, are routed to one of these queues
+   on the `to_trade` exchange, are routed to one of these queues
    (depending on the rouging key).
 
    **Note:** If you execute the "configure" command (see below), with
