@@ -18,9 +18,9 @@ The deliverables are two [docker images]: the *app-image*, and the
   2. **One or more "worker" servers.**
 
   These servers work together to collect all the information that the
-  "solver" server needs, and to actually perform the transactions
-  proposed by the "solver" server. Each "worker" server is responsible
-  for a different [database shard].
+  solver server needs, and to actually perform the transactions
+  proposed by the solver server. Each worker server is responsible for
+  a different [database shard].
 
   3. **An optional "admin API" web server.**
 
