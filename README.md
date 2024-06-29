@@ -109,51 +109,199 @@ following servers:
    [nginx]) between the admin clients and the "admin API".
 
 
-Configuration
--------------
+Configuring the "solver" server
+-------------------------------
 
-The behavior of the running container can be tuned with environment
+The behavior of the solver server can be tuned with environment
 variables. Here are the most important settings with some random
 example values:
 
-## Configuring for the "solver" server
-
 ```shell
-# The creditors agent will be responsible only for creditor IDs
-# between "$MIN_CREDITOR_ID" and "$MAX_CREDITOR_ID". This can be
-# passed as a decimal number (like "4294967296"), or a
+# All collector accounts will have their creditor IDs
+# between "$MIN_COLLECTOR_ID" and "$MAX_COLLECTOR_ID". This can
+# be passed as a decimal number (like "4294967296"), or a
 # hexadecimal number (like "0x100000000"). Numbers between
 # 0x8000000000000000 and 0xffffffffffffffff will be automatically
 # converted to their corresponding two's complement negative
-# numbers.
-MIN_CREDITOR_ID=4294967296
-MAX_CREDITOR_ID=8589934591
+# numbers. Normally, you would not need this interval to contain
+# more than a few thousand IDs.
+MIN_COLLECTOR_ID=0x0000010000000000
+MAX_COLLECTOR_ID=0x00000100000007ff
 
-# To improve the security of their accounts, creditors may configure
-# PINs (Personal Identification Numbers). The PINs will be stored in
-# the database encrypted. This variable determines the encryption key
-# (default ""). If a malicious attacker knows the encryption key, and
-# has a copy of the database, he/she will be able to decrypt all the
-# PINs. If you lose this encryption key, the users' PINs will not be
-# verified correctly, until each user configures a new PIN.
-PIN_PROTECTION_SECRET=some-long-string-that-must-be-kept-secret
+# Determiene when new trading turns will be started. In this
+# example, a new turn will be started every day at 2:00am, the
+# time allotted to the first turn phase (the currency info
+# collection phase) will be 10 minutes, and the time allotted to
+# the second turn phase (buy/sell offers collection phase) will
+# be 1 hour. The solver server will check the status of ongoing
+# trading turns every 60 seconds.
+TURN_PERIOD=1d
+TURN_PERIOD_OFFSET=2h
+TURN_PHASE1_DURATION=10m
+TURN_PHASE2_DURATION=1h
+TURN_CHECK_INTERVAL=60s
 
-# The specified number of processes ("$WEBSERVER_PROCESSES") will be
-# spawned to handle "Payments Web API" requests (default 1),
-# each process will run "$WEBSERVER_THREADS" threads in parallel
-# (default 3). The container will listen for "Payments Web API"
-# requests on port "$WEBSERVER_PORT" (default 8080).
+# In order to be traded, currencies must be pegged to other
+# currencies, thus forming a "peg-tree". At the root of the
+# peg-tree sits the "base currency". The base currency is
+# specified by its "debtor info locator" and its debtor
+# ID ("$BASE_DEBTOR_ID" and "$BASE_DEBTOR_INFO_LOCATOR").
+# Currencies with distance to the root bigger
+# than "$MAX_DISTANCE_TO_BASE" will be ighored.
+BASE_DEBTOR_INFO_LOCATOR=https://currencies.swaptacular.org/USD
+BASE_DEBTOR_ID=666
+MAX_DISTANCE_TO_BASE=10
+
+# The amount of every arranged trade must rounded to an integer
+# number. For this reason, trading small amounts may result in
+# signifficant rounding errors. To avoid this, trades for amounts
+# smaller than "$MIN_TRADE_AMOUNT" will be not be arranged.
+MIN_TRADE_AMOUNT=1000
+
+# Connection string for the solver's PostgreSQL database server.
+SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
+
+# Set the minimum level of severity for log messages ("info",
+# "warning", or "error"). The default is "warning".
+APP_LOG_LEVEL=info
+
+# Set format for log messages ("text" or "json"). The default is
+# "text".
+APP_LOG_FORMAT=text
+```
+
+For more configuration options, check the
+[development.env](../master/development.env) file.
+
+
+Configuring "worker" servers
+----------------------------
+
+The behavior of worker servers can be tuned with environment
+variables. Here are the most important settings with some random
+example values:
+
+```shell
+# All collector accounts will have their creditor IDs
+# between "$MIN_COLLECTOR_ID" and "$MAX_COLLECTOR_ID". This can
+# be passed as a decimal number (like "4294967296"), or a
+# hexadecimal number (like "0x100000000"). Numbers between
+# 0x8000000000000000 and 0xffffffffffffffff will be automatically
+# converted to their corresponding two's complement negative
+# numbers. Normally, you would not need this interval to contain
+# more than a few thousand IDs.
+MIN_COLLECTOR_ID=0x0000010000000000
+MAX_COLLECTOR_ID=0x00000100000007ff
+
+TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=5m
+TRANSFERS_AMOUNT_CUT=1e-6
+WORKER_POSTGRES_URL=postgresql+psycopg://swpt_worker:swpt_worker@pg:5432/${POSTGRES_DB}
+SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@pg:5432/${POSTGRES_DB}
+
+# Parameters for the communication with the RabbitMQ server which is
+# responsible for brokering SMP messages. The container will connect
+# to "$PROTOCOL_BROKER_URL" (default
+# "amqp://guest:guest@localhost:5672"), will consume messages from the
+# queue named "$PROTOCOL_BROKER_QUEUE" (default "swpt_trade"),
+# prefetching at most "$PROTOCOL_BROKER_PREFETCH_COUNT" messages at
+# once (default 1). The specified number of processes
+# ("$PROTOCOL_BROKER_PROCESSES") will be spawned to consume and
+# process messages (default 1), each process will run
+# "$PROTOCOL_BROKER_THREADS" threads in parallel (default 1). Note
+# that PROTOCOL_BROKER_PROCESSES can be set to 0, in which case, the
+# container will not consume any messages from the queue.
+PROTOCOL_BROKER_URL=amqp://guest:guest@localhost:5672
+PROTOCOL_BROKER_QUEUE=swpt_trade
+PROTOCOL_BROKER_PROCESSES=1
+PROTOCOL_BROKER_THREADS=3
+PROTOCOL_BROKER_PREFETCH_COUNT=10
+
+# The binding key with which the "$PROTOCOL_BROKER_QUEUE"
+# RabbitMQ queue is bound to the incoming messages' topic
+# exchange (default "#"). The binding key must consist of zero or
+# more 0s or 1s, separated by dots, ending with a hash symbol.
+# For example: "0.1.#", "1.#", or "#".
+PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
+
+# All outgoing RabbitMQ messages are first recorded in the
+# PostgreSQL database, and then are "fulshed" to the RabbitMQ
+# message broker. The specified number of
+# processes ("$FLUSH_PROCESSES") will be spawned to flush
+# messages (default 1). Note that FLUSH_PROCESSES can be set to
+# 0, in which case, the container will not flush any messages.
+# The "$FLUSH_PERIOD" value specifies the number of seconds to
+# wait between two sequential flushes (default 2).
+FLUSH_PROCESSES=2
+FLUSH_PERIOD=1.5
+
+HTTP_FETCH_PROCESSES=1
+HTTP_FETCH_PERIOD=2.0
+HTTP_FETCH_CONNECTIONS=100
+HTTP_FETCH_TIMEOUT=10.0
+
+TRIGGER_TRANSFERS_PROCESSES=1
+TRIGGER_TRANSFERS_PERIOD=2.0
+
+HANDLE_PRISTINE_COLLECTORS_THREADS=1
+HANDLE_PRISTINE_COLLECTORS_PERIOD=60.0
+
+# Set this to "true" after splitting a parent database shard into
+# two children shards. You may set this back to "false", once all
+# left-over records from the parent have been deleted from the
+# child shard.
+DELETE_PARENT_SHARD_RECORDS=false
+
+# Set the minimum level of severity for log messages ("info",
+# "warning", or "error"). The default is "warning".
+APP_LOG_LEVEL=info
+
+# Set format for log messages ("text" or "json"). The default is
+# "text".
+APP_LOG_FORMAT=text
+```
+
+For more configuration options, check the
+[development.env](../master/development.env) file.
+
+ 
+Configuring "admin API" server
+------------------------------
+
+The behavior of admin API server can be tuned with environment
+variables. Here are the most important settings with some random
+example values:
+
+```shell
+# All collector accounts will have their creditor IDs
+# between "$MIN_COLLECTOR_ID" and "$MAX_COLLECTOR_ID". This can
+# be passed as a decimal number (like "4294967296"), or a
+# hexadecimal number (like "0x100000000"). Numbers between
+# 0x8000000000000000 and 0xffffffffffffffff will be automatically
+# converted to their corresponding two's complement negative
+# numbers. Normally, you would not need this interval to contain
+# more than a few thousand IDs.
+MIN_COLLECTOR_ID=0x0000010000000000
+MAX_COLLECTOR_ID=0x00000100000007ff
+
+# Connection string for the solver's PostgreSQL database server.
+SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
+
+# The specified number of processes ("$WEBSERVER_PROCESSES") will
+# be spawned to handle "admin API" requests (default 1), each
+# process will run "$WEBSERVER_THREADS" threads in
+# parallel (default 3). The container will listen for "Payments
+# Web API" requests on port "$WEBSERVER_PORT" (default 8080).
 WEBSERVER_PROCESSES=2
 WEBSERVER_THREADS=10
 WEBSERVER_PORT=8003
 
-# Requests to the "Payments Web API" are protected by an OAuth
-# 2.0 authorization server. With every request, the client (a Web
-# browser, for example) presents a token, and to verify the validity
-# of the token, internally, a request is made to the OAuth 2.0
-# authorization server. This is called "token introspection". This
-# variable sets the URL at which internal token introspection requests
-# will be sent.
+# Requests to the "admin API" are protected by an OAuth 2.0
+# authorization server. With every request, the client (a Web
+# browser, for example) presents a token, and to verify the
+# validity of the token, internally, a request is made to the
+# OAuth 2.0 authorization server. This is called "token
+# introspection". This variable sets the URL at which internal
+# token introspection requests will be sent.
 #
 # NOTE: The response to the "token introspection" request will contain
 # a "username" field. The OAuth 2.0 authorization server must be
@@ -166,62 +314,6 @@ WEBSERVER_PORT=8003
 # the creditor with the specified <CREDITOR_ID> (an unsigned 64-bit
 # integer).
 OAUTH2_INTROSPECT_URL=http://localhost:4445/oauth2/introspect
-
-# Connection string for a PostgreSQL database server to connect to.
-POSTGRES_URL=postgresql+psycopg://swpt_creditors:swpt_creditors@localhost:5435/test
-
-# Connection string for a Redis database server to connect to.
-REDIS_URL=redis://localhost:6380/0?health_check_interval=30
-
-# Parameters for the communication with the RabbitMQ server which is
-# responsible for brokering SMP messages. The container will connect
-# to "$PROTOCOL_BROKER_URL" (default
-# "amqp://guest:guest@localhost:5672"), will consume messages from the
-# queue named "$PROTOCOL_BROKER_QUEUE" (default "swpt_creditors"),
-# prefetching at most "$PROTOCOL_BROKER_PREFETCH_COUNT" messages at
-# once (default 1). The specified number of processes
-# ("$PROTOCOL_BROKER_PROCESSES") will be spawned to consume and
-# process messages (default 1), each process will run
-# "$PROTOCOL_BROKER_THREADS" threads in parallel (default 1). Note
-# that PROTOCOL_BROKER_PROCESSES can be set to 0, in which case, the
-# container will not consume any messages from the queue.
-PROTOCOL_BROKER_URL=amqp://guest:guest@localhost:5672
-PROTOCOL_BROKER_QUEUE=swpt_creditors
-PROTOCOL_BROKER_PROCESSES=1
-PROTOCOL_BROKER_THREADS=3
-PROTOCOL_BROKER_PREFETCH_COUNT=10
-
-# The binding key with which the "$PROTOCOL_BROKER_QUEUE"
-# RabbitMQ queue is bound to the incoming messages' topic
-# exchange (default "#"). The binding key must consist of zero or
-# more 0s or 1s, separated by dots, ending with a hash symbol.
-# For example: "0.1.#", "1.#", or "#".
-PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
-
-# All outgoing Swaptacular Messaging Protocol messages are first
-# recorded in the PostgreSQL database, and then are "fulshed" to
-# the RabbitMQ message broker. The specified number of
-# processes ("$FLUSH_PROCESSES") will be spawned to flush
-# messages (default 1). Note that FLUSH_PROCESSES can be set to
-# 0, in which case, the container will not flush any messages.
-# The "$FLUSH_PERIOD" value specifies the number of seconds to
-# wait between two sequential flushes (default 2).
-FLUSH_PROCESSES=2
-FLUSH_PERIOD=1.5
-
-# The processing of incoming events consists of several stages. The
-# following configuration variables control the number of worker
-# threads that will be involved on each respective stage (default
-# 1). You must set this to a reasonable value, and increase it when
-# you start experiencing problems with performance.
-PROCESS_LOG_ADDITIONS_THREADS=10
-PROCESS_LEDGER_UPDATES_THREADS=10
-
-# Set this to "true" after splitting a parent database shard into
-# two children shards. You may set this back to "false", once all
-# left-over records from the parent have been deleted from the
-# child shard.
-DELETE_PARENT_SHARD_RECORDS=false
 
 # Set the minimum level of severity for log messages ("info",
 # "warning", or "error"). The default is "warning".
