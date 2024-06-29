@@ -41,12 +41,12 @@ Dependencies
 Containers started from the *app-image* must have access to the
 following servers:
 
-1. One [PostgreSQL] server instance, which stores *the solver server's
-   data*.
+1. One [PostgreSQL] server instance, which stores the solver server's
+   data.
 
 2. One PostgreSQL server instance **for each worker server**.
 
-3. [RabbitMQ] server instance, which acts as broker for [Swaptacular
+3. A [RabbitMQ] server instance, which acts as broker for [Swaptacular
    Messaging Protocol] (SMP) messages.
 
    The following [RabbitMQ exchanges] must be configured on the broker
@@ -69,20 +69,20 @@ following servers:
      The following types of messages will be published on this
      exchange:
 
-     * Incoming SMP messages related to the *collector accounts*. (To
-       do its job, the "Circular Trade" service creates and uses
-       system accounts, called "collector accounts", which act as
+     * Incoming SMP messages related to *collector accounts*. (To do
+       its job, the "Circular Trade" service creates and uses system
+       accounts, called "collector accounts", which act as
        distribution hubs for money.)
 
-     * Incoming SMP messages concerning transfers with "agent"
+     * Incoming SMP messages concerning transfers with *"agent"*
        coordinator type. (The "agent" coordinator type is reserved for
-       transfers initiated by the "Circular Trade" service on behalf
+       transfers initiated by the "Circular Trade" service, on behalf
        of users.)
 
-     * Internal "Circular Trade" messages. (To do their jobs, worker
-       servers will send messages to each other. Even when there is
-       only one worker server, it will use the `to_trade` exchange to
-       send messages to itself.)
+     * Internal messages. (To do their jobs, worker servers will send
+       messages to each other. Even when there is only one worker
+       server, it will use the `to_trade` exchange to send messages to
+       itself.)
 
    Also, **for each worker server** one [RabbitMQ queue] must be
    configured on the broker instance, so that all messages published
@@ -94,7 +94,7 @@ following servers:
    attempt will be made to automatically setup all the required
    RabbitMQ queues, exchanges, and the bindings between them.
 
-4. Optional [OAuth 2.0] authorization server, which authorizes
+4. An optional [OAuth 2.0] authorization server, which authorizes
    clients' requests to the [Admin Web API]. There is a plethora of
    popular Oauth 2.0 server implementations. Normally, they maintain
    their own user database, and go together with UI for user
