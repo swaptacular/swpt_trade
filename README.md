@@ -99,7 +99,7 @@ following servers:
    RabbitMQ queues, exchanges, and the bindings between them.
 
 4. An optional [OAuth 2.0] authorization server, which authorizes
-   clients' requests to the [Admin Web API]. There is a plethora of
+   clients' requests to the *admin API*. There is a plethora of
    popular Oauth 2.0 server implementations. Normally, they maintain
    their own user database, and go together with UI for user
    registration, login, and authorization consent.
