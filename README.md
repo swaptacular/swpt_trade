@@ -68,9 +68,9 @@ following servers:
      (sharding).
 
    Also, **for each worker server** one [RabbitMQ queue] must be
-   configured on the broker instance, so that all incoming SMP
-   messages for the creditors managed by a given worker server
-   instance, are routed to this queue.
+   configured on the broker instance, so that all messages published
+   on the `to_trade exchange, are routed to one of these queues
+   (depending on the rouging key).
 
    **Note:** If you execute the "configure" command (see below), with
    the environment variable `SETUP_RABBITMQ_BINDINGS` set to `yes`, an
