@@ -104,11 +104,9 @@ following servers:
    their own user database, and go together with UI for user
    registration, login, and authorization consent.
 
-To increase security and performance, it is highly recommended that
-you configure HTTP reverse-proxy server(s) (like [nginx]) between your
-clients and your "Payments Web API". In addition, this approach allows
-different creditors to be located on different database servers
-(sharding).
+   To increase security and performance, it is highly recommended that
+   you configure HTTP reverse-proxy server(s) (like [nginx]) between
+   the clients and the "admin API".
 
 
 [Swaptacular]: https://swaptacular.github.io/overview
@@ -123,3 +121,4 @@ different creditors to be located on different database servers
 [Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
 ["Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
 [OAuth 2.0]: https://oauth.net/2/
+[nginx]: https://en.wikipedia.org/wiki/Nginx
