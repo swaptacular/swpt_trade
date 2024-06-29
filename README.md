@@ -44,10 +44,10 @@ following servers:
 1. One [PostgreSQL] server instance, which stores the solver server's
    data.
 
-2. One or more [PostgreSQL] server instances, which store each worker
+2. One or more PostgreSQL server instances, which store each worker
    server's data.
 
-3. A [RabbitMQ] server instance, which acts as broker for [Swaptacular
+3. [RabbitMQ] server instance, which acts as broker for [Swaptacular
    Messaging Protocol] (SMP) messages.
 
    The following [RabbitMQ exchanges] must be configured on the broker
@@ -59,16 +59,16 @@ following servers:
      routing key will be "00.00.00.00.00.00.00.0a".
 
    - **`to_trade`**: For messages that must be processed by one of the
-     "worker" servers. The routing key will represent the highest 24
+     worker servers. The routing key will represent the highest 24
      bits of the MD5 digest of the sharding key. For example, if the
      sharding key for a given message type is the creditor ID, and the
      creditor ID is 123, the routing key will be
      "1.1.1.1.1.1.0.0.0.0.0.1.0.0.0.0.0.1.1.0.0.0.1.1". This allows
-     different messages to be handled by different "worker" servers
+     different messages to be handled by different worker servers
      (sharding).
 
    Also, one [RabbitMQ queue] must be configured on the broker
-   instance, **for each "worker" server**, so that all incoming SMP
+   instance, **for each worker server**, so that all incoming SMP
    messages for the creditors stored on the PostgreSQL server
    instance, are routed to this queue.
 
