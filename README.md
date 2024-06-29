@@ -256,17 +256,17 @@ FLUSH_PROCESSES=2
 FLUSH_PERIOD=1.5
 
 # Worker servers should periodically make scheduled HTTP requests
-# to fetch debtor info doucments. The specified number of
+# to fetch currency info doucments. The specified number of
 # processes ("$HTTP_FETCH_PROCESSES") will be spawned to do this
 # job (default 1). Each process will open a maximum number
 # of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections, and
 # will give up after not receiving a response
 # for "$HTTP_FETCH_TIMEOUT" seconds. Note that
 # HTTP_FETCH_PROCESSES can be set to 0, in which case, the
-# container will not try to fetch any debtor info doucments.
+# container will not try to fetch any currency info doucments.
 # The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
 # to wait between two sequential database queries to obtain
-# scheduled HTTP fetches which time to be performed has
+# scheduled HTTP fetches whose time to be performed has
 # come (default 5).
 HTTP_FETCH_PROCESSES=1
 HTTP_FETCH_CONNECTIONS=100
@@ -280,11 +280,19 @@ HTTP_FETCH_PERIOD=2.5
 # can be set to 0, in which case, the container will not trigger
 # any transfer attempts. The "$TRIGGER_TRANSFERS_PERIOD" value
 # specifies the number of seconds to wait between two sequential
-# database queries to obtain scheduled transfer attempts which
+# database queries to obtain scheduled transfer attempts whose
 # time to be triggered has come (default 5).
 TRIGGER_TRANSFERS_PROCESSES=1
 TRIGGER_TRANSFERS_PERIOD=2.5
 
+# Worker servers should periodically query the solver's database
+# for new ("pristine") collector accounts that need to be
+# created. The "$HANDLE_PRISTINE_COLLECTORS_PERIOD" value
+# specifies the number of seconds to wait between two sequential
+# database queries to obtain new collector accounts from the
+# solver's database (default 60). The specified number of
+# threads ("$HANDLE_PRISTINE_COLLECTORS_THREADS") will be spawned
+# to create the needed collector accounts (default 1).
 HANDLE_PRISTINE_COLLECTORS_THREADS=1
 HANDLE_PRISTINE_COLLECTORS_PERIOD=60.0
 
