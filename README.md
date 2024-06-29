@@ -49,8 +49,8 @@ following servers:
 3. A [RabbitMQ] server instance, which acts as broker for [Swaptacular
    Messaging Protocol] (SMP) messages.
 
-   The following [RabbitMQ exchanges] must be configured on the broker
-   instance:
+   The following [RabbitMQ topic exchanges] must be configured on the
+   broker instance:
 
    - **`creditors_out`**: For messages that must be sent to accounting
      authorities. The routing key will represent the debtor ID as
@@ -235,7 +235,7 @@ PROTOCOL_BROKER_THREADS=3
 PROTOCOL_BROKER_PREFETCH_COUNT=10
 
 # The binding key with which the "$PROTOCOL_BROKER_QUEUE"
-# RabbitMQ queue is bound to the incoming messages' topic
+# RabbitMQ queue is bound to the `to_trade` topic
 # exchange (default "#"). The binding key must consist of zero or
 # more 0s or 1s, separated by dots, ending with a hash symbol.
 # For example: "0.1.#", "1.#", or "#".
@@ -361,7 +361,7 @@ For more configuration options, check the
 [PostgreSQL]: https://www.postgresql.org/
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
-[RabbitMQ exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[RabbitMQ topic exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
 [Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
 ["Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
 [OAuth 2.0]: https://oauth.net/2/
