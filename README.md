@@ -204,6 +204,12 @@ MIN_COLLECTOR_ID=0x0000010000000000
 MAX_COLLECTOR_ID=0x00000100000007ff
 
 TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=5m
+
+# For each arranged transfer, a very small portion of the
+# transferred amount will be seized as a reward for performing a
+# transaction that is beneficial to all the participants. This
+# value specifies how big the seized portion is. The default
+# is "1e-5", wich means that 0.001% of the amount will be seized.
 TRANSFERS_AMOUNT_CUT=1e-6
 
 # Connection string for this worker's PostgreSQL database server.
@@ -292,7 +298,7 @@ TRIGGER_TRANSFERS_PERIOD=2.5
 # database queries to obtain new collector accounts from the
 # solver's database (default 60). The specified number of
 # threads ("$HANDLE_PRISTINE_COLLECTORS_THREADS") will be spawned
-# to create the needed collector accounts (default 1).
+# to actually create the needed collector accounts (default 1).
 HANDLE_PRISTINE_COLLECTORS_THREADS=1
 HANDLE_PRISTINE_COLLECTORS_PERIOD=60.0
 
