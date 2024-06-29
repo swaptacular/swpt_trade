@@ -203,7 +203,15 @@ example values:
 MIN_COLLECTOR_ID=0x0000010000000000
 MAX_COLLECTOR_ID=0x00000100000007ff
 
-TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=5m
+# When outgouing transfers are performed, a deadline for each
+# transfer should be specified. This allows the "Circular Trade"
+# service to make a resonable estimate for the possible losses
+# coming form negative interest rates. This value specifies the
+# period in which it is quite probalbe that all outgoing
+# transfers will be successfully performed. The default is 2
+# hours. As a rule of thumb, this period should be twice as big
+# as the TURN_PHASE2_DURATION.
+TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=3h
 
 # For each arranged transfer, a very small portion of the
 # transferred amount will be seized as a reward for performing a
