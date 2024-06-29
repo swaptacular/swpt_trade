@@ -41,11 +41,10 @@ Dependencies
 Containers started from the *app-image* must have access to the
 following servers:
 
-1. One [PostgreSQL] server instance, which stores the solver server's
-   data.
+1. One [PostgreSQL] server instance, which stores *the solver server's
+   data*.
 
-2. One or more PostgreSQL server instances, which store each worker
-   server's data.
+2. One PostgreSQL server instance **for each worker server**.
 
 3. [RabbitMQ] server instance, which acts as broker for [Swaptacular
    Messaging Protocol] (SMP) messages.
