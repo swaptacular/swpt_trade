@@ -70,10 +70,10 @@ following servers:
      The following types of messages will be published on this
      exchange:
 
-     a. Incoming SMP messages related to the "collector accounts". (To
-        do its job, the "Circular Trade" service creates and uses
-        system accounts, called "collector accounts", which act as
-        distribution hubs for money.)
+     * Incoming SMP messages related to the "collector accounts". (To
+       do its job, the "Circular Trade" service creates and uses
+       system accounts, called "collector accounts", which act as
+       distribution hubs for money.)
 
    Also, **for each worker server** one [RabbitMQ queue] must be
    configured on the broker instance, so that all messages published
