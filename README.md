@@ -19,7 +19,7 @@ The deliverables are two [docker images]: the *app-image*, and the
   2. **One or more "worker" servers.**
 
   These servers work together to collect all the information that the
-  solver server needs, and to actually perform the transactions
+  solver server need, and to actually perform the transactions
   proposed by the solver server. Each worker server is responsible for
   a different [database shard].
 
@@ -82,7 +82,9 @@ following servers:
 
      * Policy, ledger, and flag update notifications, sent by the
        subsystem that is responsible for managing users' accounts.
-       (See the ["Creditors Agent" reference implementation].)
+       (The "Circular Trade" reference implementations is designed to
+       work in tandem with the ["Creditors Agent" reference
+       implementation].)
 
      * Internal messages. (To do their jobs, worker servers will send
        messages to each other. Even when there is only one worker
