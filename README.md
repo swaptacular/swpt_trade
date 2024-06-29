@@ -260,8 +260,8 @@ PROTOCOL_BROKER_PREFETCH_COUNT=10
 PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
 
 # All outgoing RabbitMQ messages are first recorded in the
-# PostgreSQL database, and then are "fulshed" to the RabbitMQ
-# message broker. The specified number of
+# worker's PostgreSQL database, and then are "fulshed" to the
+# RabbitMQ message broker. The specified number of
 # processes ("$FLUSH_PROCESSES") will be spawned to flush
 # messages (default 1). Note that FLUSH_PROCESSES can be set to
 # 0, in which case, the container will not flush any messages.
