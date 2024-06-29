@@ -255,7 +255,7 @@ PROTOCOL_BROKER_QUEUE_ROUTING_KEY=#
 FLUSH_PROCESSES=2
 FLUSH_PERIOD=1.5
 
-# Worker servers should periodically make HTTP scheduled requests
+# Worker servers should periodically make scheduled HTTP requests
 # to fetch debtor info doucments. The specified number of
 # processes ("$HTTP_FETCH_PROCESSES") will be spawned to do this
 # job (default 1). Each process will open a maximum number
@@ -266,15 +266,24 @@ FLUSH_PERIOD=1.5
 # container will not try to fetch any debtor info doucments.
 # The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
 # to wait between two sequential database queries to obtain
-# scheduled HTTP fetches, which time to be performed has
+# scheduled HTTP fetches which time to be performed has
 # come (default 5).
 HTTP_FETCH_PROCESSES=1
-HTTP_FETCH_PERIOD=2.5
 HTTP_FETCH_CONNECTIONS=100
 HTTP_FETCH_TIMEOUT=10.0
+HTTP_FETCH_PERIOD=2.5
 
+# Worker servers should periodically trigger scheduled transfer
+# attempts. The specified number of
+# processes ("$TRIGGER_TRANSFERS_PROCESSES") will be spawned to
+# do this job (default 1). Note that TRIGGER_TRANSFERS_PROCESSES
+# can be set to 0, in which case, the container will not trigger
+# any transfer attempts. The "$TRIGGER_TRANSFERS_PERIOD" value
+# specifies the number of seconds to wait between two sequential
+# database queries to obtain scheduled transfer attempts which
+# time to be triggered has come (default 5).
 TRIGGER_TRANSFERS_PROCESSES=1
-TRIGGER_TRANSFERS_PERIOD=2.0
+TRIGGER_TRANSFERS_PERIOD=2.5
 
 HANDLE_PRISTINE_COLLECTORS_THREADS=1
 HANDLE_PRISTINE_COLLECTORS_PERIOD=60.0
