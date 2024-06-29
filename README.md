@@ -195,8 +195,19 @@ MAX_COLLECTOR_ID=0x00000100000007ff
 
 TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=5m
 TRANSFERS_AMOUNT_CUT=1e-6
-WORKER_POSTGRES_URL=postgresql+psycopg://swpt_worker:swpt_worker@pg:5432/${POSTGRES_DB}
-SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@pg:5432/${POSTGRES_DB}
+
+# Connection string for this worker's PostgreSQL database server.
+WORKER_POSTGRES_URL=postgresql+psycopg://swpt_worker:swpt_worker@localhost:5435/test
+
+# Connection string for the solver's PostgreSQL database server.
+SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
+
+# Each worker server maintains a pool of database connections to
+# the solver's PostgreSQL database server. This variable
+# determines the maximum number of connections in this pool. If
+# zero is specified (the default) there is no limit to the
+# connection pool's size.
+SOLVER_CLIENT_POOL_SIZE=0
 
 # Parameters for the communication with the RabbitMQ server which is
 # responsible for brokering SMP messages. The container will connect
