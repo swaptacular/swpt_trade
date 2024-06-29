@@ -104,9 +104,9 @@ following servers:
    their own user database, and go together with UI for user
    registration, login, and authorization consent.
 
-   To increase security and performance, it is highly recommended that
-   you configure HTTP reverse-proxy server(s) (like [nginx]) between
-   the clients and the "admin API".
+   Also, to increase security and performance, it is highly
+   recommended that you configure HTTP reverse-proxy server(s) (like
+   [nginx]) between the admin clients and the "admin API".
 
 
 [Swaptacular]: https://swaptacular.github.io/overview
