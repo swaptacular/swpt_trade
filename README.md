@@ -70,9 +70,9 @@ following servers:
      exchange:
 
      * Incoming SMP messages related to *collector accounts*. (To do
-       its job, the "Circular Trade" service creates and uses system
-       accounts, called "collector accounts", which act as
-       distribution hubs for money.)
+       their jobs, worker servers create and use system accounts,
+       called "collector accounts", which act as distribution hubs for
+       money.)
 
      * Incoming SMP messages concerning transfers with *"agent"*
        coordinator type. (The "agent" coordinator type is reserved for
