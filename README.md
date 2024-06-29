@@ -67,10 +67,18 @@ following servers:
      different messages to be handled by different worker servers
      (sharding).
 
+     The following types of messages will be published on this
+     exchange:
+
+     a) Incoming SMP messages related to the "collector accounts". (To
+        do its job, the "Circular Trade" service creates and uses
+        system accounts, called "collector accounts", which act as
+        distribution hubs for money.)
+
    Also, **for each worker server** one [RabbitMQ queue] must be
    configured on the broker instance, so that all messages published
    on the `to_trade` exchange, are routed to one of these queues
-   (depending on the rouging key).
+   (determined by the rouging key).
 
    **Note:** If you execute the "configure" command (see below), with
    the environment variable `SETUP_RABBITMQ_BINDINGS` set to `yes`, an
