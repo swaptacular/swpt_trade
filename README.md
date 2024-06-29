@@ -11,7 +11,7 @@ The deliverables are two [docker images]: the *app-image*, and the
 
   1. **One "solver" server.**
   
-  This server periodically performs "trading turns", gathering
+  This server periodically performs *trading turns*, gathering
   currencies information, together with buy and sell offers, and
   analyzing (and "solving") them so as to propose a list of
   transactions that will be beneficial for all the participants.
