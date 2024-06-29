@@ -79,9 +79,9 @@ following servers:
        transfers initiated by the "Circular Trade" service, on behalf
        of users.)
 
-     * Policy change notifications sent by the subsystem that is
-       responsible for managing users' accounts. (See the [Swaptacular
-       "Creditors Agent" reference implementation].)
+     * Policy, ledger, and flag update notifications, sent by the
+       subsystem that is responsible for managing users' accounts.
+       (See the ["Creditors Agent" reference implementation].)
 
      * Internal messages. (To do their jobs, worker servers will send
        messages to each other. Even when there is only one worker
@@ -121,5 +121,5 @@ different creditors to be located on different database servers
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
 [Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
-[Swaptacular "Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
+["Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
 [OAuth 2.0]: https://oauth.net/2/
