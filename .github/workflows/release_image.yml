@@ -1,0 +1,49 @@
+name: Create and publish a Docker image
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - registry: ghcr.io
+            target: app-image
+            image: ghcr.io/${{ github.repository }}
+          - registry: ghcr.io
+            target: swagger-ui-image
+            image: ghcr.io/${{ github.repository }}_swagger_ui
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the container registry
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446
+        with:
+          registry: ${{ matrix.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81
+        with:
+          images: ${{ matrix.image }}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
