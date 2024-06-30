@@ -458,8 +458,8 @@ container allows you to execute the following *documented commands*:
   Starts additional worker processes that perform scheduled HTTP
   requests to fetch debtor info documents. These commands allow you to
   start processes dedicated to fetching debtor info documents. (See
-  "HTTP_FETCH_PROCESSES" and "HTTP_FETCH_PERIOD" environment
-  variables.)
+  "HTTP_FETCH_PROCESSES", "HTTP_FETCH_CONNECTIONS",
+  "HTTP_FETCH_TIMEOUT" and "HTTP_FETCH_PERIOD" environment variables.)
 
 * `trigger_transfers`
 
@@ -467,6 +467,56 @@ container allows you to execute the following *documented commands*:
   attempts. These commands allow you to start processes dedicated to
   triggering transfer attempts. (See "TRIGGER_TRANSFERS_PROCESSES" and
   "TRIGGER_TRANSFERS_PERIOD" environment variables.)
+
+
+How to run the tests
+--------------------
+
+1.  Install [Docker Engine] and [Docker Compose].
+
+2.  To create an *.env* file with reasonable defalut values, run this
+    command:
+
+        $ cp development.env .env
+
+3.  To run the unit tests, use the following commands:
+
+        $ docker-compose build
+        $ docker-compose run tests-config test
+
+
+How to setup a development environment
+--------------------------------------
+
+1.  Install [Poetry](https://poetry.eustace.io/docs/).
+
+2.  Create a new [Python](https://docs.python.org/) virtual
+    environment and activate it.
+
+3.  To install dependencies, run this command:
+
+        $ poetry install
+
+4.  To run the minimal set of services needed for development, use
+    this command:
+
+        $ docker-compose up --build
+
+    This will start its own PostgreSQL and Redis server instances in
+    docker containers, but will rely on being able to connect to a
+    RabbitMQ server instance at
+    "amqp://guest:guest@localhost:5672". The OAuth 2.0 authorization
+    will be bypassed.
+
+    Note that because the RabbitMQ "guest" user [can only connect from
+    localhost], you should either explicitly allow the "guest" user to
+    connect from anywhere, or create a new RabbitMQ user, and change
+    the RabbitMQ connection URLs accordingly (`PROTOCOL_BROKER_URL` in
+    the *.env* file).
+
+5.  You can use `flask run -p 5000` to run a local web server, and
+    `pytest --cov=swpt_trade --cov-report=html` to run the tests and
+    generate a test coverage report.
 
 
 [Swaptacular]: https://swaptacular.github.io/overview
