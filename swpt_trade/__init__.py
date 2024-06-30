@@ -191,8 +191,8 @@ class Configuration(metaclass=MetaEnvReader):
     )
 
     TURN_PERIOD = "1d"
-    TURN_PERIOD_OFFSET = "0"
-    TURN_CHECK_INTERVAL = "1m"
+    TURN_PERIOD_OFFSET = "2h"
+    TURN_CHECK_INTERVAL = "60s"
     TURN_PHASE1_DURATION = "10m"
     TURN_PHASE2_DURATION = "1h"
 

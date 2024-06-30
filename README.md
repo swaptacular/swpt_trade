@@ -121,12 +121,13 @@ example values:
 
 ```shell
 # Determiene when new trading turns will be started. In this
-# example, a new turn will be started every day at 2:00am, the
-# time allotted to the first turn phase (the currency info
-# collection phase) will be 10 minutes, and the time allotted to
-# the second turn phase (buy/sell offers collection phase) will
-# be 1 hour. The solver server will check the status of ongoing
-# trading turns every 60 seconds.
+# example (these are the default values), a new turn will be
+# started every day at 2:00am, the time allotted to the first
+# turn phase (the currency info collection phase) will be 10
+# minutes, and the time allotted to the second turn
+# phase (buy/sell offers collection phase) will be 1 hour. The
+# solver server will check the status of ongoing trading turns
+# every 60 seconds.
 TURN_PERIOD=1d
 TURN_PERIOD_OFFSET=2h
 TURN_PHASE1_DURATION=10m
@@ -139,7 +140,7 @@ TURN_CHECK_INTERVAL=60s
 # specified by its "debtor info locator" and its debtor
 # ID ("$BASE_DEBTOR_ID" and "$BASE_DEBTOR_INFO_LOCATOR").
 # Currencies with distance to the root bigger
-# than "$MAX_DISTANCE_TO_BASE" will be ighored.
+# than "$MAX_DISTANCE_TO_BASE" will be ighored (default 10).
 BASE_DEBTOR_INFO_LOCATOR=https://currencies.swaptacular.org/USD
 BASE_DEBTOR_ID=666
 MAX_DISTANCE_TO_BASE=10
@@ -147,8 +148,9 @@ MAX_DISTANCE_TO_BASE=10
 # The amount of every arranged trade must rounded to an integer
 # number. For this reason, trading small amounts may result in
 # signifficant rounding errors. To avoid this, trades for amounts
-# smaller than "$MIN_TRADE_AMOUNT" will be not be arranged.
-MIN_TRADE_AMOUNT=1000
+# smaller than "$MIN_TRADE_AMOUNT" will be not be arranged (the
+# default is 1000).
+MIN_TRADE_AMOUNT=10000
 
 # Connection string for the solver's PostgreSQL database server.
 SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
@@ -264,9 +266,9 @@ FLUSH_PERIOD=1.5
 # requests to fetch debtor info doucments. The specified number
 # of processes ("$HTTP_FETCH_PROCESSES") will be spawned to do
 # this job (default 1). Each process will open a maximum number
-# of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections, and
-# will give up after not receiving a response
-# for "$HTTP_FETCH_TIMEOUT" seconds. Note that
+# of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections (default
+# 100), and will give up after not receiving a response
+# for "$HTTP_FETCH_TIMEOUT" seconds (default 10). Note that
 # HTTP_FETCH_PROCESSES can be set to 0, in which case, the
 # container will not try to fetch any debtor info doucments.
 # The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
