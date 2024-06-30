@@ -519,6 +519,14 @@ How to setup a development environment
     generate a test coverage report.
 
 
+How to run all services (production-like)
+-----------------------------------------
+
+The "Circular Trade" service is intended to work in tandem with the
+"Creditors Agent" service. To start them both, see the ["Creditors
+Agent" reference implementation].
+
+
 [Swaptacular]: https://swaptacular.github.io/overview
 [docker images]: https://www.geeksforgeeks.org/what-is-docker-images/
 [database shard]: https://en.wikipedia.org/wiki/Shard_(database_architecture)
