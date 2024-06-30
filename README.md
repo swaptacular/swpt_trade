@@ -120,17 +120,6 @@ variables. Here are the most important settings with some random
 example values:
 
 ```shell
-# All collector accounts will have their creditor IDs
-# between "$MIN_COLLECTOR_ID" and "$MAX_COLLECTOR_ID". This can
-# be passed as a decimal number (like "4294967296"), or a
-# hexadecimal number (like "0x100000000"). Numbers between
-# 0x8000000000000000 and 0xffffffffffffffff will be automatically
-# converted to their corresponding two's complement negative
-# numbers. Normally, you would not need this interval to contain
-# more than a few thousand IDs.
-MIN_COLLECTOR_ID=0x0000010000000000
-MAX_COLLECTOR_ID=0x00000100000007ff
-
 # Determiene when new trading turns will be started. In this
 # example, a new turn will be started every day at 2:00am, the
 # time allotted to the first turn phase (the currency info
@@ -199,7 +188,8 @@ example values:
 # 0x8000000000000000 and 0xffffffffffffffff will be automatically
 # converted to their corresponding two's complement negative
 # numbers. Normally, you would not need this interval to contain
-# more than a few thousand IDs.
+# more than a few thousand IDs. The defaults are: from
+# "0x0000010000000000" to "0x00000100000007ff".
 MIN_COLLECTOR_ID=0x0000010000000000
 MAX_COLLECTOR_ID=0x00000100000007ff
 
@@ -345,7 +335,8 @@ example values:
 # 0x8000000000000000 and 0xffffffffffffffff will be automatically
 # converted to their corresponding two's complement negative
 # numbers. Normally, you would not need this interval to contain
-# more than a few thousand IDs.
+# more than a few thousand IDs. The defaults are: from
+# "0x0000010000000000" to "0x00000100000007ff".
 MIN_COLLECTOR_ID=0x0000010000000000
 MAX_COLLECTOR_ID=0x00000100000007ff
 

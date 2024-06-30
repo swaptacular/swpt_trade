@@ -77,8 +77,6 @@ RUN python -m compileall -x '^\./(migrations|tests)/' . \
 RUN SOLVER_POSTGRES_URL=sqlite:// \
     WORKER_POSTGRES_URL=sqlite:// \
     SQLALCHEMY_ENGINE_OPTIONS={} \
-    MIN_COLLECTOR_ID=1 \
-    MAX_COLLECTOR_ID=1 \
     flask openapi write openapi.json
 
 USER $FLASK_APP
