@@ -540,3 +540,6 @@ Agent" reference implementation].
 ["Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
 [OAuth 2.0]: https://oauth.net/2/
 [nginx]: https://en.wikipedia.org/wiki/Nginx
+[Docker Engine]: https://docs.docker.com/engine/
+[Docker Compose]: https://docs.docker.com/compose/
+[can only connect from localhost]: https://www.rabbitmq.com/access-control.html#loopback-users
