@@ -203,7 +203,7 @@ MAX_COLLECTOR_ID=0x00000100000007ff
 # scheduled outgoing transfers will be successfully performed.
 # The default is 2 hours. As a rule of thumb, this period should
 # be twice as big as the TURN_PHASE2_DURATION period.
-TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=3h
+TRANSFERS_HEALTHY_MAX_COMMIT_DELAY=2.5h
 
 # For each arranged transfer, a very small portion of the
 # transferred amount will be seized as a reward for performing a
@@ -263,14 +263,14 @@ FLUSH_PROCESSES=2
 FLUSH_PERIOD=1.5
 
 # Worker servers should periodically perform scheduled HTTP
-# requests to fetch debtor info doucments. The specified number
+# requests to fetch debtor info documents. The specified number
 # of processes ("$HTTP_FETCH_PROCESSES") will be spawned to do
 # this job (default 1). Each process will open a maximum number
 # of "$HTTP_FETCH_CONNECTIONS" parallel HTTP connections (default
 # 100), and will give up after not receiving a response
 # for "$HTTP_FETCH_TIMEOUT" seconds (default 10). Note that
 # HTTP_FETCH_PROCESSES can be set to 0, in which case, the
-# container will not try to fetch any debtor info doucments.
+# container will not try to fetch any debtor info documents.
 # The "$HTTP_FETCH_PERIOD" value specifies the number of seconds
 # to wait between two sequential database queries to obtain
 # scheduled HTTP fetches whose time to be performed has
@@ -392,6 +392,81 @@ APP_LOG_FORMAT=text
 
 For more configuration options, check the
 [development.env](../master/development.env) file.
+
+
+Available commands
+------------------
+
+The [entrypoint](../master/docker/entrypoint.sh) of the docker
+container allows you to execute the following *documented commands*:
+
+* `solver`
+
+  Starts a solver server.
+
+  **IMPORTANT NOTE: You must start exactly one container with this
+  command.**
+
+* `worker`
+
+  Starts a worker server. Also, this is the command that will be
+  executed if no arguments are passed to the entrypoint.
+
+  **IMPORTANT NOTE: For each worker database instance, you must start
+  exactly one container with this command.**
+
+* `webserver`
+
+  Starts an admin API server. This command allows you to start as many
+  admin API web servers as you like.
+
+* `configure`
+
+  Initializes a new empty solver PostgreSQL database, and a new empty
+  worker PostgreSQL database.
+
+  **IMPORTANT NOTE: This command has to be run only once (at the
+  beginning), but running it multiple times should not do any harm.**
+
+* `consume_messages`
+
+  Starts only the processes that consume SMP messages. This command
+  allows you to start as many additional dedicated RabbitMQ message
+  processors as necessary, to handle the load.
+
+* `flush_all`
+
+  Starts only the worker processes that send outgoing messages to the
+  RabbitMQ broker, and remove the messages from the PostgreSQL database.
+
+* `flush_configure_accounts`, `flush_prepare_transfers`,
+  `flush_finalize_transfers`, `flush_fetch_debtor_infos`,
+  `flush_store_documents`, `flush_discover_debtors`,
+  `flush_confirm_debtors`, `flush_activate_collectors`,
+  `flush_candidate_offers`, `flush_needed_collectors`,
+  `flush_revise_account_locks`, `flush_trigger_transfers`,
+  `flush_account_id_requests`, `flush_account_id_responses`
+
+  Starts additional worker processes that send particular type of outgoing
+  messages to the RabbitMQ broker, and remove the messages from the
+  PostgreSQL database. These commands allow you to start processes dedicated
+  to the flushing of particular type of messages. (See "FLUSH_PROCESSES" and
+  "FLUSH_PERIOD" environment variables.)
+
+* `fetch_debtor_infos`
+
+  Starts additional worker processes that perform scheduled HTTP
+  requests to fetch debtor info documents. These commands allow you to
+  start processes dedicated to fetching debtor info documents. (See
+  "HTTP_FETCH_PROCESSES" and "HTTP_FETCH_PERIOD" environment
+  variables.)
+
+* `trigger_transfers`
+
+  Starts additional worker processes that trigger scheduled transfer
+  attempts. These commands allow you to start processes dedicated to
+  triggering transfer attempts. (See "TRIGGER_TRANSFERS_PROCESSES" and
+  "TRIGGER_TRANSFERS_PERIOD" environment variables.)
 
 
 [Swaptacular]: https://swaptacular.github.io/overview

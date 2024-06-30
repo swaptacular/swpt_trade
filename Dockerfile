@@ -81,7 +81,7 @@ RUN SOLVER_POSTGRES_URL=sqlite:// \
 
 USER $FLASK_APP
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
-CMD ["all"]
+CMD ["worker"]
 
 
 # This is the swagger-ui image. Starting from the final app image, it
