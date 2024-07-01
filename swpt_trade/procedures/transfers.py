@@ -103,7 +103,7 @@ def process_candidate_offer_signal(
         WorkerTurn.query
         .filter_by(turn_id=turn_id, phase=2, worker_turn_subphase=5)
         .options(load_only(WorkerTurn.collection_deadline))
-        .with_for_update(read=True)
+        .with_for_update(read=True, skip_locked=True)
         .one_or_none()
     )
     if not worker_turn:
@@ -1127,6 +1127,7 @@ def put_prepared_transfer_through_transfer_attempts(
     return True
 
 
+@atomic
 def put_finalized_transfer_through_transfer_attempts(
         *,
         debtor_id: int,
