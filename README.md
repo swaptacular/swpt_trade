@@ -3,9 +3,10 @@ Swaptacular "Circular Trade" reference implementation
 
 This project implements automated currency exchanges for
 [Swaptacular], in the spirit of [Circular Multilateral
-Barter](/public/docs/cmb-general.pdf). The deliverables are two
-[docker images]: the *app-image*, and the *swagger-ui-image*. Both images
-are generated from the project's [Dockerfile](../master/Dockerfile).
+Barter](https://swaptacular.github.io/public/docs/cmb-general.pdf).
+The deliverables are two [docker images]: the *app-image*, and the
+*swagger-ui-image*. Both images are generated from the project's
+[Dockerfile](../master/Dockerfile).
 
 * The `app-image` implements 3 types of servers that the "Circular
   Trade" service consists of:
