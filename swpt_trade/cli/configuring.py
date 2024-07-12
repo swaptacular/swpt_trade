@@ -31,6 +31,7 @@ def subscribe():  # pragma: no cover
         CREDITORS_OUT_EXCHANGE,
         TO_TRADE_EXCHANGE,
     )
+    CA_LOOPBACK_FILTER_EXCHANGE = "ca.loopback_filter"
 
     logger = logging.getLogger(__name__)
     queue_name = current_app.config["PROTOCOL_BROKER_QUEUE"]
@@ -45,7 +46,13 @@ def subscribe():  # pragma: no cover
         CREDITORS_IN_EXCHANGE, exchange_type="headers", durable=True
     )
     channel.exchange_declare(
-        CREDITORS_OUT_EXCHANGE, exchange_type="topic", durable=True
+        CA_LOOPBACK_FILTER_EXCHANGE, exchange_type="headers", durable=True
+    )
+    channel.exchange_declare(
+        CREDITORS_OUT_EXCHANGE,
+        exchange_type="topic",
+        durable=True,
+        arguments={"alternate-exchange": CA_LOOPBACK_FILTER_EXCHANGE},
     )
     channel.exchange_declare(
         TO_TRADE_EXCHANGE, exchange_type="topic", durable=True

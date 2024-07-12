@@ -50,7 +50,8 @@ following servers:
 2. One PostgreSQL server instance **for each worker server**.
 
 3. A [RabbitMQ] server instance, which acts as broker for [Swaptacular
-   Messaging Protocol] (SMP) messages.
+   Messaging Protocol] (SMP) messages. The [rabbitmq_random_exchange
+   plugin] should be enabled.
 
    The following [RabbitMQ topic exchanges] must be configured on the
    broker instance:
@@ -516,6 +517,11 @@ How to setup a development environment
     the RabbitMQ connection URLs accordingly (`PROTOCOL_BROKER_URL` in
     the *.env* file).
 
+    Moreover, you need to enable the `rabbitmq_random_exchange` plugin by
+    running:
+
+        $ sudo rabbitmq-plugins enable rabbitmq_random_exchange
+
 5.  You can use `flask run -p 5000` to run a local web server, and
     `pytest --cov=swpt_trade --cov-report=html` to run the tests and
     generate a test coverage report.
@@ -538,6 +544,7 @@ Agent" reference implementation].
 [RabbitMQ]: https://www.rabbitmq.com/
 [RabbitMQ queue]: https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html
 [RabbitMQ topic exchanges]: https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html
+[rabbitmq_random_exchange plugin]: https://github.com/rabbitmq/rabbitmq-random-exchange
 [Swaptacular Messaging Protocol]: https://github.com/swaptacular/swpt_accounts/blob/master/protocol.rst
 ["Creditors Agent" reference implementation]: https://github.com/swaptacular/swpt_creditors
 [OAuth 2.0]: https://oauth.net/2/
