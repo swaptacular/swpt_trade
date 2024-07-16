@@ -5,6 +5,7 @@ import json
 import sys
 import os
 import os.path
+import re
 from json import dumps
 from typing import List
 from flask_cors import CORS
@@ -121,6 +122,10 @@ def _filter_pika_connection_reset_errors(
     return not is_pika_connection_reset_error
 
 
+def _as_regex(s: str) -> str:
+    return f"^{re.escape(s)}$"
+
+
 def configure_logging(
     level: str, format: str, associated_loggers: List[str]
 ) -> None:
@@ -189,6 +194,8 @@ class Configuration(metaclass=MetaEnvReader):
     MAX_COLLECTOR_ID: _parse_creditor_id = (
         _parse_creditor_id("0x00000100000007ff")
     )
+    OAUTH2_SUPERUSER_USERNAME = "creditors-superuser"
+    OAUTH2_SUPERVISOR_USERNAME = "creditors-supervisor"
 
     TURN_PERIOD = "1d"
     TURN_PERIOD_OFFSET = "2h"
@@ -336,8 +343,8 @@ class Configuration(metaclass=MetaEnvReader):
     APP_START_DISPATCHING_BURST_COUNT = 10000
     APP_DEBTOR_INFO_FETCH_BURST_COUNT = 2000
     APP_RESCHEDULED_TRANSFERS_BURST_COUNT = 5000
-    APP_SUPERUSER_SUBJECT_REGEX = "^creditors-superuser$"
-    APP_SUPERVISOR_SUBJECT_REGEX = "^creditors-supervisor$"
+    APP_SUPERUSER_SUBJECT_REGEX = ""
+    APP_SUPERVISOR_SUBJECT_REGEX = ""
     APP_CREDITOR_SUBJECT_REGEX = "^creditors:([0-9]+)$"
 
 
@@ -416,6 +423,15 @@ def create_app(config_dict={}):
     app.url_map.converters["i64"] = Int64Converter
     app.config.from_object(Configuration)
     app.config.from_mapping(config_dict)
+
+    if not app.config["APP_SUPERUSER_SUBJECT_REGEX"]:
+        app.config["APP_SUPERUSER_SUBJECT_REGEX"] = _as_regex(
+            app.config["OAUTH2_SUPERUSER_USERNAME"]
+        )
+    if not app.config["APP_SUPERVISOR_SUBJECT_REGEX"]:
+        app.config["APP_SUPERVISOR_SUBJECT_REGEX"] = _as_regex(
+            app.config["OAUTH2_SUPERVISOR_USERNAME"]
+        )
     app.config["API_SPEC_OPTIONS"] = specs.API_SPEC_OPTIONS
     app.config["SQLALCHEMY_DATABASE_URI"] = app.config["WORKER_POSTGRES_URL"]
 
@@ -431,7 +447,7 @@ def create_app(config_dict={}):
         },
     }
     app.config["SHARDING_REALM"] = ShardingRealm(
-        Configuration.PROTOCOL_BROKER_QUEUE_ROUTING_KEY
+        app.config["PROTOCOL_BROKER_QUEUE_ROUTING_KEY"]
     )
     if app.config["APP_ENABLE_CORS"]:
         CORS(

@@ -345,6 +345,28 @@ example values:
 MIN_COLLECTOR_ID=0x0000010000000000
 MAX_COLLECTOR_ID=0x00000100000007ff
 
+# Requests to the "admin API" are protected by an OAuth
+# 2.0 authorization server. With every request, the client (a Web
+# browser, for example) presents a token, and to verify the
+# validity of the token, internally, a request is made to the
+# OAuth 2.0 authorization server. This is called "token
+# introspection". The OAUTH2_INTROSPECT_URL variable sets the URL
+# at which internal token introspection requests will be sent.
+#
+# IMPORTANT NOTE: The response to the "token introspection" request
+# will contain a "username" field. In order to be allowed to use the
+# admin API, the username returned by the OAuth 2.0 authorization
+# server must one of the following:
+#
+# 1) "$OAUTH2_SUPERUSER_USERNAME" -- The default value for
+#    OAUTH2_SUPERUSER_USERNAME is "creditors-superuser".
+#
+# 2) "$OAUTH2_SUPERVISOR_USERNAME" -- The default value for
+#    OAUTH2_SUPERVISOR_USERNAME is "creditors-supervisor".
+OAUTH2_INTROSPECT_URL=http://localhost:4445/oauth2/introspect
+OAUTH2_SUPERUSER_USERNAME=creditors-superuser
+OAUTH2_SUPERVISOR_USERNAME=creditors-supervisor
+
 # Connection string for the solver's PostgreSQL database server.
 SOLVER_POSTGRES_URL=postgresql+psycopg://swpt_solver:swpt_solver@localhost:5435/test
 
@@ -363,26 +385,6 @@ SOLVER_CLIENT_POOL_SIZE=0
 WEBSERVER_PROCESSES=2
 WEBSERVER_THREADS=10
 WEBSERVER_PORT=8003
-
-# Requests to the "admin API" are protected by an OAuth 2.0
-# authorization server. With every request, the client (a Web
-# browser, for example) presents a token, and to verify the
-# validity of the token, internally, a request is made to the
-# OAuth 2.0 authorization server. This is called "token
-# introspection". This variable sets the URL at which internal
-# token introspection requests will be sent.
-#
-# NOTE: The response to the "token introspection" request will contain
-# a "username" field. The OAuth 2.0 authorization server must be
-# configured to return usernames that match one of the following
-# regular expressions: ^creditors-superuser$, ^creditors-supervisor$,
-# ^creditors:([0-9]+)$. The "creditors-superuser" account will be
-# allowed to do everything; the "creditors-supervisor" account will be
-# allowed to view creditors' data, and to create new creditors; the
-# "creditors:<CREDITOR_ID>" accounts will only be allowed access to
-# the creditor with the specified <CREDITOR_ID> (an unsigned 64-bit
-# integer).
-OAUTH2_INTROSPECT_URL=http://localhost:4445/oauth2/introspect
 
 # Set the minimum level of severity for log messages ("info",
 # "warning", or "error"). The default is "warning".
