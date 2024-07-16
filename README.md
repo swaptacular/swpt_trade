@@ -358,10 +358,13 @@ MAX_COLLECTOR_ID=0x00000100000007ff
 # admin API, the username returned by the OAuth 2.0 authorization
 # server must one of the following:
 #
-# 1) "$OAUTH2_SUPERUSER_USERNAME" -- The default value for
+# 1) "$OAUTH2_SUPERUSER_USERNAME" -- This user will be allowed
+#    to do everything. The default value for
 #    OAUTH2_SUPERUSER_USERNAME is "creditors-superuser".
 #
-# 2) "$OAUTH2_SUPERVISOR_USERNAME" -- The default value for
+# 2) "$OAUTH2_SUPERVISOR_USERNAME" -- This user will be
+#    allowed to view the admin data, and to perform non-critical
+#    admin tasks. The default value for
 #    OAUTH2_SUPERVISOR_USERNAME is "creditors-supervisor".
 OAUTH2_INTROSPECT_URL=http://localhost:4445/oauth2/introspect
 OAUTH2_SUPERUSER_USERNAME=creditors-superuser
