@@ -53,7 +53,7 @@ def test_flush_messages(mocker, app, db_session):
         ]
     )
     assert result.exit_code != 2
-    assert send_signalbus_message.called_once()
+    send_signalbus_message.assert_called_once()
     assert len(m.FinalizeTransferSignal.query.all()) == 0
 
 
