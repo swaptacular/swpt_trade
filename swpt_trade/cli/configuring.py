@@ -81,9 +81,9 @@ def subscribe():  # pragma: no cover
     # short period of time. A possible solution for this would be to
     # use two queues instead of one: One queue (a quorum queue) for
     # the external messages, promising high-availability; and another
-    # queue (classic or quorum) for the internal messages, of which we
-    # could get a lot, but for which we do not necessarily need
-    # high-availability.
+    # queue (a classic queue, or a length-limited quorum queue) for
+    # the internal messages, of which we could have a lot, but for
+    # which we do not necessarily need high-availability.
     channel.queue_declare(dead_letter_queue_name, durable=True)
     logger.info('Declared "%s" dead-letter queue.', dead_letter_queue_name)
 
