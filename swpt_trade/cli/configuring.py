@@ -74,13 +74,16 @@ def subscribe():  # pragma: no cover
 
     # Declare a queue and a corresponding dead-letter queue.
     #
-    # TODO: It would probably be better to use a "stream" instead of
-    #       classic queues here, given that we have figured out how to
-    #       do the stream offset tracking. This would allow for
-    #       high-availability. Using a "quorum" queues here is almost
-    #       certainly not a good idea, because quorum queues consume
+    # TODO: Using a "quorum" queue here (with a "stream" dead-letter
+    #       queue) looks like a good idea, but quorum queues consume
     #       lots of memory when there are lots of messages in the
-    #       queue, which should be expected.
+    #       queue. In our case, we can have lots of internal messages
+    #       generated in a very short period of time. A possible
+    #       solution for this would be to use two queues instead of
+    #       one: One queue (a quorum queue) for the external messages,
+    #       promising high-availability; and another queue (a classic
+    #       queue) for the internal messages, of which we could get a
+    #       lot, but for which we do not need high-availability.
     channel.queue_declare(dead_letter_queue_name, durable=True)
     logger.info('Declared "%s" dead-letter queue.', dead_letter_queue_name)
 
