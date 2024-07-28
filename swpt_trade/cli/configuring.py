@@ -72,21 +72,22 @@ def subscribe():  # pragma: no cover
         TO_TRADE_EXCHANGE,
     )
 
-    # declare a corresponding dead-letter queue
-    channel.queue_declare(
-        dead_letter_queue_name,
-        durable=True,
-        arguments={"x-queue-type": "stream"},
-    )
+    # Declare a queue and a corresponding dead-letter queue.
+    #
+    # TODO: It would probably be better to use a "stream" instead of
+    #       classic queues here, given that we have figured out how to
+    #       do the stream offset tracking. This would allow for
+    #       high-availability. Using a "quorum" queues here is almost
+    #       certainly not a good idea, because quorum queues consume
+    #       lots of memory when there are lots of messages in the
+    #       queue, which should be expected.
+    channel.queue_declare(dead_letter_queue_name, durable=True)
     logger.info('Declared "%s" dead-letter queue.', dead_letter_queue_name)
 
-    # declare the queue
     channel.queue_declare(
         queue_name,
         durable=True,
         arguments={
-            "x-queue-type": "quorum",
-            "overflow": "reject-publish",
             "x-dead-letter-exchange": "",
             "x-dead-letter-routing-key": dead_letter_queue_name,
         },
