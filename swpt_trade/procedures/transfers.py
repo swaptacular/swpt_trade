@@ -99,6 +99,14 @@ def process_candidate_offer_signal(
 ):
     current_ts = datetime.now(tz=timezone.utc)
 
+    # TODO: Each candidate offer obtaining a FOR SHARE lock here
+    # *might* be a performance problem. When multiple transactions
+    # simultaneously hold locks to a single row, PostgreSQL maintains
+    # a list of transaction IDs in the "pg_multixact subdirectory",
+    # which can grow significantly in size. If this turns out to be a
+    # problem in practice, we may be able to get by without obtaining
+    # a FOR SHARE lock here. For example, we may simply check the
+    # current time instead.
     worker_turn = (
         WorkerTurn.query
         .filter_by(turn_id=turn_id, phase=2, worker_turn_subphase=5)
