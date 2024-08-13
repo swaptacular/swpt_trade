@@ -160,7 +160,6 @@ class AccountLock(db.Model):
                 ),
             )
         ),
-        db.ForeignKeyConstraint(["turn_id"], ["worker_turn.turn_id"]),
         db.Index("idx_lock_account_turn_id", turn_id),
         db.Index(
             "idx_lock_account_coordinator_request_id",
@@ -175,8 +174,6 @@ class AccountLock(db.Model):
             ),
         },
     )
-
-    worker_turn = db.relationship("WorkerTurn")
 
     @property
     def is_self_lock(self):
