@@ -291,7 +291,7 @@ def put_prepared_transfer_through_account_locks(
     """
     query = (
         db.session.query(AccountLock, WorkerTurn)
-        .join(AccountLock.worker_turn)
+        .join(WorkerTurn, WorkerTurn.turn_id == AccountLock.turn_id)
         .filter(
             AccountLock.creditor_id == coordinator_id,
             AccountLock.coordinator_request_id == coordinator_request_id,
