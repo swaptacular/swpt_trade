@@ -42,7 +42,6 @@ def test_last_fetch_retry(mocker, app, db_session, restore_expiry):
             debtor_id=666,
             is_locator_fetch=True,
             is_discovery_fetch=False,
-            ignore_cache=True,
         )
     )
     db.session.commit()
@@ -82,7 +81,6 @@ def test_cached_and_wrong_shard(
             debtor_id=666,
             is_locator_fetch=True,
             is_discovery_fetch=False,
-            ignore_cache=False,
         )
     )
     db.session.add(
@@ -91,7 +89,6 @@ def test_cached_and_wrong_shard(
             debtor_id=888,
             is_locator_fetch=True,
             is_discovery_fetch=False,
-            ignore_cache=True,
         )
     )
     db.session.commit()
@@ -133,15 +130,13 @@ def test_process_debtor_info_fetches(mocker, app, db_session, current_ts):
         debtor_id=666,
         is_locator_fetch=True,
         is_discovery_fetch=True,
-        ignore_cache=True,
     )
     dif2 = m.DebtorInfoFetch(
         iri="wrong IRI",
         debtor_id=999,
         is_locator_fetch=True,
         is_discovery_fetch=False,
-        ignore_cache=False,
-    )
+      )
     db.session.add(dif1)
     db.session.add(dif2)
     db.session.commit()
@@ -154,7 +149,6 @@ def test_process_debtor_info_fetches(mocker, app, db_session, current_ts):
     fetches[0].debtor_id == 999
     fetches[0].is_locator_fetch is True
     fetches[0].is_discovery_fetch is False
-    fetches[0].ignore_cache is False
     fetches[0].recursion_level == 0
     fetches[0].attempts_count == 1
     fetches[0].latest_attempt_at is not None
@@ -167,7 +161,6 @@ def test_process_debtor_info_fetches(mocker, app, db_session, current_ts):
     assert fetch_signals[0].debtor_id == 777
     assert fetch_signals[0].is_locator_fetch is True
     assert fetch_signals[0].is_discovery_fetch is False
-    assert fetch_signals[0].ignore_cache is False
     assert fetch_signals[0].recursion_level == 1
 
     stored_signals = m.StoreDocumentSignal.query.all()

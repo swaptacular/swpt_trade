@@ -143,7 +143,7 @@ class FetchDebtorInfoSignal(Signal):
         debtor_id = fields.Integer()
         is_locator_fetch = fields.Boolean()
         is_discovery_fetch = fields.Boolean()
-        ignore_cache = fields.Boolean()
+        forced_iri = fields.String()
         recursion_level = fields.Integer()
         inserted_at = fields.DateTime(data_key="ts")
 
@@ -154,7 +154,7 @@ class FetchDebtorInfoSignal(Signal):
     debtor_id = db.Column(db.BigInteger, nullable=False)
     is_locator_fetch = db.Column(db.BOOLEAN, nullable=False)
     is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False)
-    ignore_cache = db.Column(db.BOOLEAN, nullable=False)
+    forced_iri = db.Column(db.String)
     recursion_level = db.Column(db.SmallInteger, nullable=False)
 
     @property

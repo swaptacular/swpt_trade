@@ -91,7 +91,7 @@ class DebtorInfoFetch(db.Model):
     debtor_id = db.Column(db.BigInteger, primary_key=True)
     is_locator_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
     is_discovery_fetch = db.Column(db.BOOLEAN, nullable=False, default=False)
-    ignore_cache = db.Column(db.BOOLEAN, nullable=False, default=False)
+    forced_iri = db.Column(db.String)
     recursion_level = db.Column(db.SmallInteger, nullable=False, default=0)
     inserted_at = db.Column(
         db.TIMESTAMP(timezone=True), nullable=False, default=get_now_utc

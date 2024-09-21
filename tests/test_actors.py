@@ -264,7 +264,7 @@ def test_on_fetch_debtor_info_signal(db_session, actors):
         debtor_id=D_ID,
         is_locator_fetch=True,
         is_discovery_fetch=False,
-        ignore_cache=False,
+        forced_iri=None,
         recursion_level=2,
         ts=datetime.now(tz=timezone.utc),
     )

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from marshmallow import ValidationError
 from flask import current_app
-from sqlalchemy.sql.expression import and_, not_
+from sqlalchemy.sql.expression import and_, null
 from swpt_pythonlib.utils import ShardingRealm
 from swpt_pythonlib.swpt_uris import parse_debtor_uri
 from swpt_trade.extensions import db
@@ -119,7 +119,6 @@ def _process_debtor_info_fetches_batch(
                             debtor_id=peg_debtor_id,
                             is_locator_fetch=True,
                             is_discovery_fetch=False,
-                            ignore_cache=False,
                             recursion_level=recursion_level + 1,
                         )
                     )
@@ -157,7 +156,7 @@ def _query_and_resolve_pending_fetches(
             DebtorInfoDocument,
             and_(
                 DebtorInfoDocument.debtor_info_locator == DebtorInfoFetch.iri,
-                not_(DebtorInfoFetch.ignore_cache),
+                DebtorInfoFetch.forced_iri == null(),
             ),
         )
         .filter(DebtorInfoFetch.next_attempt_at <= current_ts)
@@ -256,7 +255,7 @@ def _make_https_requests(
             # Here we catch and log such errors as warnings.
             logger.warning(
                 "Caught error during request to %s",
-                fetch.iri,
+                fetch.forced_iri or fetch.iri,
                 exc_info=obj,
             )
             results.append(FetchResult(fetch=fetch))
@@ -290,7 +289,7 @@ async def _make_https_request(
         client: aiohttp.ClientSession,
         fetch: DebtorInfoFetch,
 ) -> FetchResult:
-    iri = fetch.iri
+    iri = fetch.forced_iri or fetch.iri
     try:
         if not iri.startswith("https://"):
             raise aiohttp.InvalidURL(iri)

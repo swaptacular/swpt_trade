@@ -413,7 +413,7 @@ def _on_fetch_debtor_info_signal(
     debtor_id: int,
     is_locator_fetch: bool,
     is_discovery_fetch: bool,
-    ignore_cache: bool,
+    forced_iri: Optional[str],
     recursion_level: int,
     ts: datetime,
     *args,
@@ -424,7 +424,7 @@ def _on_fetch_debtor_info_signal(
         debtor_id=debtor_id,
         is_locator_fetch=is_locator_fetch,
         is_discovery_fetch=is_discovery_fetch,
-        ignore_cache=ignore_cache,
+        forced_iri=forced_iri,
         recursion_level=recursion_level,
         ts=ts,
     )

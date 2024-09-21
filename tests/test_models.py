@@ -145,7 +145,6 @@ def test_non_smp_signals(db_session):
         debtor_id=1,
         is_locator_fetch=True,
         is_discovery_fetch=False,
-        ignore_cache=False,
         recursion_level=0,
     )
     db_session.add(signal)
