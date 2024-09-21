@@ -21,7 +21,7 @@ def schedule_debtor_info_fetch(
         debtor_id: int,
         is_locator_fetch: bool,
         is_discovery_fetch: bool,
-        ignore_cache: bool,
+        forced_iri: Optional[str],
         recursion_level: int,
         ts: datetime,
 ) -> None:
@@ -38,8 +38,8 @@ def schedule_debtor_info_fetch(
         debtor_info_fetch.is_discovery_fetch = (
             is_discovery_fetch or debtor_info_fetch.is_discovery_fetch
         )
-        debtor_info_fetch.ignore_cache = (
-            ignore_cache or debtor_info_fetch.ignore_cache
+        debtor_info_fetch.forced_iri = (
+            forced_iri or debtor_info_fetch.forced_iri
         )
         debtor_info_fetch.recursion_level = min(
             recursion_level, debtor_info_fetch.recursion_level
@@ -52,7 +52,7 @@ def schedule_debtor_info_fetch(
                     debtor_id=debtor_id,
                     is_locator_fetch=is_locator_fetch,
                     is_discovery_fetch=is_discovery_fetch,
-                    ignore_cache=ignore_cache,
+                    forced_iri=forced_iri,
                     recursion_level=recursion_level,
                 )
             )
@@ -101,7 +101,7 @@ def discover_debtor(
                         debtor_id=debtor_id,
                         is_locator_fetch=True,
                         is_discovery_fetch=False,
-                        ignore_cache=forced_refetch,
+                        forced_iri=iri if forced_refetch else None,
                         recursion_level=0,
                     )
                 )
@@ -118,7 +118,6 @@ def discover_debtor(
                     debtor_id=debtor_id,
                     is_locator_fetch=False,
                     is_discovery_fetch=True,
-                    ignore_cache=True,
                     recursion_level=0,
                 )
             )
@@ -139,7 +138,6 @@ def discover_debtor(
                 debtor_id=debtor_id,
                 is_locator_fetch=False,
                 is_discovery_fetch=True,
-                ignore_cache=True,
                 recursion_level=0,
             )
         )
@@ -185,7 +183,6 @@ def confirm_debtor(
             debtor_id=debtor_id,
             is_locator_fetch=True,
             is_discovery_fetch=False,
-            ignore_cache=True,
             recursion_level=0,
         )
     )

@@ -133,7 +133,7 @@ def test_fetch_debtor_infos(mocker, app, db_session):
         debtor_id=666,
         is_locator_fetch=True,
         is_discovery_fetch=True,
-        ignore_cache=True,
+        forced_iri=None,
     )
     db.session.add(dif)
     db.session.commit()
@@ -167,7 +167,6 @@ def test_fetch_debtor_infos(mocker, app, db_session):
     assert fetch_signals[0].debtor_id == 777
     assert fetch_signals[0].is_locator_fetch is True
     assert fetch_signals[0].is_discovery_fetch is False
-    assert fetch_signals[0].ignore_cache is False
     assert fetch_signals[0].recursion_level == 1
 
     stored_signals = m.StoreDocumentSignal.query.all()
