@@ -414,7 +414,7 @@ def create_app(config_dict={}):
     from flask import Flask
     from swpt_pythonlib.utils import Int64Converter
     from .extensions import db, migrate, api, publisher
-    from .routes import collectors_api, specs
+    from .routes import collectors_api, health_api, specs
     from .cli import swpt_trade
     from . import models  # noqa
 
@@ -461,6 +461,7 @@ def create_app(config_dict={}):
     publisher.init_app(app)
     api.init_app(app)
     api.register_blueprint(collectors_api)
+    api.register_blueprint(health_api)
     app.cli.add_command(swpt_trade)
     _check_config_sanity(app.config)
 

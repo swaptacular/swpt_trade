@@ -91,3 +91,8 @@ def test_ensure_collectors(client):
     assert r.status_code == 500
     assert len(CollectorAccount.query.all()) == 5
 
+
+def test_health_check(client):
+    r = client.get("/trade/health/check/public")
+    assert r.status_code == 200
+    assert r.content_type == "text/plain"
