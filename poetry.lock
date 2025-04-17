@@ -1957,8 +1957,8 @@ SQLAlchemy = ">=1.4.18"
 [package.source]
 type = "git"
 url = "https://github.com/swaptacular/swpt_pythonlib.git"
-reference = "v0.10.4"
-resolved_reference = "5c28508a739d5f4da33e0812bf54ccb0c7f1b409"
+reference = "v0.10.5"
+resolved_reference = "6924a90a93f6e025041c773a7944a868e6e1d90e"
 
 [[package]]
 name = "tomlkit"
@@ -2308,4 +2308,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "74d928185d8070809925f082ee7eb94cdf2a48f45136b6a2d34637a25945cc8d"
+content-hash = "0e4d031405b82a85eba9cd13e88af768aeb6270b20c5cdb217a8fdbf6931cdf3"
