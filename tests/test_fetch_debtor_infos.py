@@ -244,6 +244,47 @@ def test_make_https_requests(app, mocker):
     assert results[3].retry is True
 
 
+def test_make_https_request_reads_bounded_body(app):
+    import asyncio
+    from swpt_trade.fetch_debtor_infos import _make_https_request
+
+    max_length = app.config["APP_COIN_INFO_DOCUMENT_MAX_LENGTH"]
+    read_sizes = []
+
+    class FakeContent:
+        async def read(self, n=-1):
+            assert n > 0, "the whole body must not be read"
+            read_sizes.append(n)
+            return n * b"x"
+
+    class FakeResponse:
+        status = 200
+        content_type = "application/vnd.swaptacular.coin-info+json"
+        content = FakeContent()
+
+        async def read(self):  # pragma: no cover
+            raise AssertionError("the whole body must not be read")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class FakeClient:
+        def get(self, iri, **kwargs):
+            return FakeResponse()
+
+    fetch = m.DebtorInfoFetch(
+        iri="https://example.com/huge", debtor_id=555, is_locator_fetch=True
+    )
+    result = asyncio.run(_make_https_request(FakeClient(), fetch))
+
+    assert read_sizes == [max_length + 1]
+    assert result.document is None
+    assert result.retry is True
+
+
 def test_parse_debtor_info_document(app):
     with pytest.raises(
             InvalidDebtorInfoDocument,
