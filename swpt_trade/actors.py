@@ -184,6 +184,13 @@ def _on_account_transfer_signal(
         transfer_note,
     )
     if coordinator_type == CT_AGENT:
+        if acquired_amount == 0:
+            _LOGGER.warning(
+                "Zero acquired amount for an agent transfer (debtor_id=%d).",
+                debtor_id,
+            )
+            return
+
         if transfer_note_format != AGENT_TRANSFER_NOTE_FORMAT:
             _LOGGER.warning(
                 'Unexpected transfer note format ("%s") for an agent transfer'
@@ -319,10 +326,9 @@ def _on_rejected_agent_transfer_signal(
         coordinator_request_id,
         status_code,
     )
-    if coordinator_type != CT_AGENT:  # pragma: no cover
-        raise RuntimeError(
-            f'Unexpected coordinator type: "{coordinator_type}"'
-        )
+    if coordinator_type != CT_AGENT:
+        _LOGGER.error('Unexpected coordinator type: "%s"', coordinator_type)
+        return
     error = None
 
     procedures.put_rejected_transfer_through_account_locks(
@@ -382,10 +388,9 @@ def _on_prepared_agent_transfer_signal(
         locked_amount,
         recipient,
     )
-    if coordinator_type != CT_AGENT:  # pragma: no cover
-        raise RuntimeError(
-            f'Unexpected coordinator type: "{coordinator_type}"'
-        )
+    if coordinator_type != CT_AGENT:
+        _LOGGER.error('Unexpected coordinator type: "%s"', coordinator_type)
+        return
 
     has_been_processed = (
         procedures.put_prepared_transfer_through_account_locks(
@@ -447,10 +452,9 @@ def _on_finalized_agent_transfer_signal(
         committed_amount,
         status_code,
     )
-    if coordinator_type != CT_AGENT:  # pragma: no cover
-        raise RuntimeError(
-            f'Unexpected coordinator type: "{coordinator_type}"'
-        )
+    if coordinator_type != CT_AGENT:
+        _LOGGER.error('Unexpected coordinator type: "%s"', coordinator_type)
+        return
 
     error = procedures.put_finalized_transfer_through_transfer_attempts(
         debtor_id=debtor_id,

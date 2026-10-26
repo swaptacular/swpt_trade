@@ -119,6 +119,77 @@ def test_on_finalized_agent_transfer_signal(db_session, actors):
     )
 
 
+def test_on_account_transfer_signal_zero_amount(db_session, actors):
+    note = utils.TransferNote(
+        turn_id=1,
+        note_kind=utils.TransferNote.Kind.COLLECTING,
+        first_id=C_ID,
+        second_id=C_ID,
+    )
+
+    # A zero acquired amount must be ignored (not raise).
+    actors._on_account_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        creation_date=date.fromisoformat("2020-01-02"),
+        transfer_number=1,
+        coordinator_type="agent",
+        sender="666",
+        recipient=str(C_ID),
+        acquired_amount=0,
+        transfer_note_format=m.AGENT_TRANSFER_NOTE_FORMAT,
+        transfer_note=str(note),
+        committed_at=datetime.fromisoformat("2019-10-01T00:00:00+00:00"),
+        principal=1000,
+        ts=datetime.fromisoformat("2000-01-01T00:00:00+00:00"),
+        previous_transfer_number=0,
+    )
+
+
+def test_unexpected_coordinator_type(db_session, actors):
+    ts = datetime.fromisoformat("2019-10-01T00:00:00+00:00")
+
+    # Signals with unexpected coordinator types must be ignored (not
+    # raise), otherwise the consumer would stop.
+    actors._on_rejected_agent_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        coordinator_type="direct",
+        coordinator_id=C_ID,
+        coordinator_request_id=1,
+        status_code="TEST",
+        total_locked_amount=0,
+        ts=ts,
+    )
+    actors._on_prepared_agent_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        transfer_id=1,
+        coordinator_type="direct",
+        coordinator_id=C_ID,
+        coordinator_request_id=1,
+        locked_amount=0,
+        recipient="666",
+        prepared_at=ts,
+        demurrage_rate=-50.0,
+        deadline=ts,
+        ts=ts,
+    )
+    actors._on_finalized_agent_transfer_signal(
+        debtor_id=D_ID,
+        creditor_id=C_ID,
+        transfer_id=1,
+        coordinator_type="direct",
+        coordinator_id=C_ID,
+        coordinator_request_id=1,
+        committed_amount=0,
+        status_code="OK",
+        total_locked_amount=0,
+        prepared_at=ts,
+        ts=ts,
+    )
+
+
 def test_on_account_transfer_signal_invalid(db_session, actors):
     actors._on_account_transfer_signal(
         debtor_id=D_ID,
