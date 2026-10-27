@@ -362,10 +362,18 @@ async def _make_https_request(
 
         async with client.get(iri, max_redirects=2) as response:
             if response.status == 200:
+                # NOTE: The document may come from an untrusted
+                # server. To avoid reading an arbitrarily big response
+                # body into memory, we read one byte more than the
+                # maximum allowed document length.
+                max_length = current_app.config[
+                    "APP_COIN_INFO_DOCUMENT_MAX_LENGTH"
+                ]
+                body = await response.content.read(max_length + 1)
                 return FetchResult(
                     fetch=fetch,
                     document=_parse_debtor_info_document(
-                        response.content_type, await response.read()
+                        response.content_type, body
                     ),
                     store_document=True,
                 )
